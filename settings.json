@@ -21,8 +21,7 @@
           {
             "type": "command",
             "command": "powershell.exe -NoProfile -File C:/Users/Michael/.claude/telemetry/log-prompt.ps1",
-            "shell": "bash",
-            "async": true
+            "shell": "bash"
           }
         ]
       }
