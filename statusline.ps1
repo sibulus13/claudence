@@ -117,10 +117,12 @@ if ($has_history -and $p -gt 0) {
     $br_col  = if ($br -gt 0) { $red } else { $green }
 
     # Label color is static (yellow=caution, red=blocking, blue=info)
-    # Value color is dynamic based on current rate
-    $i_str  = "${yellow}Interrupts:${reset}${i_val}${i} ${i_pct}%${reset}${it_col}${i_trend}${reset}"
+    # Value color is dynamic based on current rate; rate% and trend only shown when non-zero
+    $i_rate_str = if ($i -gt 0) { " ${i_pct}%${reset}${it_col}${i_trend}" } else { '' }
+    $b_rate_str = if ($all_b -gt 0) { " ${b_pct}%${reset}${bt_col}${b_trend}" } else { '' }
+    $i_str  = "${yellow}Interrupts:${reset}${i_val}${i}${i_rate_str}${reset}"
     $e_str  = if ($e -gt 0) { "  ${blue}Enrichments:${reset}${dim}${e}${reset}" } else { '' }
-    $b_str  = "${red}Blocked:${reset}${b_val}${all_b} ${b_pct}%${reset}${bt_col}${b_trend}${reset}"
+    $b_str  = "${red}Blocked:${reset}${b_val}${all_b}${b_rate_str}${reset}"
     $br_str = if ($br -gt 0) { " ${br_col}(${br}x repeats)${reset}" } else { '' }
 } else {
     $i_val  = Color-By-Count $i 1 3
