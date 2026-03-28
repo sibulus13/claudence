@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# pre-commit hook — installed by setup.ps1 to .git/hooks/pre-commit
+# Runs classification tests when any telemetry/ file is staged.
+# Blocks the commit if tests fail.
+
+staged=$(git diff --cached --name-only 2>/dev/null | grep -E '^telemetry/')
+if [ -z "$staged" ]; then
+  exit 0
+fi
+
+echo "telemetry/ files staged — running classification tests..."
+powershell.exe -NoProfile -ExecutionPolicy Bypass \
+  -File "C:/Users/Michael/.claude/tests/run-tests.ps1"
+
+exit $?

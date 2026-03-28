@@ -1,28 +1,19 @@
 # analyze-session.ps1
-# Fires on Stop (synchronous). First logs the stop event so subsequent prompts
-# can detect it, then scores session friction and manages cumulative tracking.
+# Fires on Stop (synchronous). Logs the stop event, scores session friction,
+# manages rolling averages, cumulative tracking, and plays a completion sound.
 #
 # Friction scoring per session:
-#   +3  interrupt     - prompt injected while Claude was mid-run (no preceding stop)
-#   +2  correction    - prompt submitted < 60s after a stop (escape + re-prompt)
-#   +1  enrichment    - mid-run multi-topic context addition (low friction)
+#   +3  override      - user replaced the current direction entirely
+#   +1  addition      - user injected context (mid-run or additive language post-stop)
 #   +1  permission_req - tool not pre-approved; generates allow-rule suggestion
 #   +2  perm_repeat   - same tool blocked again this session
 #
-# Sound logic (single unified decision - do NOT play sound in the async Stop hook):
-#   elapsed > 30s OR score >= 5 OR retrospect_needed -> ring
+# Sound logic (single unified decision):
+#   elapsed > 30s OR score >= 5 OR retrospect_needed -> ring (chimes)
 #   otherwise                                         -> notify
-#   score < 2 AND elapsed <= 30s                      -> notify (soft)
 #
-# Cumulative retrospection threshold:
-#   When (sessions_since_review >= 3 AND cumulative_score >= 6):
-#     -> notify user to run /retrospect
-#     -> reset cumulative counter
-#
-# Per-turn breakdown:
-#   Each turn (prompt -> next prompt) includes tool_done events and perm_req events.
-#   Inferred approve: perm_req for tool X followed by tool_done for tool X in same turn.
-#   Inferred deny:    perm_req for tool X with no subsequent tool_done for tool X.
+# Retrospection threshold:
+#   sessions_since_review >= 3 AND cumulative_score >= 6 -> prompt /retrospect
 
 $rawInput = [Console]::In.ReadToEnd()
 $data = try { $rawInput | ConvertFrom-Json -ErrorAction Stop } catch { $null }
@@ -59,9 +50,9 @@ $events = Get-Content $session_file -ErrorAction SilentlyContinue |
 if ($events.Count -eq 0) { exit 0 }
 
 # --- Score friction ---
-$score              = 0
-$friction_notes     = [System.Collections.Generic.List[string]]::new()
-$allow_suggestions  = [System.Collections.Generic.List[string]]::new()
+$score             = 0
+$friction_notes    = [System.Collections.Generic.List[string]]::new()
+$allow_suggestions = [System.Collections.Generic.List[string]]::new()
 
 $prompts      = @($events | Where-Object { $_.event -eq 'prompt' })
 $perm_reqs    = @($events | Where-Object { $_.event -eq 'permission_req' })
@@ -69,17 +60,13 @@ $perm_repeats = @($events | Where-Object { $_.event -eq 'perm_req_repeat' })
 
 foreach ($p in $prompts) {
     switch ($p.classification) {
-        'interrupt' {
+        'override' {
             $score += 3
-            $friction_notes.Add("Mid-run interrupt (+3): short prompt injected while Claude was executing")
+            $friction_notes.Add("Override (+3): user replaced direction — $($p.prompt_text.Substring(0, [Math]::Min(80, $p.prompt_text.Length)))")
         }
-        'enrichment' {
+        'addition' {
             $score += 1
-            $friction_notes.Add("Mid-run enrichment (+1): multi-topic context added while Claude was executing")
-        }
-        'correction' {
-            $score += 2
-            $friction_notes.Add("Quick correction (+2): re-prompted within 60s of stop")
+            $friction_notes.Add("Addition (+1): user injected context — $($p.prompt_text.Substring(0, [Math]::Min(80, $p.prompt_text.Length)))")
         }
         # first_prompt and followup score 0
     }
@@ -112,8 +99,6 @@ foreach ($req in $perm_repeats) {
 }
 
 # --- Build per-turn breakdown ---
-# A turn is the span of events between two consecutive prompt events.
-# We group: [prompt_i .. prompt_{i+1}) and analyze tool_done + perm_req within each span.
 $turns = [System.Collections.Generic.List[object]]::new()
 
 for ($ti = 0; $ti -lt $prompts.Count; $ti++) {
@@ -125,7 +110,6 @@ for ($ti = 0; $ti -lt $prompts.Count; $ti++) {
         [System.DateTime]::MaxValue
     }
 
-    # Events in this turn window (after prompt, before next prompt)
     $turn_events = @($events | Where-Object {
         $_.ts -and
         [System.DateTime]::Parse($_.ts) -gt $turn_start -and
@@ -135,11 +119,10 @@ for ($ti = 0; $ti -lt $prompts.Count; $ti++) {
     $turn_tool_dones = @($turn_events | Where-Object { $_.event -eq 'tool_done' })
     $turn_perm_reqs  = @($turn_events | Where-Object { $_.event -in @('permission_req', 'perm_req_repeat') })
 
-    # Infer approve/deny per perm_req: approve if a tool_done for same tool follows
     $decisions = [System.Collections.Generic.List[object]]::new()
     foreach ($req in $turn_perm_reqs) {
-        $req_ts    = [System.DateTime]::Parse($req.ts)
-        $approved  = $turn_tool_dones | Where-Object {
+        $req_ts   = [System.DateTime]::Parse($req.ts)
+        $approved = $turn_tool_dones | Where-Object {
             $_.tool -eq $req.tool -and [System.DateTime]::Parse($_.ts) -gt $req_ts
         }
         $decisions.Add([PSCustomObject]@{
@@ -164,14 +147,9 @@ if (-not (Test-Path $report_dir)) { New-Item $report_dir -ItemType Directory -Fo
 
 $cwd         = if ($prompts.Count -gt 0 -and $prompts[0].cwd) { $prompts[0].cwd } else { '' }
 $short_id    = $session_id.Substring(0, [Math]::Min(8, $session_id.Length))
-$interrupts  = @($prompts | Where-Object { $_.classification -eq 'interrupt' }).Count
-$enrichments = @($prompts | Where-Object { $_.classification -eq 'enrichment' }).Count
-$corrections = @($prompts | Where-Object { $_.classification -eq 'correction' }).Count
-
-# Locate Claude Code's own transcript for this session (history.jsonl is global;
-# per-session transcript entries have a matching session_id field)
-$transcript_path = "C:\Users\Michael\.claude\history.jsonl"
-$compacts = @($events | Where-Object { $_.event -eq 'compact' })
+$overrides   = @($prompts | Where-Object { $_.classification -eq 'override' }).Count
+$additions   = @($prompts | Where-Object { $_.classification -eq 'addition' }).Count
+$compacts    = @($events  | Where-Object { $_.event -eq 'compact' })
 
 $report = [PSCustomObject]@{
     ts                = (Get-Date -Format 'o')
@@ -181,13 +159,12 @@ $report = [PSCustomObject]@{
     score             = $score
     total_events      = $events.Count
     prompt_count      = $prompts.Count
-    interrupts        = $interrupts
-    enrichments       = $enrichments
-    corrections       = $corrections
+    overrides         = $overrides
+    additions         = $additions
     perm_req_count    = $perm_reqs.Count
     perm_repeat_count = $perm_repeats.Count
     compact_count     = $compacts.Count
-    transcript_path   = $transcript_path
+    transcript_path   = "C:\Users\Michael\.claude\history.jsonl"
     session_jsonl     = $session_file
     friction_notes    = $friction_notes.ToArray()
     allow_suggestions = $allow_suggestions.ToArray()
@@ -195,15 +172,14 @@ $report = [PSCustomObject]@{
 } | ConvertTo-Json -Depth 5
 $report | Set-Content (Join-Path $report_dir "${short_id}.json")
 
-# --- Update rolling averages (I/P and B/P rates per session, window=5) ---
-# I rate = pure interrupts only (enrichments excluded - they are not friction)
-# B rate = all blocks including repeats (repeats are higher-signal friction)
+# --- Update rolling averages (O/P and A/P and B/P rates, window=5) ---
 $avg_file = "C:\Users\Michael\.claude\telemetry\rolling-averages.json"
 $window   = 5
 
 if ($prompts.Count -gt 0) {
     $all_blocks = $perm_reqs.Count + $perm_repeats.Count
-    $i_rate = [Math]::Round($interrupts  / $prompts.Count, 4)
+    $o_rate = [Math]::Round($overrides   / $prompts.Count, 4)
+    $a_rate = [Math]::Round($additions   / $prompts.Count, 4)
     $b_rate = [Math]::Round($all_blocks  / $prompts.Count, 4)
 
     $avg_data = if (Test-Path $avg_file) {
@@ -211,7 +187,14 @@ if ($prompts.Count -gt 0) {
     } else { $null }
 
     if (-not $avg_data) {
-        $avg_data = [PSCustomObject]@{ window = $window; sessions = @(); avg_i_rate = 0.0; avg_b_rate = 0.0; session_count = 0 }
+        $avg_data = [PSCustomObject]@{
+            window        = $window
+            sessions      = @()
+            avg_o_rate    = 0.0
+            avg_a_rate    = 0.0
+            avg_b_rate    = 0.0
+            session_count = 0
+        }
     }
 
     $sessions_list = [System.Collections.Generic.List[object]]::new()
@@ -222,21 +205,27 @@ if ($prompts.Count -gt 0) {
         ts           = (Get-Date -Format 'o')
         cwd          = $cwd
         prompts      = $prompts.Count
-        interrupts   = $interrupts
-        enrichments  = $enrichments
+        overrides    = $overrides
+        additions    = $additions
         perm_reqs    = $perm_reqs.Count
         perm_repeats = $perm_repeats.Count
-        i_rate       = $i_rate
+        o_rate       = $o_rate
+        a_rate       = $a_rate
         b_rate       = $b_rate
     })
     while ($sessions_list.Count -gt $window) { $sessions_list.RemoveAt(0) }
 
-    $total_i = 0.0; $total_b = 0.0
-    foreach ($s in $sessions_list) { $total_i += $s.i_rate; $total_b += $s.b_rate }
+    $total_o = 0.0; $total_a = 0.0; $total_b = 0.0
+    foreach ($s in $sessions_list) {
+        $total_o += if ($s.o_rate) { $s.o_rate } else { 0.0 }
+        $total_a += if ($s.a_rate) { $s.a_rate } else { 0.0 }
+        $total_b += if ($s.b_rate) { $s.b_rate } else { 0.0 }
+    }
     $n = $sessions_list.Count
 
     $avg_data.sessions      = $sessions_list.ToArray()
-    $avg_data.avg_i_rate    = [Math]::Round($total_i / $n, 4)
+    $avg_data.avg_o_rate    = [Math]::Round($total_o / $n, 4)
+    $avg_data.avg_a_rate    = [Math]::Round($total_a / $n, 4)
     $avg_data.avg_b_rate    = [Math]::Round($total_b / $n, 4)
     $avg_data.session_count = $n
     $avg_data | ConvertTo-Json -Depth 5 | Set-Content $avg_file
@@ -253,12 +242,12 @@ if (-not $cum) {
 }
 
 if ($score -gt 0) {
-    $cum.total_score          += $score
+    $cum.total_score           += $score
     $cum.sessions_since_review += 1
 }
 $cum | ConvertTo-Json | Set-Content $cumulative_file
 
-# --- Determine output and play sound (single unified decision) ---
+# --- Determine output and play sound ---
 $retrospect_needed = ($cum.sessions_since_review -ge 3 -and $cum.total_score -ge 6)
 $play_ring = ($elapsed -gt 30 -or $score -ge 5 -or $retrospect_needed)
 
@@ -266,19 +255,15 @@ $suggest_str = if ($allow_suggestions.Count -gt 0) {
     " Suggested allow rules: $($allow_suggestions -join ', ')."
 } else { '' }
 
-# Play sound before outputting systemMessage to minimize perceived delay
 Start-Sleep -Milliseconds 400
 $snd_dir = 'C:/Users/Michael/.claude/sounds/'
 if ($play_ring) {
     (New-Object System.Media.SoundPlayer "${snd_dir}ring-half.wav").PlaySync()
-} elseif ($score -ge 2) {
-    (New-Object System.Media.SoundPlayer "${snd_dir}notify-half.wav").PlaySync()
 } else {
     (New-Object System.Media.SoundPlayer "${snd_dir}notify-half.wav").PlaySync()
 }
 
 if ($retrospect_needed) {
-    # Reset cumulative counter now that we're notifying
     $cum.total_score           = 0
     $cum.sessions_since_review = 0
     $cum.last_review_ts        = (Get-Date -Format 'o')
@@ -292,13 +277,13 @@ if ($retrospect_needed) {
 
 if ($score -ge 5) {
     [PSCustomObject]@{
-        systemMessage = "Friction score $score this session ($interrupts interrupt(s), $corrections correction(s), $($perm_reqs.Count) permission request(s)).${suggest_str} Report: ~\.claude\telemetry\reports\${short_id}.json"
+        systemMessage = "Friction score $score this session ($overrides override(s), $additions addition(s), $($perm_reqs.Count) permission request(s)).${suggest_str} Report: ~\.claude\telemetry\reports\${short_id}.json"
     } | ConvertTo-Json -Compress
     exit 0
 }
 
 if ($score -ge 2) {
     [PSCustomObject]@{
-        systemMessage = "Friction score $score this session ($interrupts interrupt(s), $corrections correction(s), $($perm_reqs.Count) permission request(s)). Report: ~\.claude\telemetry\reports\${short_id}.json"
+        systemMessage = "Friction score $score this session ($overrides override(s), $additions addition(s), $($perm_reqs.Count) permission request(s)). Report: ~\.claude\telemetry\reports\${short_id}.json"
     } | ConvertTo-Json -Compress
 }

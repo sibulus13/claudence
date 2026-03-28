@@ -52,6 +52,27 @@ Set-WavVolume "$windows_media\Windows Notify.wav"  "$sounds_dir\notify-half.wav"
 Set-WavVolume "$windows_media\chimes.wav"            "$sounds_dir\ring-half.wav"
 Set-WavVolume "$windows_media\Windows Ding.wav"     "$sounds_dir\ding-half.wav"
 
+# Install Pester 5 for classification tests
+$pester = Get-Module -ListAvailable -Name Pester | Sort-Object Version -Descending | Select-Object -First 1
+if (-not $pester -or $pester.Version -lt [version]'5.0') {
+    Write-Host "Installing Pester 5..." -ForegroundColor Yellow
+    Install-Module Pester -Force -Scope CurrentUser -SkipPublisherCheck -MinimumVersion 5.0
+    Write-Host "Pester installed."
+} else {
+    Write-Host "Pester $($pester.Version) already installed."
+}
+
+# Install pre-commit hook
+$git_hooks_dir = "$root\.git\hooks"
+$hook_src      = "$root\hooks\pre-commit"
+if ((Test-Path $git_hooks_dir) -and (Test-Path $hook_src)) {
+    Copy-Item $hook_src "$git_hooks_dir\pre-commit" -Force
+    Write-Host "Pre-commit hook installed."
+} else {
+    Write-Host "Skipped pre-commit hook (no .git directory found — run after git init)." -ForegroundColor Yellow
+}
+
 Write-Host ""
 Write-Host "Setup complete. Open a new Claude Code session to activate hooks." -ForegroundColor Green
 Write-Host "If hooks don't fire, open /hooks in Claude Code to reload settings." -ForegroundColor Yellow
+Write-Host "Run tests anytime: powershell.exe -File `"$root\tests\run-tests.ps1`"" -ForegroundColor Cyan

@@ -1,19 +1,19 @@
 # statusline.ps1
 # Runs after each assistant message. Outputs session KPIs with rolling-average trend comparison.
 #
-# Layout (no history):   Prompts:4  Interrupts:1  Blocked:2  |  ctx 12%  $0.08  5m
-# Layout (with history): Prompts:4  Interrupts:1 20%+  Blocked:2 50%+  |  ctx 67%  $0.13  12m
+# Layout (no history):   Prompts:4  Overrides:1  Blocked:2  |  ctx 12%  $0.08  5m
+# Layout (with history): Prompts:4  Overrides:1 25%+  Additions:2 50%  Blocked:1 25%-  |  ctx 67%  $0.13  12m
 #
-#   Prompts     prompts sent this session (cyan)
-#   Interrupts  mid-run short injections — friction (green/yellow/red by count or rate)
-#   Enrichments mid-run rich context additions — low friction (dim, only shown if > 0)
-#   Blocked     tool calls that needed approval (green/yellow/red); repeats always red
-#   ctx         context window used % (green/yellow/red)
-#   $           session cost (dim)
+#   Prompts    prompts sent this session (cyan)
+#   Overrides  user replaced direction — high friction (red label, yellow/red by rate)
+#   Additions  user injected context — low friction (yellow label, shown only if > 0)
+#   Blocked    tool calls that needed approval (red label); repeats always red
+#   ctx        context window used % (green/yellow/red)
+#   $          session cost (dim)
 #   Xm / Xh Xm session elapsed time (dim)
 #
-#   With >=2 sessions of history: Interrupts and Blocked also show rate% and trend
-#   Trend: + worse than avg, - better than avg (only shown when history exists)
+#   With >=2 sessions of history: Overrides and Blocked show rate% and trend
+#   Trend: + worse than avg, - better than avg (only when non-zero)
 
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $OutputEncoding            = [System.Text.Encoding]::UTF8
@@ -25,7 +25,6 @@ $green  = "${E}[32m"
 $yellow = "${E}[33m"
 $red    = "${E}[31m"
 $dim    = "${E}[2m"
-$blue   = "${E}[34m"
 
 function Color-By-Count([int]$val, [int]$warn, [int]$crit) {
     if ($val -ge $crit) { return $red }
@@ -72,8 +71,8 @@ $state = if (Test-Path $state_file) {
 } else { $null }
 
 $p  = if ($state) { [int]$state.prompts      } else { 0 }
-$i  = if ($state) { [int]$state.interrupts   } else { 0 }
-$e  = if ($state) { [int]$state.enrichments  } else { 0 }
+$o  = if ($state) { [int]$state.overrides    } else { 0 }
+$a  = if ($state) { [int]$state.additions    } else { 0 }
 $b  = if ($state) { [int]$state.perm_reqs    } else { 0 }
 $br = if ($state) { [int]$state.perm_repeats } else { 0 }
 
@@ -97,39 +96,43 @@ $avg_data = if (Test-Path $avg_file) {
 
 $has_history = $avg_data -and ([int]$avg_data.session_count) -ge 2
 
-# --- Format Interrupts and Blocked ---
+# --- Format Overrides, Additions, Blocked ---
 $all_b = $b + $br
 
 if ($has_history -and $p -gt 0) {
-    $i_rate = $i     / $p
+    $o_rate = $o     / $p
+    $a_rate = $a     / $p
     $b_rate = $all_b / $p
-    $avg_i  = [double]$avg_data.avg_i_rate
-    $avg_b  = [double]$avg_data.avg_b_rate
+    $avg_o  = if ($avg_data.avg_o_rate) { [double]$avg_data.avg_o_rate } else { 0.0 }
+    $avg_a  = if ($avg_data.avg_a_rate) { [double]$avg_data.avg_a_rate } else { 0.0 }
+    $avg_b  = if ($avg_data.avg_b_rate) { [double]$avg_data.avg_b_rate } else { 0.0 }
 
-    $i_trend = Get-Trend $i_rate $avg_i
+    $o_trend = Get-Trend $o_rate $avg_o
     $b_trend = Get-Trend $b_rate $avg_b
-    $i_pct   = [int]($i_rate * 100)
+    $o_pct   = [int]($o_rate * 100)
+    $a_pct   = [int]($a_rate * 100)
     $b_pct   = [int]($b_rate * 100)
-    $it_col  = Trend-Color $i_trend
+    $ot_col  = Trend-Color $o_trend
     $bt_col  = Trend-Color $b_trend
-    $i_val   = Color-By-Rate $i_rate
+    $o_val   = Color-By-Rate $o_rate
     $b_val   = Color-By-Rate $b_rate
-    $br_col  = if ($br -gt 0) { $red } else { $green }
 
-    # Label color is static (yellow=caution, red=blocking, blue=info)
-    # Value color is dynamic based on current rate; rate% and trend only shown when non-zero
-    $i_rate_str = if ($i -gt 0) { " ${i_pct}%${reset}${it_col}${i_trend}" } else { '' }
+    # Rate% and trend only shown when non-zero
+    $o_rate_str = if ($o -gt 0) { " ${o_pct}%${reset}${ot_col}${o_trend}" } else { '' }
+    $a_rate_str = if ($a -gt 0) { " ${a_pct}%" } else { '' }
     $b_rate_str = if ($all_b -gt 0) { " ${b_pct}%${reset}${bt_col}${b_trend}" } else { '' }
-    $i_str  = "${yellow}Interrupts:${reset}${i_val}${i}${i_rate_str}${reset}"
-    $e_str  = if ($e -gt 0) { "  ${blue}Enrichments:${reset}${dim}${e}${reset}" } else { '' }
+    $br_col     = if ($br -gt 0) { $red } else { $reset }
+
+    $o_str  = "${red}Overrides:${reset}${o_val}${o}${o_rate_str}${reset}"
+    $a_str  = if ($a -gt 0) { "  ${yellow}Additions:${reset}${a}${a_rate_str}${reset}" } else { '' }
     $b_str  = "${red}Blocked:${reset}${b_val}${all_b}${b_rate_str}${reset}"
     $br_str = if ($br -gt 0) { " ${br_col}(${br}x repeats)${reset}" } else { '' }
 } else {
-    $i_val  = Color-By-Count $i 1 3
-    $b_val  = Color-By-Count $all_b 1 3
+    $o_val = Color-By-Count $o 1 3
+    $b_val = Color-By-Count $all_b 1 3
 
-    $i_str  = "${yellow}Interrupts:${reset}${i_val}${i}${reset}"
-    $e_str  = if ($e -gt 0) { "  ${blue}Enrichments:${reset}${dim}${e}${reset}" } else { '' }
+    $o_str  = "${red}Overrides:${reset}${o_val}${o}${reset}"
+    $a_str  = if ($a -gt 0) { "  ${yellow}Additions:${reset}${a}${reset}" } else { '' }
     $b_str  = "${red}Blocked:${reset}${b_val}${all_b}${reset}"
     $br_str = if ($br -gt 0) { " ${red}(${br}x repeats)${reset}" } else { '' }
 }
@@ -149,4 +152,4 @@ if ($null -ne $cost_usd) {
 }
 $meta = if ($meta_parts.Count -gt 0) { "  ${dim}|${reset}  " + ($meta_parts -join '  ') } else { '' }
 
-Write-Host "${p_str}  ${i_str}${e_str}  ${b_str}${br_str}${meta}${runtime_str}"
+Write-Host "${p_str}  ${o_str}${a_str}  ${b_str}${br_str}${meta}${runtime_str}"
