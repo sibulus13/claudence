@@ -1,0 +1,84 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash",
+      "Anything"
+    ],
+    "deny": [],
+    "ask": []
+  },
+  "autoUpdatesChannel": "latest",
+  "voiceEnabled": true,
+  "statusLine": {
+    "type": "command",
+    "command": "powershell.exe -NoProfile -File C:/Users/Michael/.claude/statusline.ps1",
+    "padding": 1
+  },
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell.exe -NoProfile -File C:/Users/Michael/.claude/telemetry/log-prompt.ps1",
+            "shell": "bash",
+            "async": true
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell.exe -NoProfile -File C:/Users/Michael/.claude/telemetry/analyze-session.ps1",
+            "shell": "bash"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell.exe -NoProfile -File C:/Users/Michael/.claude/telemetry/log-tool-done.ps1",
+            "shell": "bash",
+            "async": true
+          }
+        ]
+      }
+    ],
+    "PostCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell.exe -NoProfile -File C:/Users/Michael/.claude/telemetry/record-compact.ps1",
+            "shell": "bash",
+            "async": true
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell.exe -NoProfile -File C:/Users/Michael/.claude/telemetry/log-permission.ps1",
+            "shell": "bash",
+            "async": true
+          },
+          {
+            "type": "command",
+            "command": "powershell.exe -NoProfile -Command \"(New-Object System.Media.SoundPlayer 'C:/Users/Michael/.claude/sounds/ding-half.wav').PlaySync()\"",
+            "shell": "bash",
+            "async": true
+          }
+        ]
+      }
+    ]
+  }
+}
