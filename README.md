@@ -79,7 +79,7 @@ Values are default terminal color until they cross a threshold, then turn **yell
 **1. Clone this repo** into a staging directory (do NOT clone directly into `~\.claude` — Claude Code writes runtime state there and will conflict with git):
 
 ```powershell
-git clone https://github.com/michaelruiz/claudence "$env:USERPROFILE\.claude-dotfiles"
+git clone https://github.com/sibulus13/claudence "$env:USERPROFILE\.claude-dotfiles"
 ```
 
 **2. Copy files into `~\.claude`:**
