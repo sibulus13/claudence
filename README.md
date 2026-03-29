@@ -1,4 +1,4 @@
-# claude-code-dotfiles
+# Claudence
 
 A hooks-driven telemetry and workflow system for [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview) on Windows. It tracks session friction in real time, plays sound notifications, and periodically prompts you to reflect on how you're collaborating with Claude — so each session runs more smoothly than the last.
 
@@ -9,16 +9,16 @@ A hooks-driven telemetry and workflow system for [Claude Code](https://docs.anth
 **A live status bar after every response:**
 
 ```
-Prompts:6  Interrupts:1 17%+  Blocked:2 33%  |  ctx 34%  $0.21  28m
+Prompts:6  Overrides:1 17%+  Additions:2  Blocked:1 17%  |  ctx 34%  $0.21  28m
 ```
 
 **Sound notifications:**
-- Chime when Claude finishes (louder/longer chime for long or high-friction runs)
+- Chime when Claude finishes (louder for long or high-friction runs)
 - Ding when a tool needs your approval
 
-**Per-session friction reports** saved to `~/.claude/telemetry/reports/` — who interrupted what, which tools you blocked, what patterns are emerging.
+**Per-session friction reports** saved to `~/.claude/telemetry/reports/` — what was overridden, which tools you blocked, what patterns are emerging.
 
-**Trend tracking** across your last 5 sessions — the status bar shows `+` or `-` next to interrupt and block rates when they drift meaningfully from your rolling average.
+**Trend tracking** across your last 5 sessions — the status bar shows `+` or `-` next to override and block rates when they drift meaningfully from your rolling average.
 
 **Retrospection prompts** — after enough friction accumulates across sessions, Claude will suggest running `/retrospect` to review patterns, update allow rules, and refresh context.
 
@@ -26,15 +26,14 @@ Prompts:6  Interrupts:1 17%+  Blocked:2 33%  |  ctx 34%  $0.21  28m
 
 ## How It Works
 
-Every prompt you send is classified into one of five types:
+Every prompt you send is classified into one of four types:
 
 | Type | When | Friction |
 |------|------|---------|
 | `first_prompt` | First message in a session | 0 |
-| `followup` | Deliberate next turn after Claude stopped | 0 |
-| `correction` | Re-prompt within 60s of Claude stopping | +2 |
-| `interrupt` | Short prompt while Claude is mid-run | +3 |
-| `enrichment` | Long/multi-topic prompt while Claude is mid-run | +1 |
+| `followup` | Clean next turn after Claude stopped | 0 |
+| `override` | Replacement language after stop ("actually", "instead", "forget that", "start over") | +3 |
+| `addition` | Additive language ("also", "note that", "by the way") OR any prompt sent mid-run | +1 |
 
 And every tool approval or denial is tracked:
 
@@ -43,27 +42,27 @@ And every tool approval or denial is tracked:
 | Tool needed approval | +1 |
 | Same tool blocked again this session | +2 |
 
-**Why this matters:** High interrupt rates usually mean unclear initial prompts. High block rates usually mean your allow rules are out of date. The system surfaces these patterns so you can fix the root cause instead of living with the friction.
+**Why this matters:** High override rates mean Claude is consistently going in the wrong direction — your prompts may need more upfront context or constraints. High block rates mean your allow rules are out of date. The system surfaces these patterns so you can fix the root cause instead of living with the friction.
 
 ---
 
 ## Status Bar Explained
 
 ```
-Prompts:4  Interrupts:0  Blocked:1  |  ctx 12%  $0.08  14m
+Prompts:4  Overrides:0  Blocked:1  |  ctx 12%  $0.08  14m
 ```
 
 | Field | Color | Meaning |
 |-------|-------|---------|
 | `Prompts:N` | cyan label | Total prompts sent this session |
-| `Interrupts:N` | yellow label | Prompts sent while Claude was mid-run |
-| `Enrichments:N` | blue label | (Only shown if > 0) Multi-topic mid-run prompts |
+| `Overrides:N` | red label | Prompts that replaced the current direction |
+| `Additions:N` | yellow label | Only shown if > 0. Context injected mid-run or additively |
 | `Blocked:N` | red label | Tool calls that needed approval |
 | `ctx N%` | green label | Context window used |
 | `$N.NN` | dim | Session cost |
 | `Nm` / `Nh Nm` | dim | Session elapsed time |
 
-Values are default terminal color until they cross a threshold, then turn **yellow** (warning) or **red** (critical). When you have 2+ sessions of history, interrupt and block rates also show a trend marker: `+` means worse than your rolling average, `-` means better.
+Values are default terminal color until they cross a threshold, then turn **yellow** (warning) or **red** (critical). With 2+ sessions of history, override and block rates show a trend marker: `+` means worse than your rolling average, `-` means better.
 
 ---
 
@@ -80,7 +79,7 @@ Values are default terminal color until they cross a threshold, then turn **yell
 **1. Clone this repo** into a staging directory (do NOT clone directly into `~\.claude` — Claude Code writes runtime state there and will conflict with git):
 
 ```powershell
-git clone https://github.com/<you>/claude-code-dotfiles "$env:USERPROFILE\.claude-dotfiles"
+git clone https://github.com/michaelruiz/claudence "$env:USERPROFILE\.claude-dotfiles"
 ```
 
 **2. Copy files into `~\.claude`:**
@@ -89,7 +88,7 @@ git clone https://github.com/<you>/claude-code-dotfiles "$env:USERPROFILE\.claud
 robocopy "$env:USERPROFILE\.claude-dotfiles" "$env:USERPROFILE\.claude" /E /XD .git /XF .gitignore README.md
 ```
 
-**3. Run the bootstrap script** to create directories and generate sound files from Windows Media:
+**3. Run the bootstrap script** to create directories, generate sound files from Windows Media, install Pester 5, and wire the pre-commit hook:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE\.claude\setup.ps1"
@@ -106,18 +105,25 @@ That's it. The status bar and sound notifications are active from your next sess
 ```
 ~/.claude/
 ├── CLAUDE.md                    # Global instructions injected into every session
-├── PARALLELIZATION.md           # Subagent parallelization guidelines
 ├── settings.json                # Hooks, permissions, statusLine config
 ├── statusline.ps1               # Status bar — runs after every response
 ├── setup.ps1                    # Bootstrap — run once on a new machine
 │
 ├── telemetry/
-│   ├── DESIGN.md                # Full design doc for the friction system
+│   ├── lib/
+│   │   └── classification.ps1   # Pure classification functions (dot-sourced by tests)
 │   ├── log-prompt.ps1           # UserPromptSubmit: classify + record prompt
 │   ├── analyze-session.ps1      # Stop: score session, play sound, write report
 │   ├── log-permission.ps1       # PermissionRequest: log + play ding
 │   ├── log-tool-done.ps1        # PostToolUse: log completions (for denial inference)
 │   └── record-compact.ps1       # PostCompact: capture summary in session log
+│
+├── tests/
+│   ├── classification.tests.ps1 # 57 Pester 5 tests for classification logic
+│   └── run-tests.ps1            # Test runner (auto-installs Pester 5 if missing)
+│
+├── hooks/
+│   └── pre-commit               # Gates telemetry/ commits on passing tests
 │
 ├── skills/
 │   └── retrospect.md            # /retrospect skill definition
@@ -152,11 +158,11 @@ Every time Claude asks for tool approval, it's logged. After a session, the repo
 
 ### 2. Diagnose why a session felt rough
 
-Open the session report after a high-friction run. The `turns[]` array shows every turn: what prompt classification it got, how many tool calls happened, and whether each approval was granted or denied. A turn with `classification: "interrupt"` and `decision: "deny"` on multiple tools is a clear signal: you interrupted, then blocked Claude repeatedly — which is why it felt slow.
+Open the session report after a high-friction run. The `turns[]` array shows every turn: what prompt classification it got, how many tool calls happened, and whether each approval was granted or denied. A turn with `classification: "override"` means you had to redirect Claude — which is a signal that the original prompt left too much ambiguous.
 
 ### 3. Improve your prompting habits
 
-If your `Interrupts` rate is consistently `+` (worse than average), your initial prompts aren't giving Claude enough context to run unattended. The status bar makes this visible in real time — before bad habits compound. Use `/retrospect` to review your last few sessions and get concrete rewrite suggestions for your typical prompts.
+If your `Overrides` rate is consistently `+` (worse than average), your initial prompts aren't giving Claude enough direction to run unattended. The status bar makes this visible in real time — before bad habits compound. Use `/retrospect` to review your last few sessions and get concrete suggestions for what to clarify upfront.
 
 ### 4. Track cost and context across a long session
 

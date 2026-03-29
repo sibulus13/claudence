@@ -62,11 +62,11 @@ foreach ($p in $prompts) {
     switch ($p.classification) {
         'override' {
             $score += 3
-            $friction_notes.Add("Override (+3): user replaced direction — $($p.prompt_text.Substring(0, [Math]::Min(80, $p.prompt_text.Length)))")
+            $friction_notes.Add("Override (+3): user replaced direction - $($p.prompt_text.Substring(0, [Math]::Min(80, $p.prompt_text.Length)))")
         }
         'addition' {
             $score += 1
-            $friction_notes.Add("Addition (+1): user injected context — $($p.prompt_text.Substring(0, [Math]::Min(80, $p.prompt_text.Length)))")
+            $friction_notes.Add("Addition (+1): user injected context - $($p.prompt_text.Substring(0, [Math]::Min(80, $p.prompt_text.Length)))")
         }
         # first_prompt and followup score 0
     }
