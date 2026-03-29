@@ -204,6 +204,32 @@ These are created at runtime and excluded from the repo:
 
 ---
 
+## Roadmap
+
+Nice-to-have additions that aren't built yet:
+
+### Skills
+| Skill | What it would do |
+|-------|-----------------|
+| `/friction` | Print the current session's live friction score and notes on demand, without waiting for Stop |
+| `/report` | Summarize the last session's friction report in readable prose — score, overrides, blocked tools, turn breakdown |
+| `/session` | Show a timeline of all events logged for the current session (prompts, tool calls, permission requests, compactions) |
+
+### Hook gaps
+| Hook | What it enables |
+|------|----------------|
+| `Notification` | Play a sound when Claude needs your attention while you're away from the screen |
+| `PreCompact` | Prompt you to specify what context to preserve before compaction runs |
+| `PreToolUse` | Log what Claude intends to do before it does it — richer telemetry and optional input rewriting |
+
+### Scale
+| Item | What it would do |
+|------|-----------------|
+| Cross-machine sync | Push telemetry reports to a remote store so rolling averages survive machine changes |
+| Team mode | Aggregate friction data across multiple users in a shared repo |
+
+---
+
 ## License
 
 MIT
