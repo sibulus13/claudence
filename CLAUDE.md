@@ -75,3 +75,9 @@ Do not play sounds manually or adjust system volume unless explicitly asked.
 ## Memory System
 
 Auto-memory is active at `C:\Users\Michael\.claude\projects\[project]\memory\`. When learning something non-obvious about the user, project, or workflow, save it to the appropriate memory file and update `MEMORY.md`. Check existing memories before starting work on a familiar project.
+
+## Available Skills
+
+These user-defined skills are loaded at session start from `~/.claude/skills/`:
+
+- `/retrospect` — Review accumulated session friction reports, propose allow-rule additions and CLAUDE.md updates, apply them, and reset the cumulative counter. Run this when the status bar shows a high override or block rate, or when Claude suggests it automatically.

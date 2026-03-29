@@ -1,13 +1,15 @@
 # setup.ps1
 # Bootstrap ~\.claude on a new Windows machine.
-# Run once after cloning the dotfiles repo to C:\Users\<user>\.claude
+# Run once after copying the dotfiles repo into %USERPROFILE%\.claude
 # Usage: powershell.exe -NoProfile -ExecutionPolicy Bypass -File setup.ps1
 
 $root = "$env:USERPROFILE\.claude"
 
-# Ensure required directories exist
+# ── 1. Ensure required directories exist ─────────────────────────────────────
+
 @(
     "$root\sounds",
+    "$root\skills",
     "$root\telemetry\sessions",
     "$root\telemetry\reports",
     "$root\templates"
@@ -18,9 +20,32 @@ $root = "$env:USERPROFILE\.claude"
     }
 }
 
-# Copy Windows system sounds at 80% amplitude into sounds\
-# Requires the WAV files to either be committed to the repo (preferred)
-# or regenerated from the Windows media library here.
+# ── 2. Patch settings.json with the current user's paths ─────────────────────
+#
+# settings.json is committed with hardcoded C:/Users/Michael paths so that the
+# file works out of the box on the original machine. On any other machine, this
+# step rewrites every occurrence of the original username with $env:USERNAME.
+
+$settings_path = "$root\settings.json"
+if (Test-Path $settings_path) {
+    $content = Get-Content $settings_path -Raw
+    # Replace the literal username embedded in paths
+    $original_user = "Michael"
+    $current_user  = $env:USERNAME
+
+    if ($content -match [regex]::Escape("C:/Users/$original_user") -and $current_user -ne $original_user) {
+        $patched = $content -replace [regex]::Escape("C:/Users/$original_user"), "C:/Users/$current_user"
+        # Also fix backslash variants
+        $patched = $patched -replace [regex]::Escape("C:\Users\$original_user"), "C:\Users\$current_user"
+        Set-Content $settings_path $patched -NoNewline
+        Write-Host "Patched settings.json: replaced $original_user -> $current_user"
+    } else {
+        Write-Host "settings.json already uses correct paths for $current_user"
+    }
+}
+
+# ── 3. Generate sound files from Windows Media at 80% volume ─────────────────
+
 $windows_media = "C:\Windows\Media"
 $sounds_dir    = "$root\sounds"
 
@@ -29,7 +54,6 @@ function Set-WavVolume {
     if (Test-Path $dst) { return }
     if (-not (Test-Path $src)) { Write-Warning "Source not found: $src"; return }
     $bytes = [System.IO.File]::ReadAllBytes($src)
-    # Find 'data' chunk (PCM samples start after the 8-byte chunk header)
     $data_pos = 0
     for ($i = 12; $i -lt $bytes.Length - 4; $i++) {
         if ($bytes[$i] -eq 0x64 -and $bytes[$i+1] -eq 0x61 -and $bytes[$i+2] -eq 0x74 -and $bytes[$i+3] -eq 0x61) {
@@ -48,31 +72,44 @@ function Set-WavVolume {
     Write-Host "Generated $(Split-Path $dst -Leaf) at $([int]($scale*100))% volume"
 }
 
-Set-WavVolume "$windows_media\Windows Notify.wav"  "$sounds_dir\notify-half.wav"
-Set-WavVolume "$windows_media\chimes.wav"            "$sounds_dir\ring-half.wav"
-Set-WavVolume "$windows_media\Windows Ding.wav"     "$sounds_dir\ding-half.wav"
+Set-WavVolume "$windows_media\Windows Notify.wav" "$sounds_dir\notify-half.wav"
+Set-WavVolume "$windows_media\chimes.wav"          "$sounds_dir\ring-half.wav"
+Set-WavVolume "$windows_media\Windows Ding.wav"   "$sounds_dir\ding-half.wav"
 
-# Install Pester 5 for classification tests
+# ── 4. Install Pester 5 for classification tests ─────────────────────────────
+
 $pester = Get-Module -ListAvailable -Name Pester | Sort-Object Version -Descending | Select-Object -First 1
 if (-not $pester -or $pester.Version -lt [version]'5.0') {
     Write-Host "Installing Pester 5..." -ForegroundColor Yellow
+    # NuGet provider is required by Install-Module
+    if (-not (Get-PackageProvider -Name NuGet -ErrorAction SilentlyContinue)) {
+        Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -Scope CurrentUser | Out-Null
+    }
     Install-Module Pester -Force -Scope CurrentUser -SkipPublisherCheck -MinimumVersion 5.0
     Write-Host "Pester installed."
 } else {
     Write-Host "Pester $($pester.Version) already installed."
 }
 
-# Install pre-commit hook
+# ── 5. Install pre-commit hook ────────────────────────────────────────────────
+
 $git_hooks_dir = "$root\.git\hooks"
 $hook_src      = "$root\hooks\pre-commit"
 if ((Test-Path $git_hooks_dir) -and (Test-Path $hook_src)) {
     Copy-Item $hook_src "$git_hooks_dir\pre-commit" -Force
     Write-Host "Pre-commit hook installed."
 } else {
-    Write-Host "Skipped pre-commit hook (no .git directory found — run after git init)." -ForegroundColor Yellow
+    Write-Host "Skipped pre-commit hook (no .git directory — run after git init)." -ForegroundColor Yellow
 }
 
+# ── Done ──────────────────────────────────────────────────────────────────────
+
 Write-Host ""
-Write-Host "Setup complete. Open a new Claude Code session to activate hooks." -ForegroundColor Green
-Write-Host "If hooks don't fire, open /hooks in Claude Code to reload settings." -ForegroundColor Yellow
-Write-Host "Run tests anytime: powershell.exe -File `"$root\tests\run-tests.ps1`"" -ForegroundColor Cyan
+Write-Host "Setup complete." -ForegroundColor Green
+Write-Host ""
+Write-Host "Next steps:" -ForegroundColor Cyan
+Write-Host "  1. Fully quit and reopen Claude Code (not just a new terminal)" -ForegroundColor Cyan
+Write-Host "  2. In Claude Code, run /hooks to confirm the hooks loaded" -ForegroundColor Cyan
+Write-Host "  3. The /retrospect skill will appear in the / menu after restart" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "Run tests anytime: powershell.exe -File `"$root\tests\run-tests.ps1`"" -ForegroundColor Yellow
