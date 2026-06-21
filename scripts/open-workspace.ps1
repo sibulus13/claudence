@@ -33,16 +33,13 @@ $Now          = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
 New-Item -ItemType Directory -Force -Path $RegistryDir | Out-Null
 
 # ── Check if workspace already open in WezTerm ───────────────────────────────
+# Use --format json (available in all modern WezTerm builds) instead of
+# parsing the text table, which varies in column order across versions.
 $existingPane = $null
 try {
-  $listOutput = wezterm cli list 2>&1 | Select-Object -Skip 1  # skip header
-  foreach ($line in $listOutput) {
-    $cols = $line.Trim() -split '\s+', 6
-    if ($cols.Count -ge 4 -and $cols[3] -eq $WorkspaceName) {
-      $existingPane = $cols[2]  # PANEID column
-      break
-    }
-  }
+  $panes = wezterm cli list --format json 2>$null | ConvertFrom-Json
+  $existingPane = ($panes | Where-Object { $_.workspace -eq $WorkspaceName } |
+    Select-Object -First 1).pane_id
 } catch { }
 
 if ($existingPane) {
