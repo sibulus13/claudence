@@ -3,13 +3,14 @@
 # Dot-source this file in log-prompt.ps1 and in Pester tests.
 #
 # Classifications:
-#   first_prompt  — no prior events in session
-#   followup      — Claude had stopped, prompt is a clean next step
-#   addition      — user injects context (mid-run OR additive language post-stop)
-#   override      — user replaces the current direction entirely
+#   first_prompt    — no prior events in session
+#   followup        — Claude had stopped; prompt is a clean next step (including post-stop additive language)
+#   override        — Claude had stopped; user explicitly redirects the current direction
+#   addition        — Claude is running; user queues additional context or a parallel task
+#   denial_context  — Claude is running; user denied a tool call and is providing context/reason
 #
 # Friction scores (applied in analyze-session.ps1):
-#   override +3    addition +1    followup/first_prompt 0
+#   override +3    addition +1    denial_context +1    followup/first_prompt 0
 
 function Test-IsOverride {
     param([string]$Text)
@@ -40,6 +41,9 @@ function Test-IsOverride {
 }
 
 function Test-IsAddition {
+    # Detects additive language patterns.
+    # NOTE: No longer called from Get-PromptClassification — post-stop additive prompts
+    # now classify as 'followup'. This function is kept for direct unit testing.
     param([string]$Text)
     if ([string]::IsNullOrWhiteSpace($Text)) { return $false }
     $patterns = @(
@@ -56,6 +60,36 @@ function Test-IsAddition {
         '(?i)\bseparately\b'
     )
     foreach ($p in $patterns) { if ($Text -match $p) { return $true } }
+    return $false
+}
+
+function Get-IsDenialContext {
+    # Returns $true if there is an unmatched permission_req in the current turn —
+    # meaning a tool was denied and the user is now providing context/reason for it.
+    param([array]$PriorEvents)
+    if (-not $PriorEvents -or $PriorEvents.Count -eq 0) { return $false }
+
+    # Scope to events since the most recent prompt (the current running turn only)
+    $last_prompt = @($PriorEvents | Where-Object { $_.event -eq 'prompt' }) | Select-Object -Last 1
+    $turn_events = if ($last_prompt) {
+        $lp_ts = [datetime]::Parse($last_prompt.ts)
+        @($PriorEvents | Where-Object { $_.ts -and [datetime]::Parse($_.ts) -gt $lp_ts })
+    } else {
+        $PriorEvents
+    }
+
+    $perm_events = @($turn_events | Where-Object { $_.event -in @('permission_req', 'perm_req_repeat') })
+    if (-not $perm_events -or $perm_events.Count -eq 0) { return $false }
+
+    $tool_dones = @($turn_events | Where-Object { $_.event -eq 'tool_done' })
+
+    foreach ($req in $perm_events) {
+        $req_ts  = [datetime]::Parse($req.ts)
+        $matched = $tool_dones | Where-Object {
+            $_.tool -eq $req.tool -and [datetime]::Parse($_.ts) -gt $req_ts
+        }
+        if (-not $matched) { return $true }  # Unmatched perm_req = denied
+    }
     return $false
 }
 
@@ -81,11 +115,11 @@ function Get-PromptClassification {
     )
 
     if (-not $claude_stopped) {
-        # Claude is still generating — any input is an addition
+        # Claude is still generating — check for tool denial context first
+        if (Get-IsDenialContext $PriorEvents) { return 'denial_context' }
         return 'addition'
     }
 
-    if (Test-IsOverride $PromptText) { return 'override'  }
-    if (Test-IsAddition $PromptText) { return 'addition'  }
+    if (Test-IsOverride $PromptText) { return 'override' }
     return 'followup'
 }

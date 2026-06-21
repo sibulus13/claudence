@@ -61,20 +61,25 @@ $state = if (Test-Path $state_file) {
 
 if (-not $state -or $state.session_id -ne $session_id) {
     $state = [PSCustomObject]@{
-        session_id   = $session_id
-        prompts      = 0
-        overrides    = 0
-        additions    = 0
-        perm_reqs    = 0
-        perm_repeats = 0
-        started_at   = (Get-Date -Format 'o')
+        session_id      = $session_id
+        prompts         = 0
+        overrides       = 0
+        additions       = 0
+        denial_contexts = 0
+        perm_reqs       = 0
+        perm_repeats    = 0
+        started_at      = (Get-Date -Format 'o')
     }
 }
 
 $state.prompts += 1
 switch ($classification) {
-    'override' { $state.overrides += 1 }
-    'addition' { $state.additions += 1 }
+    'override'        { $state.overrides        += 1 }
+    'addition'        { $state.additions        += 1 }
+    'denial_context'  { $state.denial_contexts  += 1 }
 }
 
 $state | ConvertTo-Json | Set-Content $state_file
+
+# Signal that Claude is now running (statusline spinner reads this)
+"$([datetime]::UtcNow.ToString('o'))" | Set-Content "C:\Users\Michael\.claude\telemetry\running.flag"

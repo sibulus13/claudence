@@ -1,0 +1,6 @@
+{
+  "frequencyDays": 7,
+  "thresholdOccurrences": 2,
+  "maxSessionsToAnalyze": 10,
+  "autoApply": false
+}

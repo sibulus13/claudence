@@ -55,14 +55,14 @@ $state = if (Test-Path $state_file) {
 
 if (-not $state -or $state.session_id -ne $session_id) {
     $state = [PSCustomObject]@{
-        session_id   = $session_id
-        prompts      = 0
-        interrupts   = 0
-        enrichments  = 0
-        corrections  = 0
-        perm_reqs    = 0
-        perm_repeats = 0
-        started_at   = (Get-Date -Format 'o')
+        session_id      = $session_id
+        prompts         = 0
+        overrides       = 0
+        additions       = 0
+        denial_contexts = 0
+        perm_reqs       = 0
+        perm_repeats    = 0
+        started_at      = (Get-Date -Format 'o')
     }
 }
 

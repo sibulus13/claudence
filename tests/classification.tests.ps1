@@ -7,6 +7,72 @@ BeforeAll {
     . "$PSScriptRoot\..\telemetry\lib\classification.ps1"
 }
 
+Describe "Get-IsDenialContext" {
+
+    Context "No prior events" {
+        It "returns false with null events" {
+            Get-IsDenialContext $null | Should -Be $false
+        }
+        It "returns false with empty array" {
+            Get-IsDenialContext @() | Should -Be $false
+        }
+    }
+
+    Context "Unmatched perm_req (tool was denied)" {
+        It "returns true when perm_req has no subsequent tool_done for that tool" {
+            $events = @(
+                [PSCustomObject]@{ ts = '2026-01-01T10:00:00Z'; event = 'prompt';       classification = 'first_prompt' }
+                [PSCustomObject]@{ ts = '2026-01-01T10:00:05Z'; event = 'permission_req'; tool = 'Bash' }
+                # No tool_done for Bash — was denied
+            )
+            Get-IsDenialContext $events | Should -Be $true
+        }
+
+        It "returns true for perm_req_repeat with no subsequent tool_done" {
+            $events = @(
+                [PSCustomObject]@{ ts = '2026-01-01T10:00:00Z'; event = 'prompt';           classification = 'first_prompt' }
+                [PSCustomObject]@{ ts = '2026-01-01T10:00:05Z'; event = 'perm_req_repeat';  tool = 'Bash' }
+            )
+            Get-IsDenialContext $events | Should -Be $true
+        }
+    }
+
+    Context "Matched perm_req (tool was approved)" {
+        It "returns false when perm_req is followed by tool_done for the same tool" {
+            $events = @(
+                [PSCustomObject]@{ ts = '2026-01-01T10:00:00Z'; event = 'prompt';       classification = 'first_prompt' }
+                [PSCustomObject]@{ ts = '2026-01-01T10:00:05Z'; event = 'permission_req'; tool = 'Bash' }
+                [PSCustomObject]@{ ts = '2026-01-01T10:00:10Z'; event = 'tool_done';      tool = 'Bash' }
+            )
+            Get-IsDenialContext $events | Should -Be $false
+        }
+
+        It "returns false when tool_done for a different tool does not satisfy the perm_req" {
+            $events = @(
+                [PSCustomObject]@{ ts = '2026-01-01T10:00:00Z'; event = 'prompt';       classification = 'first_prompt' }
+                [PSCustomObject]@{ ts = '2026-01-01T10:00:05Z'; event = 'permission_req'; tool = 'Bash' }
+                [PSCustomObject]@{ ts = '2026-01-01T10:00:10Z'; event = 'tool_done';      tool = 'Read' }  # different tool
+            )
+            Get-IsDenialContext $events | Should -Be $true
+        }
+    }
+
+    Context "Scoped to current turn only" {
+        It "ignores unmatched perm_req from a previous turn" {
+            $events = @(
+                # Turn 1: perm_req denied (old turn)
+                [PSCustomObject]@{ ts = '2026-01-01T09:00:00Z'; event = 'prompt';       classification = 'first_prompt' }
+                [PSCustomObject]@{ ts = '2026-01-01T09:00:05Z'; event = 'permission_req'; tool = 'Bash' }
+                # Turn 1 stop + Turn 2 prompt — new turn begins
+                [PSCustomObject]@{ ts = '2026-01-01T09:01:00Z'; event = 'stop' }
+                [PSCustomObject]@{ ts = '2026-01-01T09:02:00Z'; event = 'prompt';       classification = 'followup' }
+                # No perm_req in turn 2
+            )
+            Get-IsDenialContext $events | Should -Be $false
+        }
+    }
+}
+
 Describe "Test-IsOverride" {
 
     Context "Start-anchored override signals" {
@@ -205,17 +271,47 @@ Describe "Get-PromptClassification" {
         It "returns override for 'instead' post-stop" {
             Get-PromptClassification "Let's use a different pattern instead" $script:stoppedEvents | Should -Be 'override'
         }
-        It "returns addition for additive language post-stop" {
-            Get-PromptClassification "Also add error handling to that function" $script:stoppedEvents | Should -Be 'addition'
+        It "returns followup for additive language post-stop (additive language no longer scores as addition)" {
+            Get-PromptClassification "Also add error handling to that function" $script:stoppedEvents | Should -Be 'followup'
         }
-        It "returns addition for 'note that' post-stop" {
-            Get-PromptClassification "Note that we're on Windows so use backslashes" $script:stoppedEvents | Should -Be 'addition'
+        It "returns followup for 'note that' post-stop" {
+            Get-PromptClassification "Note that we're on Windows so use backslashes" $script:stoppedEvents | Should -Be 'followup'
         }
         It "returns followup for neutral text post-stop" {
             Get-PromptClassification "Let's implement the settings screen next" $script:stoppedEvents | Should -Be 'followup'
         }
         It "returns followup for a question post-stop" {
             Get-PromptClassification "What's the best way to handle authentication here?" $script:stoppedEvents | Should -Be 'followup'
+        }
+    }
+
+    Context "Denial context (mid-run with unmatched perm_req)" {
+        BeforeAll {
+            $script:deniedEvents = @(
+                [PSCustomObject]@{ event = 'stop';         ts = '2026-01-01T09:00:00Z' }
+                [PSCustomObject]@{ event = 'prompt';       ts = '2026-01-01T10:00:00Z'; classification = 'first_prompt' }
+                [PSCustomObject]@{ event = 'permission_req'; ts = '2026-01-01T10:00:05Z'; tool = 'Bash' }
+                # No tool_done for Bash — it was denied
+            )
+        }
+        It "returns denial_context when there is an unmatched perm_req in the current turn" {
+            Get-PromptClassification "Don't run that, it would delete the wrong dir" $script:deniedEvents | Should -Be 'denial_context'
+        }
+        It "returns denial_context even with neutral text" {
+            Get-PromptClassification "Actually that command is wrong" $script:deniedEvents | Should -Be 'denial_context'
+        }
+        It "returns denial_context even with additive language" {
+            Get-PromptClassification "Also you should avoid touching node_modules" $script:deniedEvents | Should -Be 'denial_context'
+        }
+
+        It "returns addition (not denial_context) when perm_req was approved" {
+            $approvedEvents = @(
+                [PSCustomObject]@{ event = 'stop';          ts = '2026-01-01T09:00:00Z' }
+                [PSCustomObject]@{ event = 'prompt';        ts = '2026-01-01T10:00:00Z'; classification = 'first_prompt' }
+                [PSCustomObject]@{ event = 'permission_req'; ts = '2026-01-01T10:00:05Z'; tool = 'Bash' }
+                [PSCustomObject]@{ event = 'tool_done';     ts = '2026-01-01T10:00:10Z'; tool = 'Bash' }
+            )
+            Get-PromptClassification "Also update the types" $approvedEvents | Should -Be 'addition'
         }
     }
 
