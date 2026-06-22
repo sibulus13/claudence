@@ -67,11 +67,43 @@ local function write_active(window, pane)
   end
 end
 
--- Maximize the window on first launch.
--- config.maximized is not a valid field in this WezTerm build; the gui-startup
--- event is the correct hook for controlling the initial window state.
+-- ── Default startup layout ────────────────────────────────────────────────────
+-- Tab 1: persistent keys reference (always visible on launch)
+-- Tab 2: shell in D:/repo (main working directory)
+-- config.maximized is not valid in this WezTerm build; gui-startup is the
+-- correct hook for window-state setup.
+local REPO_DIR = 'D:/repo'
+
+local function keymap_args()
+  if wezterm.target_triple:find('windows') then
+    local f = keymap_file:gsub('/', '\\')
+    return {
+      'powershell.exe', '-NoProfile', '-Command',
+      '[Console]::OutputEncoding=[Text.Encoding]::UTF8; ' ..
+      'while ($true) { Clear-Host; Get-Content "' .. f .. '"; Start-Sleep -Seconds 86400 }',
+    }
+  end
+  return { 'bash', '-c',
+    'while true; do clear; cat "' .. keymap_file .. '"; sleep 86400; done' }
+end
+
 wezterm.on('gui-startup', function(cmd)
-  local _, _, window = wezterm.mux.spawn_window(cmd or {})
+  -- cmd is non-nil when WezTerm was launched with an explicit command;
+  -- in that case honour it and only maximise.
+  if cmd then
+    local _, _, window = wezterm.mux.spawn_window(cmd)
+    window:gui_window():maximize()
+    return
+  end
+
+  -- Default layout: keys tab first, then a shell in D:/repo
+  local _, _, window = wezterm.mux.spawn_window({
+    args = keymap_args(),
+    cwd  = REPO_DIR,
+  })
+  -- Second tab: plain shell, lands in D:/repo
+  window:spawn_tab({ cwd = REPO_DIR })
+  -- Stay on tab 1 (keys) so it's the first thing the user sees
   window:gui_window():maximize()
 end)
 
@@ -86,21 +118,8 @@ wezterm.on('window-activated',     write_active)
 local keymap_file = wezterm.home_dir .. '/.claude/keymap.txt'
 
 local function show_keymap(win, pane)
-  local cmd
-  if wezterm.target_triple:find('windows') then
-    local f = keymap_file:gsub('/', '\\')
-    -- Explicit UTF-8 output encoding; infinite loop keeps the tab alive.
-    cmd = {
-      'powershell.exe', '-NoProfile', '-Command',
-      '[Console]::OutputEncoding=[Text.Encoding]::UTF8; ' ..
-      'while ($true) { Clear-Host; Get-Content "' .. f .. '"; Start-Sleep -Seconds 86400 }',
-    }
-  else
-    cmd = { 'bash', '-c',
-      'while true; do clear; cat "' .. keymap_file .. '"; sleep 86400; done' }
-  end
   win:perform_action(
-    act.SpawnCommandInNewTab { args = cmd, label = 'keys' },
+    act.SpawnCommandInNewTab { args = keymap_args() },
     pane
   )
 end
