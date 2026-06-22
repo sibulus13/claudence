@@ -148,15 +148,71 @@ local function show_keymap(win, pane)
   )
 end
 
+-- ── Repo launcher ─────────────────────────────────────────────────────────────
+-- Alt+G opens a fuzzy picker of every git repo under D:\repo, excluding
+-- .worktrees (ephemeral branches) and archive (retired projects).
+-- Selecting a repo creates a dual-pane workspace via open-workspace.ps1,
+-- or focuses it if the workspace already exists in this WezTerm session.
+
+local OPEN_WS_SCRIPT = (os.getenv('USERPROFILE') or '') .. '\\.claude\\scripts\\open-workspace.ps1'
+
+local function path_to_ws_name(rel)
+  return rel:lower()
+    :gsub('[/\\%s]+', '-')   -- separators + spaces → dash
+    :gsub('[^a-z0-9%-]', '') -- strip non-alphanumeric
+    :gsub('%-+', '-')        -- collapse runs
+    :gsub('^%-+', '')        -- strip leading
+    :gsub('%-+$', '')        -- strip trailing
+end
+
+local function discover_repos()
+  local ok, stdout = wezterm.run_child_process({
+    'powershell.exe', '-NoProfile', '-NoLogo', '-NonInteractive', '-Command',
+    'Get-ChildItem "D:\\repo" -Recurse -Depth 4 -Force -Filter ".git" ' ..
+    '| Where-Object { $_.FullName -notmatch "[\\\\/]\\.worktrees[\\\\/]|[\\\\/]archive[\\\\/]" } ' ..
+    '| ForEach-Object { $_.Parent.FullName } ' ..
+    '| Sort-Object -Unique',
+  })
+  if not ok then return {} end
+
+  local repos = {}
+  for line in stdout:gmatch('[^\r\n]+') do
+    line = line:match('^%s*(.-)%s*$')  -- trim
+    if line ~= '' then
+      local rel = line:gsub('D:\\repo\\', ''):gsub('D:/repo/', ''):gsub('\\', '/')
+      table.insert(repos, { path = line, rel = rel, ws = path_to_ws_name(rel) })
+    end
+  end
+  return repos
+end
+
+local function launch_repo(win, pane, repo)
+  -- If workspace already open, just switch to it
+  for _, name in ipairs(wezterm.mux.get_workspace_names()) do
+    if name == repo.ws then
+      win:perform_action(act.SwitchToWorkspace { name = repo.ws }, pane)
+      return
+    end
+  end
+  -- Otherwise run the workspace opener script (creates dual-pane + updates registry)
+  wezterm.run_child_process({
+    'powershell.exe', '-NoProfile', '-NoLogo', '-NonInteractive',
+    '-File', OPEN_WS_SCRIPT,
+    '-WorkspaceName', repo.ws,
+    '-ProjectPath', repo.path,
+  })
+  win:perform_action(act.SwitchToWorkspace { name = repo.ws }, pane)
+end
+
 -- ── Keybindings ───────────────────────────────────────────────────────────────
 --
 --  Nominal usage: 1–3 horizontal panes per tab, 1–3 tabs per workspace.
 --
---  PANE NAV   A=left  D=right       (horizontal only — panes are side by side)
---  TAB NAV    W=prev  S=next        (W/S traverse the tab list up/down)
+--  PANE NAV   A=left  D=right
+--  TAB NAV    W=prev  S=next
 --  PANE OPS   Z=zoom  X=close  C=split-H  V=split-V  T=new-tab
---  WORKSPACES F=fuzzy  R=rename  [/]=cycle
---  HELP       /=persistent overlay (Alt+X to close)
+--  WORKSPACES F=fuzzy  R=rename  [/]=cycle  G=repo launcher
+--  HELP       /=keymap pane
 --
 config.keys = {
 
@@ -183,6 +239,25 @@ config.keys = {
   { key = 't', mods = 'ALT', action = act.SpawnTab 'CurrentPaneDomain'           },
 
   -- ── Workspace management ──────────────────────────────────────────────
+  -- Alt+G: repo launcher — fuzzy-pick any git repo under D:\repo
+  { key = 'g', mods = 'ALT',
+    action = wezterm.action_callback(function(win, pane)
+      local repos = discover_repos()
+      if #repos == 0 then return end
+      local choices = {}
+      for _, r in ipairs(repos) do
+        table.insert(choices, { id = r.path, label = r.rel })
+      end
+      win:perform_action(act.InputSelector {
+        title             = 'Open repo workspace  (Alt+G)',
+        choices           = choices,
+        fuzzy             = true,
+        action = wezterm.action_callback(function(w, p, id, label)
+          if not id then return end
+          launch_repo(w, p, { path = id, rel = label, ws = path_to_ws_name(label) })
+        end),
+      }, pane)
+    end) },
   { key = 'f', mods = 'ALT',
     action = act.ShowLauncherArgs { flags = 'WORKSPACES|FUZZY' } },
   { key = 'r', mods = 'ALT',
