@@ -40,13 +40,18 @@ wezterm.on('update-status', function(window, _pane)
     { Attribute = { Intensity = 'Bold'  } },
     { Text = '  ⬡ ' .. ws .. '  ' },
   })
+  local task = _cached_agent_task ~= "" and ('  ·  ' .. _cached_agent_task:sub(1, 48)) or ""
   window:set_right_status(wezterm.format {
     { Foreground = { Color = '#585b70' } },
-    { Text = os.date('%H:%M') .. '   Alt+/  keys  ' },
+    { Text = os.date('%H:%M') .. task .. '   Alt+/  keys  ' },
   })
 end)
 
 -- ── Nexus sync: write active workspace on focus / tab change ─────────────────
+-- Cached agent task shown in the right status bar. Updated here (on focus
+-- change) rather than in update-status (every tick) to avoid hammering disk.
+local _cached_agent_task = ""
+
 local function write_active(window, pane)
   if not window:is_focused() then return end
   local workspace = window:active_workspace()
@@ -54,13 +59,33 @@ local function write_active(window, pane)
   local cwd       = cwd_obj and cwd_obj.file_path or ''
   if cwd:match('^/[A-Za-z]:') then cwd = cwd:sub(2) end
   cwd = cwd:gsub('\\', '/')
+
+  -- Resolve git branch for the current working directory.
+  local branch = ""
+  local ok, stdout = wezterm.run_child_process({
+    'git', '-C', cwd:gsub('/', '\\'), 'branch', '--show-current',
+  })
+  if ok then branch = stdout:match('^%s*(.-)%s*$') or "" end
+
+  -- Read helm-status.json from the project root to show agent task in status bar.
+  local status_file = cwd:gsub('/$', '') .. '/helm-status.json'
+  local sf = io.open(status_file, 'r')
+  if sf then
+    local raw = sf:read('*a')
+    sf:close()
+    _cached_agent_task = raw:match('"currentTask"%s*:%s*"([^"]*)"') or ""
+  else
+    _cached_agent_task = ""
+  end
+
   local path = wezterm.home_dir .. '/.claude/workspaces/active.json'
   local f = io.open(path, 'w')
   if f then
     f:write(string.format(
-      '{"workspace":"%s","cwd":"%s","updatedAt":"%s"}\n',
+      '{"workspace":"%s","cwd":"%s","branch":"%s","updatedAt":"%s"}\n',
       workspace:gsub('"', '\\"'),
       cwd:gsub('"', '\\"'),
+      branch:gsub('"', '\\"'),
       os.date('!%Y-%m-%dT%H:%M:%SZ')
     ))
     f:close()
