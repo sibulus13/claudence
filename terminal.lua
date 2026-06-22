@@ -274,19 +274,15 @@ end
 
 local function launch_repo(win, pane, repo)
   push_recent(repo.rel)
-  for _, name in ipairs(wezterm.mux.get_workspace_names()) do
-    if name == repo.ws then
-      win:perform_action(act.SwitchToWorkspace { name = repo.ws }, pane)
-      return
-    end
-  end
-  wezterm.run_child_process({
-    'powershell.exe', '-NoProfile', '-NoLogo', '-NonInteractive',
-    '-File', OPEN_WS_SCRIPT,
-    '-WorkspaceName', repo.ws,
-    '-ProjectPath', repo.path,
-  })
-  win:perform_action(act.SwitchToWorkspace { name = repo.ws }, pane)
+  -- Open as a new tab in the CURRENT workspace so Alt+W/S can cycle back.
+  -- The tab title is set to the repo's relative path for easy identification.
+  win:perform_action(
+    act.SpawnCommandInNewTab {
+      cwd   = repo.path,
+      label = repo.rel,
+    },
+    pane
+  )
 end
 
 -- ── Keybindings ───────────────────────────────────────────────────────────────
