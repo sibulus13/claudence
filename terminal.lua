@@ -272,19 +272,19 @@ end
 local function make_tab(mux_win, title, cwd)
   local ws  = (load_repos_cfg().workspaces or {})[title] or {}
 
-  -- Build args for left pane: wrap cmd so shell remains after exit
+  -- Left pane: use -NoExit so the same PS session becomes the interactive shell
+  -- once the restore command exits. Avoids the nested-PS TUI issue where
+  -- -Command "...; child_ps" breaks interactive apps like Claude Code.
   local left_args
   if ws.left and ws.left ~= '' then
     local safe = cwd:gsub("'", "''")
     left_args = {
-      'powershell.exe', '-NoProfile', '-NoLogo', '-Command',
-      "Set-Location '" .. safe .. "'; " .. ws.left ..
-      "; if ($LASTEXITCODE -ne 0) { Write-Host '[nexus] ' '" .. ws.left .. " exited $LASTEXITCODE' }" ..
-      "; powershell.exe -NoProfile -NoLogo",
+      'powershell.exe', '-NoProfile', '-NoLogo', '-NoExit', '-Command',
+      "Set-Location '" .. safe .. "'; " .. ws.left,
     }
   end
 
-  -- Build args for right pane: run service/tool directly
+  -- Right pane: run service/tool directly (no wrapper needed)
   local right_args
   if ws.right and ws.right ~= '' then
     local parts = {}
@@ -294,11 +294,12 @@ local function make_tab(mux_win, title, cwd)
 
   local spawn_cfg = left_args and { cwd = cwd, args = left_args } or { cwd = cwd }
   local tab = mux_win:spawn_tab(spawn_cfg)
-  if not tab then return end
+  if not tab then return nil end
   tab:set_title(title)
   local left_pane = tab:active_pane()
   left_pane:split { direction = 'Right', size = 0.40, args = right_args, cwd = cwd }
   left_pane:activate()
+  return tab
 end
 
 wezterm.on('gui-startup', function(cmd)
@@ -317,26 +318,26 @@ wezterm.on('gui-startup', function(cmd)
   shell_pane:split { direction = 'Right', size = 0.28, args = keymap_args(), cwd = REPO_DIR }
   shell_pane:activate()
 
-  -- Restore previously open repo tabs (if session is < 12 h old)
-  local session = load_session()
+  -- Restore previously open repo tabs (if session is < 12 h old).
+  -- Capture the tab object that matches activeTab so we can activate it directly
+  -- (avoids a post-loop title lookup that can race with WezTerm's async title init).
+  local session       = load_session()
+  local active_tab_ref = nil
   for _, title in ipairs(session.tabs) do
     if not title:match('^~/') then
-      make_tab(window, title, REPO_DIR .. '/' .. title)
-    end
-  end
-
-  -- Restore focus to the last active tab; fall back to Nexus (tab 1) if not found.
-  local focused = false
-  if session.activeTab ~= '' and session.activeTab ~= 'Nexus' then
-    for _, tab in ipairs(window:tabs()) do
-      if tab:get_title() == session.activeTab then
-        tab:activate()
-        focused = true
-        break
+      local tab = make_tab(window, title, REPO_DIR .. '/' .. title)
+      if tab and title == session.activeTab then
+        active_tab_ref = tab
       end
     end
   end
-  if not focused then window:tabs()[1]:activate() end
+
+  -- Focus the saved active tab, or Nexus if none matched.
+  if active_tab_ref then
+    active_tab_ref:activate()
+  else
+    window:tabs()[1]:activate()
+  end
   window:gui_window():maximize()
 end)
 
