@@ -56,11 +56,19 @@ wezterm.on('update-status', function(window, _pane)
   end
   window:set_left_status(wezterm.format(left_cells))
 
-  -- Right: time + keybinding hint only
-  window:set_right_status(wezterm.format {
-    { Foreground = { Color = '#585b70' } },
-    { Text = os.date('%H:%M') .. '   Alt+/  keys  ' },
-  })
+  -- Right: show directional split hint when split_dir key table is active
+  if window:active_key_table() == 'split_dir' then
+    window:set_right_status(wezterm.format {
+      { Foreground = { Color = '#f9e2af' } },
+      { Attribute = { Intensity = 'Bold'   } },
+      { Text = '  split →D  ←A  ↓S  ↑W   esc cancel  ' },
+    })
+  else
+    window:set_right_status(wezterm.format {
+      { Foreground = { Color = '#585b70' } },
+      { Text = os.date('%H:%M') .. '   Alt+/  keys  ' },
+    })
+  end
 
   -- Periodic session save (every 30 s) so the active tab is always current.
   -- window-focus-changed only fires on OS-level focus loss, not tab switches.
@@ -470,6 +478,18 @@ end
 --  WORKSPACES F=fuzzy  R=rename  [/]=cycle  G=repo launcher
 --  HELP       /=keymap pane
 --
+-- Alt+B activates this table; press one of WASD to split in that direction.
+-- one_shot = true means it auto-pops after one keypress (or after timeout).
+config.key_tables = {
+  split_dir = {
+    { key = 'd', action = act.SplitPane { direction = 'Right' } },
+    { key = 'a', action = act.SplitPane { direction = 'Left'  } },
+    { key = 's', action = act.SplitPane { direction = 'Down'  } },
+    { key = 'w', action = act.SplitPane { direction = 'Up'    } },
+    { key = 'Escape', action = act.PopKeyTable },
+  },
+}
+
 config.keys = {
 
   -- ── Pane navigation (cycle through all panes regardless of split axis) ──
@@ -491,8 +511,10 @@ config.keys = {
   { key = 'z', mods = 'ALT', action = act.TogglePaneZoomState                    },
   { key = 'x', mods = 'ALT', action = act.CloseCurrentPane { confirm = true }    },
   { key = 'q', mods = 'ALT', action = act.CloseCurrentTab  { confirm = true }    },
-  { key = 'c', mods = 'ALT', action = act.SplitHorizontal { domain = 'CurrentPaneDomain' } },
-  { key = 'v', mods = 'ALT', action = act.SplitVertical   { domain = 'CurrentPaneDomain' } },
+  { key = 'c', mods = 'ALT', action = act.SplitPane { direction = 'Right' } },
+  { key = 'e', mods = 'ALT', action = act.PaneSelect { mode = 'SwapWithActive' } },
+  { key = 'b', mods = 'ALT', action = act.ActivateKeyTable {
+      name = 'split_dir', one_shot = true, timeout_milliseconds = 8000 } },
   { key = 't', mods = 'ALT', action = act.SpawnTab 'CurrentPaneDomain'           },
 
   -- ── Workspace management ──────────────────────────────────────────────
