@@ -135,17 +135,29 @@ save_session = function(window)
     if not title:find('/') then goto continue end  -- skip Nexus/shell-named tabs
     parts[#parts + 1] = '"' .. title:gsub('"', '\\"') .. '"'
 
-    -- Auto-detect Claude running in the leftmost pane; persist as restore command.
-    local panes = tab:panes()
-    local left_pane = panes[1]
-    if left_pane then
-      local proc = left_pane:get_foreground_process_name() or ''
+    -- panes_with_info gives position data needed for layout detection.
+    local pinfo = tab:panes_with_info()
+
+    -- Auto-detect Claude running in the leftmost/topmost pane.
+    if pinfo[1] then
+      local proc = pinfo[1].pane:get_foreground_process_name() or ''
       if proc:lower():find('claude') then
         cfg.workspaces[title] = cfg.workspaces[title] or {}
         if cfg.workspaces[title].left ~= 'claude --continue' then
           cfg.workspaces[title].left = 'claude --continue'
           changed = true
         end
+      end
+    end
+
+    -- Detect split direction from pane positions: if pane 2 is below pane 1
+    -- it's a top/bottom split (Down); otherwise side-by-side (Right).
+    if pinfo[2] then
+      local dir = (pinfo[2].top > pinfo[1].top) and 'Down' or 'Right'
+      cfg.workspaces[title] = cfg.workspaces[title] or {}
+      if cfg.workspaces[title].split_direction ~= dir then
+        cfg.workspaces[title].split_direction = dir
+        changed = true
       end
     end
     ::continue::
@@ -300,12 +312,13 @@ local function make_tab(mux_win, title, cwd)
     right_args = parts
   end
 
+  local split_dir = ws.split_direction or 'Right'
   local spawn_cfg = left_args and { cwd = cwd, args = left_args } or { cwd = cwd }
   local tab = mux_win:spawn_tab(spawn_cfg)
   if not tab then return nil end
   tab:set_title(title)
   local left_pane = tab:active_pane()
-  left_pane:split { direction = 'Right', size = 0.40, args = right_args, cwd = cwd }
+  left_pane:split { direction = split_dir, size = 0.40, args = right_args, cwd = cwd }
   left_pane:activate()
   return tab
 end
@@ -371,14 +384,7 @@ wezterm.on('window-config-reloaded', function(window, _pane)
   window:toast_notification('Nexus', 'config reloaded', nil, 1500)
 end)
 
--- ── Help: opens a persistent "keys" tab showing the keymap ──────────────────
-
-local function show_keymap(win, pane)
-  win:perform_action(
-    act.SpawnCommandInNewTab { args = keymap_args() },
-    pane
-  )
-end
+-- ── Help: jump to Nexus tab (always tab 0, always has the keymap pane) ───────
 
 -- ── Repo launcher ─────────────────────────────────────────────────────────────
 -- Alt+O: fuzzy picker over all git repos under D:\repo.
@@ -591,9 +597,8 @@ config.keys = {
   { key = 'C', mods = 'CTRL|SHIFT', action = act.CopyTo 'Clipboard'    },
   { key = 'V', mods = 'CTRL|SHIFT', action = act.PasteFrom 'Clipboard' },
 
-  -- ── Help: persistent keymap pane (Alt+X to close) ────────────────────
-  { key = '/', mods = 'ALT',
-    action = wezterm.action_callback(show_keymap) },
+  -- ── Help: jump to Nexus tab (tab 0) where the keymap pane lives ──────
+  { key = '/', mods = 'ALT', action = act.ActivateTab(0) },
 }
 
 -- ── Scrollback / defaults ─────────────────────────────────────────────────────

@@ -1,33 +1,36 @@
 [1;97m NEXUS[0m  [2mAlt + key[0m
 [90m ─────────────────────────[0m
 
- [1;36mNAVIGATE[0m
+ [1;38;2;200;70;155mNAVIGATE[0m
  [90m─────────────────────────[0m
   [97mA / D[0m   pane    [2m◀  ▶[0m
   [97mW / S[0m   tab     [2m◀  ▶[0m
   [97m1 – 5[0m   jump to tab
 
- [1;36mLAYOUT[0m
+ [1;38;2;200;70;155mPANES[0m
  [90m─────────────────────────[0m
   [97mC[0m       split right
-  [97mB[0m       split [2m+ W↑ A← S↓ D→[0m
+  [97mB[0m       split [2m+W↑ A← S↓ D→[0m
   [97mE[0m       swap pane
   [97mZ[0m       zoom pane
-  [97mT[0m       new tab
   [97mX[0m       close pane
+
+ [1;38;2;200;70;155mTABS[0m
+ [90m─────────────────────────[0m
+  [97mT[0m       new tab
   [97mQ[0m       close tab
 
- [1;36mREPOS[0m
+ [1;38;2;200;70;155mREPOS[0m
  [90m─────────────────────────[0m
   [97mO[0m       open launcher
   [97mP[0m       pin / unpin
 
- [1;36mWORKSPACES[0m
+ [1;38;2;200;70;155mWORKSPACES[0m
  [90m─────────────────────────[0m
   [97mF[0m       fuzzy pick
   [97mN[0m       rename
   [97m[ / ][0m   cycle
 
 [90m ─────────────────────────[0m
-  [2m/   toggle this pane[0m
+  [2m/   goto nexus[0m
 [90m ─────────────────────────[0m
