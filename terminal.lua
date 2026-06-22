@@ -78,14 +78,21 @@ local REPO_DIR    = 'D:/repo'
 local function keymap_args()
   if wezterm.target_triple:find('windows') then
     local f = keymap_file:gsub('/', '\\')
+    -- ESC[2J = erase screen, ESC[H = cursor home (row 1 col 1).
+    -- More reliable than Clear-Host in non-interactive pane contexts.
     return {
       'powershell.exe', '-NoProfile', '-Command',
       '[Console]::OutputEncoding=[Text.Encoding]::UTF8; ' ..
-      'while ($true) { Clear-Host; Get-Content "' .. f .. '"; Start-Sleep -Seconds 86400 }',
+      '$e=[char]27; ' ..
+      'while ($true) { ' ..
+        'Write-Host "${e}[2J${e}[H" -NoNewline; ' ..
+        'Get-Content "' .. f .. '" -Encoding UTF8; ' ..
+        'Start-Sleep -Seconds 86400 ' ..
+      '}',
     }
   end
   return { 'bash', '-c',
-    'while true; do clear; cat "' .. keymap_file .. '"; sleep 86400; done' }
+    'while true; do printf "\\033[2J\\033[H"; cat "' .. keymap_file .. '"; sleep 86400; done' }
 end
 
 wezterm.on('gui-startup', function(cmd)

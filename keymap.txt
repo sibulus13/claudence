@@ -1,27 +1,19 @@
-+------------------+--------------------------------------------+
-|  NEXUS KEYBINDINGS   Alt + key  (left hand)                |
-+------------------+--------------------------------------------+
-|  PANE NAV        |  A  <-  left pane                        |
-|  1-3 horiz panes |  D  ->  right pane                       |
-+------------------+--------------------------------------------+
-|  TAB NAV         |  W  ^   previous tab                     |
-|  1-3 tabs        |  S  v   next tab                         |
-|                  |  1 2 3 4 5   jump to tab                 |
-+------------------+--------------------------------------------+
-|  PANE OPS        |  C   split left/right                    |
-|                  |  V   split top/bottom                    |
-|                  |  Z   zoom / unzoom pane                  |
-|                  |  X   close pane  (confirms)              |
-|                  |  T   new tab                             |
-+------------------+--------------------------------------------+
-|  WORKSPACES      |  F   fuzzy workspace picker              |
-|                  |  R   rename current workspace            |
-|                  |  [   cycle workspace left                |
-|                  |  ]   cycle workspace right               |
-+------------------+--------------------------------------------+
-|  CLIPBOARD       |  Ctrl+Shift+C   copy                     |
-|                  |  Ctrl+Shift+V   paste                    |
-+------------------+--------------------------------------------+
-|  HELP            |  /   open this tab  (navigate away with  |
-|                  |      Alt+W/S or Alt+1-5 to return)       |
-+------------------+--------------------------------------------+
+ NEXUS  Alt + key
+ --------------------------------
+ A / D   pane   left / right
+ W / S   tab    prev / next
+ 1 - 5   tab    jump to tab
+ --------------------------------
+ Z       zoom pane
+ X       close pane
+ C       split left/right
+ V       split top/bottom
+ T       new tab
+ --------------------------------
+ F       fuzzy workspace
+ R       rename workspace
+ [       cycle left
+ ]       cycle right
+ --------------------------------
+ /       toggle this pane
+ --------------------------------
