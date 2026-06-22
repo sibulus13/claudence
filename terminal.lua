@@ -39,15 +39,24 @@ local _cached_agent_task = ""
 
 wezterm.on('update-status', function(window, _pane)
   local ws = window:active_workspace()
-  window:set_left_status(wezterm.format {
+
+  -- Left: workspace name (line 1); active agent task (line 2, only when present)
+  local left_cells = {
     { Foreground = { Color = '#a6e3a1' } },
-    { Attribute = { Intensity = 'Bold'  } },
+    { Attribute = { Intensity = 'Bold' } },
     { Text = '  ⬡ ' .. ws .. '  ' },
-  })
-  local task = _cached_agent_task ~= "" and ('  ·  ' .. _cached_agent_task:sub(1, 48)) or ""
+  }
+  if _cached_agent_task ~= "" then
+    table.insert(left_cells, { Foreground = { Color = '#585b70' } })
+    table.insert(left_cells, { Attribute = { Intensity = 'Normal' } })
+    table.insert(left_cells, { Text = '\n  · ' .. _cached_agent_task:sub(1, 60) .. '  ' })
+  end
+  window:set_left_status(wezterm.format(left_cells))
+
+  -- Right: time + keybinding hint only
   window:set_right_status(wezterm.format {
     { Foreground = { Color = '#585b70' } },
-    { Text = os.date('%H:%M') .. task .. '   Alt+/  keys  ' },
+    { Text = os.date('%H:%M') .. '   Alt+/  keys  ' },
   })
 end)
 
@@ -161,15 +170,26 @@ local function write_active(window, pane)
   })
   if ok then branch = stdout:match('^%s*(.-)%s*$') or "" end
 
-  -- Read helm-status.json from the project root to show agent task in status bar.
+  -- Read helm-status.json — only show if written within the last 2 hours.
+  -- Stale entries from completed agent sessions are silently suppressed.
   local status_file = cwd:gsub('/$', '') .. '/helm-status.json'
   local sf = io.open(status_file, 'r')
+  _cached_agent_task = ""
   if sf then
-    local raw = sf:read('*a')
-    sf:close()
-    _cached_agent_task = raw:match('"currentTask"%s*:%s*"([^"]*)"') or ""
-  else
-    _cached_agent_task = ""
+    local raw = sf:read('*a'); sf:close()
+    local task    = raw:match('"currentTask"%s*:%s*"([^"]*)"')
+    local updated = raw:match('"updatedAt"%s*:%s*"([^"]*)"')
+    if task and updated then
+      local y, mo, d, h, m = updated:match('(%d+)-(%d+)-(%d+)T(%d+):(%d+)')
+      if y then
+        local age = os.time() - os.time({
+          year = tonumber(y), month = tonumber(mo), day = tonumber(d),
+          hour = tonumber(h), min  = tonumber(m),   sec = 0,
+          isdst = false,
+        })
+        if age < 7200 then _cached_agent_task = task end
+      end
+    end
   end
 
   local path = wezterm.home_dir .. '/.claude/workspaces/active.json'
