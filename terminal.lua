@@ -81,18 +81,23 @@ local function keymap_args()
     -- ESC[2J = erase screen, ESC[H = cursor home (row 1 col 1).
     -- More reliable than Clear-Host in non-interactive pane contexts.
     return {
-      'powershell.exe', '-NoProfile', '-Command',
+      -- -NoLogo suppresses the PS banner; -NonInteractive suppresses prompts.
+      -- Both would otherwise add lines to scrollback before the loop clears them.
+      'powershell.exe', '-NoProfile', '-NoLogo', '-NonInteractive', '-Command',
       '[Console]::OutputEncoding=[Text.Encoding]::UTF8; ' ..
       '$e=[char]27; ' ..
       'while ($true) { ' ..
-        'Write-Host "${e}[2J${e}[H" -NoNewline; ' ..
+        -- ESC[3J clears scrollback (not just visible screen); ESC[2J clears
+        -- visible screen; ESC[H homes the cursor. All three together guarantee
+        -- the viewport is flush at row 1 with no residual offset.
+        'Write-Host "${e}[3J${e}[2J${e}[H" -NoNewline; ' ..
         'Get-Content "' .. f .. '" -Encoding UTF8; ' ..
         'Start-Sleep -Seconds 86400 ' ..
       '}',
     }
   end
   return { 'bash', '-c',
-    'while true; do printf "\\033[2J\\033[H"; cat "' .. keymap_file .. '"; sleep 86400; done' }
+    'while true; do printf "\\033[3J\\033[2J\\033[H"; cat "' .. keymap_file .. '"; sleep 86400; done' }
 end
 
 wezterm.on('gui-startup', function(cmd)
