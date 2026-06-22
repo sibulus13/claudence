@@ -11,6 +11,7 @@
  T       new tab
  --------------------------------
  O       open repo (launcher)
+ P       pin/unpin repo as fav
  F       fuzzy open workspace
  N       name/rename workspace
  [       cycle left

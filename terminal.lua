@@ -179,20 +179,44 @@ local function show_keymap(win, pane)
 end
 
 -- ── Repo launcher ─────────────────────────────────────────────────────────────
--- Alt+G opens a fuzzy picker of every git repo under D:\repo, excluding
--- .worktrees (ephemeral branches) and archive (retired projects).
--- Selecting a repo creates a dual-pane workspace via open-workspace.ps1,
--- or focuses it if the workspace already exists in this WezTerm session.
+-- Alt+O: fuzzy picker over all git repos under D:\repo.
+-- Favorites (★) are pinned to the top; recently opened repos come next;
+-- everything else is below but still fuzzy-searchable.
+-- Alt+P: toggle-pin the current workspace's repo as a favorite.
 
 local OPEN_WS_SCRIPT = (os.getenv('USERPROFILE') or '') .. '\\.claude\\scripts\\open-workspace.ps1'
+local REPOS_CFG_PATH = wezterm.home_dir .. '/.claude/repos.json'
+local REPOS_MAX_RECENTS = 10
 
 local function path_to_ws_name(rel)
   return rel:lower()
-    :gsub('[/\\%s]+', '-')   -- separators + spaces → dash
-    :gsub('[^a-z0-9%-]', '') -- strip non-alphanumeric
-    :gsub('%-+', '-')        -- collapse runs
-    :gsub('^%-+', '')        -- strip leading
-    :gsub('%-+$', '')        -- strip trailing
+    :gsub('[/\\%s]+', '-')
+    :gsub('[^a-z0-9%-]', '')
+    :gsub('%-+', '-')
+    :gsub('^%-+', '')
+    :gsub('%-+$', '')
+end
+
+local function load_repos_cfg()
+  local f = io.open(REPOS_CFG_PATH, 'r')
+  if not f then return { favorites = {}, recents = {} } end
+  local raw = f:read('*a'); f:close()
+  local ok, data = pcall(wezterm.json_parse, raw)
+  if not ok or type(data) ~= 'table' then return { favorites = {}, recents = {} } end
+  return { favorites = data.favorites or {}, recents = data.recents or {} }
+end
+
+local function save_repos_cfg(cfg)
+  local function arr(t)
+    local parts = {}
+    for _, v in ipairs(t) do parts[#parts+1] = '"' .. v:gsub('"', '\\"') .. '"' end
+    return '[' .. table.concat(parts, ',') .. ']'
+  end
+  local f = io.open(REPOS_CFG_PATH, 'w')
+  if f then
+    f:write('{"favorites":' .. arr(cfg.favorites) .. ',"recents":' .. arr(cfg.recents) .. '}\n')
+    f:close()
+  end
 end
 
 local function discover_repos()
@@ -204,10 +228,9 @@ local function discover_repos()
     '| Sort-Object -Unique',
   })
   if not ok then return {} end
-
   local repos = {}
   for line in stdout:gmatch('[^\r\n]+') do
-    line = line:match('^%s*(.-)%s*$')  -- trim
+    line = line:match('^%s*(.-)%s*$')
     if line ~= '' then
       local rel = line:gsub('D:\\repo\\', ''):gsub('D:/repo/', ''):gsub('\\', '/')
       table.insert(repos, { path = line, rel = rel, ws = path_to_ws_name(rel) })
@@ -216,15 +239,47 @@ local function discover_repos()
   return repos
 end
 
+local function sorted_choices(repos, cfg)
+  local fav_idx, rec_idx = {}, {}
+  for i, r in ipairs(cfg.favorites) do fav_idx[r] = i end
+  for i, r in ipairs(cfg.recents)   do rec_idx[r] = i end
+
+  table.sort(repos, function(a, b)
+    local af = fav_idx[a.rel] or math.huge
+    local bf = fav_idx[b.rel] or math.huge
+    if af ~= bf then return af < bf end
+    local ar = rec_idx[a.rel] or math.huge
+    local br = rec_idx[b.rel] or math.huge
+    if ar ~= br then return ar < br end
+    return a.rel < b.rel
+  end)
+
+  local choices = {}
+  for _, r in ipairs(repos) do
+    local prefix = fav_idx[r.rel] and '\u{2605} ' or (rec_idx[r.rel] and '' or '  ')
+    table.insert(choices, { id = r.path, label = prefix .. r.rel })
+  end
+  return choices
+end
+
+local function push_recent(rel)
+  local cfg = load_repos_cfg()
+  local next = { rel }
+  for _, r in ipairs(cfg.recents) do
+    if r ~= rel and #next < REPOS_MAX_RECENTS then next[#next+1] = r end
+  end
+  cfg.recents = next
+  save_repos_cfg(cfg)
+end
+
 local function launch_repo(win, pane, repo)
-  -- If workspace already open, just switch to it
+  push_recent(repo.rel)
   for _, name in ipairs(wezterm.mux.get_workspace_names()) do
     if name == repo.ws then
       win:perform_action(act.SwitchToWorkspace { name = repo.ws }, pane)
       return
     end
   end
-  -- Otherwise run the workspace opener script (creates dual-pane + updates registry)
   wezterm.run_child_process({
     'powershell.exe', '-NoProfile', '-NoLogo', '-NonInteractive',
     '-File', OPEN_WS_SCRIPT,
@@ -269,24 +324,51 @@ config.keys = {
   { key = 't', mods = 'ALT', action = act.SpawnTab 'CurrentPaneDomain'           },
 
   -- ── Workspace management ──────────────────────────────────────────────
-  -- Alt+O: repo launcher — fuzzy-pick any git repo under D:\repo
+  -- Alt+O: repo launcher — favorites first, then recents, then rest
   { key = 'o', mods = 'ALT',
     action = wezterm.action_callback(function(win, pane)
       local repos = discover_repos()
       if #repos == 0 then return end
-      local choices = {}
-      for _, r in ipairs(repos) do
-        table.insert(choices, { id = r.path, label = r.rel })
-      end
+      local cfg     = load_repos_cfg()
+      local choices = sorted_choices(repos, cfg)
       win:perform_action(act.InputSelector {
-        title             = 'Open repo workspace  (Alt+G)',
-        choices           = choices,
-        fuzzy             = true,
-        action = wezterm.action_callback(function(w, p, id, label)
+        title  = '\u{2605} favorites  ·  recent  ·  all repos',
+        choices = choices,
+        fuzzy   = true,
+        action  = wezterm.action_callback(function(w, p, id, label)
           if not id then return end
-          launch_repo(w, p, { path = id, rel = label, ws = path_to_ws_name(label) })
+          -- Strip the visual prefix (★ or leading spaces) to recover rel
+          local rel = label:match('^[%s\u{2605}]*(.+)$') or label
+          launch_repo(w, p, { path = id, rel = rel, ws = path_to_ws_name(rel) })
         end),
       }, pane)
+    end) },
+
+  -- Alt+P: toggle-pin current repo as favorite
+  { key = 'p', mods = 'ALT',
+    action = wezterm.action_callback(function(win, pane)
+      local cwd_obj = pane:get_current_working_dir()
+      local cwd = cwd_obj and cwd_obj.file_path or ''
+      if cwd:match('^/[A-Za-z]:') then cwd = cwd:sub(2) end
+      cwd = cwd:gsub('\\', '/'):gsub('/$', '')
+      local rel = cwd:match('^[Dd]:/repo/(.+)$')
+      if not rel then
+        win:toast_notification('Nexus', 'Not inside D:/repo', nil, 1500)
+        return
+      end
+      local cfg = load_repos_cfg()
+      local found, new_favs = false, {}
+      for _, r in ipairs(cfg.favorites) do
+        if r == rel then found = true else new_favs[#new_favs+1] = r end
+      end
+      if found then
+        cfg.favorites = new_favs
+        win:toast_notification('Nexus', 'Unpinned  ' .. rel, nil, 1500)
+      else
+        table.insert(cfg.favorites, 1, rel)
+        win:toast_notification('Nexus', '\u{2605} Pinned  ' .. rel, nil, 1500)
+      end
+      save_repos_cfg(cfg)
     end) },
   { key = 'f', mods = 'ALT',
     action = act.ShowLauncherArgs { flags = 'WORKSPACES|FUZZY' } },
