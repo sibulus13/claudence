@@ -33,6 +33,10 @@ wezterm.on('format-tab-title', function(tab, _tabs, _panes, _conf, _hover, _max_
 end)
 
 -- ── Status bar ────────────────────────────────────────────────────────────────
+-- _cached_agent_task must be declared BEFORE update-status references it.
+-- Lua local scoping: a local is only visible from its declaration line onward.
+local _cached_agent_task = ""
+
 wezterm.on('update-status', function(window, _pane)
   local ws = window:active_workspace()
   window:set_left_status(wezterm.format {
@@ -140,10 +144,8 @@ local function load_session()
 end
 
 -- ── Nexus sync: write active workspace on focus / tab change ─────────────────
--- Cached agent task shown in the right status bar. Updated here (on focus
--- change) rather than in update-status (every tick) to avoid hammering disk.
-local _cached_agent_task = ""
-
+-- _cached_agent_task is declared at the top of the file (before update-status).
+-- write_active updates it here on focus change, keeping update-status disk-free.
 local function write_active(window, pane)
   if not window:is_focused() then return end
   local workspace = window:active_workspace()
@@ -289,9 +291,15 @@ end)
 wezterm.on('window-focus-changed', write_active)
 wezterm.on('window-activated',     write_active)
 
--- Toast when config hot-reloads so it's obvious the new bindings are live.
+-- Toast on config reload — but NOT on the initial startup load.
+-- wezterm.GLOBAL persists across config reloads within a session and resets
+-- on WezTerm exit, so the first event after each cold start is always silent.
 wezterm.on('window-config-reloaded', function(window, _pane)
-  window:toast_notification('WezTerm', 'config reloaded', nil, 1500)
+  if not wezterm.GLOBAL.nexus_boot_done then
+    wezterm.GLOBAL.nexus_boot_done = true
+    return
+  end
+  window:toast_notification('Nexus', 'config reloaded', nil, 1500)
 end)
 
 -- ── Help: opens a persistent "keys" tab showing the keymap ──────────────────
