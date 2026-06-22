@@ -354,7 +354,8 @@ local function discover_repos()
   local ok, stdout = wezterm.run_child_process({
     'powershell.exe', '-NoProfile', '-NoLogo', '-NonInteractive', '-Command',
     'Get-ChildItem "D:\\repo" -Recurse -Depth 4 -Force -Filter ".git" ' ..
-    '| Where-Object { $_.FullName -notmatch "[\\\\/]\\.worktrees[\\\\/]|[\\\\/]archive[\\\\/]" } ' ..
+    '| Where-Object { $_.FullName -notmatch ' ..
+    '"[\\\\/](\\.worktrees|archive|_Misc|example[s]?)[\\\\/]" } ' ..
     '| ForEach-Object { $_.Parent.FullName } ' ..
     '| Sort-Object -Unique',
   })
@@ -371,14 +372,18 @@ local function discover_repos()
 end
 
 local function sorted_choices(repos, cfg)
-  local fav_idx, rec_idx = {}, {}
+  local fav_idx, rec_idx, freq = {}, {}, cfg.frequency or {}
   for i, r in ipairs(cfg.favorites) do fav_idx[r] = i end
   for i, r in ipairs(cfg.recents)   do rec_idx[r] = i end
 
+  -- Sort: favorites first (by pin order), then frequency desc, then recency, then alpha.
   table.sort(repos, function(a, b)
     local af = fav_idx[a.rel] or math.huge
     local bf = fav_idx[b.rel] or math.huge
     if af ~= bf then return af < bf end
+    local afreq = freq[a.rel] or 0
+    local bfreq = freq[b.rel] or 0
+    if afreq ~= bfreq then return afreq > bfreq end
     local ar = rec_idx[a.rel] or math.huge
     local br = rec_idx[b.rel] or math.huge
     if ar ~= br then return ar < br end
@@ -391,24 +396,28 @@ local function sorted_choices(repos, cfg)
     table.insert(choices, { id = e.path, label = '~ ' .. e.label })
   end
   for _, r in ipairs(repos) do
-    local prefix = fav_idx[r.rel] and '\u{2605} ' or (rec_idx[r.rel] and '' or '  ')
+    local prefix = fav_idx[r.rel] and '\u{2605} ' or (rec_idx[r.rel] and '  ' or '  ')
     table.insert(choices, { id = r.path, label = prefix .. r.rel })
   end
   return choices
 end
 
-local function push_recent(rel)
+local function record_open(rel)
   local cfg = load_repos_cfg()
-  local next = { rel }
+  -- Update recents (most recent first, capped at REPOS_MAX_RECENTS)
+  local next_rec = { rel }
   for _, r in ipairs(cfg.recents) do
-    if r ~= rel and #next < REPOS_MAX_RECENTS then next[#next+1] = r end
+    if r ~= rel and #next_rec < REPOS_MAX_RECENTS then next_rec[#next_rec+1] = r end
   end
-  cfg.recents = next
+  cfg.recents = next_rec
+  -- Increment open frequency counter
+  cfg.frequency = cfg.frequency or {}
+  cfg.frequency[rel] = (cfg.frequency[rel] or 0) + 1
   save_repos_cfg(cfg)
 end
 
 local function launch_repo(win, pane, repo)
-  push_recent(repo.rel)
+  record_open(repo.rel)
   make_tab(win:mux_window(), repo.rel, repo.path)
 end
 
