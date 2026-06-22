@@ -81,23 +81,29 @@ local function keymap_args()
     -- ESC[2J = erase screen, ESC[H = cursor home (row 1 col 1).
     -- More reliable than Clear-Host in non-interactive pane contexts.
     return {
-      -- -NoLogo suppresses the PS banner; -NonInteractive suppresses prompts.
-      -- Both would otherwise add lines to scrollback before the loop clears them.
       'powershell.exe', '-NoProfile', '-NoLogo', '-NonInteractive', '-Command',
+      -- Poll window dimensions every 500ms; redraw only when they change.
+      -- This handles all resize events (split, zoom, window drag) without
+      -- relying on SIGWINCH, which PowerShell on Windows does not expose.
       '[Console]::OutputEncoding=[Text.Encoding]::UTF8; ' ..
-      '$e=[char]27; ' ..
+      '$e=[char]27; $lh=0; $lw=0; ' ..
       'while ($true) { ' ..
-        -- ESC[3J clears scrollback (not just visible screen); ESC[2J clears
-        -- visible screen; ESC[H homes the cursor. All three together guarantee
-        -- the viewport is flush at row 1 with no residual offset.
-        'Write-Host "${e}[3J${e}[2J${e}[H" -NoNewline; ' ..
-        'Get-Content "' .. f .. '" -Encoding UTF8; ' ..
-        'Start-Sleep -Seconds 86400 ' ..
+        '$h=[Console]::WindowHeight; $w=[Console]::WindowWidth; ' ..
+        'if ($h -ne $lh -or $w -ne $lw) { ' ..
+          '$lh=$h; $lw=$w; ' ..
+          'Write-Host "${e}[3J${e}[2J${e}[H" -NoNewline; ' ..
+          'Get-Content "' .. f .. '" -Encoding UTF8 ' ..
+        '}; ' ..
+        'Start-Sleep -Milliseconds 500 ' ..
       '}',
     }
   end
+  -- SIGWINCH fires on every terminal resize; trap redraws immediately.
   return { 'bash', '-c',
-    'while true; do printf "\\033[3J\\033[2J\\033[H"; cat "' .. keymap_file .. '"; sleep 86400; done' }
+    'f="' .. keymap_file .. '"; ' ..
+    'draw() { printf "\\033[3J\\033[2J\\033[H"; cat "$f"; }; ' ..
+    'trap draw WINCH; draw; ' ..
+    'while true; do sleep 86400; done' }
 end
 
 wezterm.on('gui-startup', function(cmd)
