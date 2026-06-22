@@ -47,23 +47,86 @@ wezterm.on('update-status', function(window, _pane)
   })
 end)
 
+-- ── Repos config (load/save) — declared early; used by save_session + make_tab ─
+local REPOS_CFG_PATH    = wezterm.home_dir .. '/.claude/repos.json'
+local REPOS_MAX_RECENTS = 10
+
+local function load_repos_cfg()
+  local f = io.open(REPOS_CFG_PATH, 'r')
+  if not f then return { favorites = {}, recents = {}, workspaces = {} } end
+  local raw = f:read('*a'); f:close()
+  local ok, data = pcall(wezterm.json_parse, raw)
+  if not ok or type(data) ~= 'table' then return { favorites = {}, recents = {}, workspaces = {} } end
+  return {
+    favorites  = data.favorites  or {},
+    recents    = data.recents    or {},
+    workspaces = data.workspaces or {},
+  }
+end
+
+local function save_repos_cfg(cfg)
+  local function arr(t)
+    local parts = {}
+    for _, v in ipairs(t) do parts[#parts+1] = '"' .. v:gsub('"', '\\"') .. '"' end
+    return '[' .. table.concat(parts, ',') .. ']'
+  end
+  local function ws_json(ws)
+    local kv = {}
+    for k, v in pairs(ws) do
+      local fields = {}
+      if v.left  then fields[#fields+1] = '"left":"'  .. v.left:gsub('"', '\\"')  .. '"' end
+      if v.right then fields[#fields+1] = '"right":"' .. v.right:gsub('"', '\\"') .. '"' end
+      kv[#kv+1] = '"' .. k:gsub('"', '\\"') .. '":{' .. table.concat(fields, ',') .. '}'
+    end
+    return '{' .. table.concat(kv, ',') .. '}'
+  end
+  local f = io.open(REPOS_CFG_PATH, 'w')
+  if f then
+    f:write('{"favorites":' .. arr(cfg.favorites) ..
+            ',"recents":'   .. arr(cfg.recents)   ..
+            ',"workspaces":' .. ws_json(cfg.workspaces or {}) .. '}\n')
+    f:close()
+  end
+end
+
 -- ── Session persistence ───────────────────────────────────────────────────────
 local SESSION_PATH  = wezterm.home_dir .. '/.claude/session.json'
 local SESSION_MAX_H = 12
 
 local function save_session(window)
-  local parts = {}
+  local cfg     = load_repos_cfg()
+  local changed = false
+  local parts   = {}
+
   for _, tab in ipairs(window:mux_window():tabs()) do
     local title = tab:get_title()
-    if title:find('/') then  -- repo tabs have a '/' in the rel-path title
-      parts[#parts + 1] = '"' .. title:gsub('"', '\\"') .. '"'
+    if not title:find('/') then goto continue end  -- skip Nexus/shell-named tabs
+    parts[#parts + 1] = '"' .. title:gsub('"', '\\"') .. '"'
+
+    -- Auto-detect Claude running in the leftmost pane; persist as restore command.
+    local panes = tab:panes()
+    local left_pane = panes[1]
+    if left_pane then
+      local proc = left_pane:get_foreground_process_name() or ''
+      if proc:lower():find('claude') then
+        cfg.workspaces[title] = cfg.workspaces[title] or {}
+        if cfg.workspaces[title].left ~= 'claude --continue' then
+          cfg.workspaces[title].left = 'claude --continue'
+          changed = true
+        end
+      end
     end
+    ::continue::
   end
+
+  -- Write session tab list
   local f = io.open(SESSION_PATH, 'w')
   if f then
     f:write('{"tabs":[' .. table.concat(parts, ',') .. '],"savedAt":' .. tostring(os.time()) .. '}\n')
     f:close()
   end
+  -- Only flush repos.json when something actually changed
+  if changed then save_repos_cfg(cfg) end
 end
 
 local function load_session()
@@ -162,14 +225,38 @@ local function keymap_args()
     'while true; do sleep 86400; done' }
 end
 
--- ── Shared helper: create a named tab with shell + keymap split ───────────────
+-- ── Shared helper: create a repo tab (NO keymap — that's Nexus-only) ─────────
+-- Left pane (60%): shell, or saved command (e.g. "claude --continue").
+--   Wrapped in PS so a shell prompt survives after the command exits.
+-- Right pane (40%): shell, or saved service command (e.g. "pnpm dev").
 local function make_tab(mux_win, title, cwd)
-  local tab = mux_win:spawn_tab({ cwd = cwd })
+  local ws  = (load_repos_cfg().workspaces or {})[title] or {}
+
+  -- Build args for left pane: wrap cmd so shell remains after exit
+  local left_args
+  if ws.left and ws.left ~= '' then
+    local safe = cwd:gsub("'", "''")
+    left_args = {
+      'powershell.exe', '-NoProfile', '-NoLogo', '-Command',
+      "Set-Location '" .. safe .. "'; " .. ws.left .. "; powershell.exe -NoProfile -NoLogo",
+    }
+  end
+
+  -- Build args for right pane: run service/tool directly
+  local right_args
+  if ws.right and ws.right ~= '' then
+    local parts = {}
+    for p in ws.right:gmatch('%S+') do parts[#parts+1] = p end
+    right_args = parts
+  end
+
+  local spawn_cfg = left_args and { cwd = cwd, args = left_args } or { cwd = cwd }
+  local tab = mux_win:spawn_tab(spawn_cfg)
   if not tab then return end
   tab:set_title(title)
-  local shell_pane = tab:active_pane()
-  shell_pane:split { direction = 'Right', size = 0.28, args = keymap_args(), cwd = cwd }
-  shell_pane:activate()
+  local left_pane = tab:active_pane()
+  left_pane:split { direction = 'Right', size = 0.40, args = right_args, cwd = cwd }
+  left_pane:activate()
 end
 
 wezterm.on('gui-startup', function(cmd)
@@ -223,8 +310,6 @@ end
 -- Alt+P: toggle-pin the current workspace's repo as a favorite.
 
 local OPEN_WS_SCRIPT = (os.getenv('USERPROFILE') or '') .. '\\.claude\\scripts\\open-workspace.ps1'
-local REPOS_CFG_PATH = wezterm.home_dir .. '/.claude/repos.json'
-local REPOS_MAX_RECENTS = 10
 
 local function path_to_ws_name(rel)
   return rel:lower()
@@ -233,28 +318,6 @@ local function path_to_ws_name(rel)
     :gsub('%-+', '-')
     :gsub('^%-+', '')
     :gsub('%-+$', '')
-end
-
-local function load_repos_cfg()
-  local f = io.open(REPOS_CFG_PATH, 'r')
-  if not f then return { favorites = {}, recents = {} } end
-  local raw = f:read('*a'); f:close()
-  local ok, data = pcall(wezterm.json_parse, raw)
-  if not ok or type(data) ~= 'table' then return { favorites = {}, recents = {} } end
-  return { favorites = data.favorites or {}, recents = data.recents or {} }
-end
-
-local function save_repos_cfg(cfg)
-  local function arr(t)
-    local parts = {}
-    for _, v in ipairs(t) do parts[#parts+1] = '"' .. v:gsub('"', '\\"') .. '"' end
-    return '[' .. table.concat(parts, ',') .. ']'
-  end
-  local f = io.open(REPOS_CFG_PATH, 'w')
-  if f then
-    f:write('{"favorites":' .. arr(cfg.favorites) .. ',"recents":' .. arr(cfg.recents) .. '}\n')
-    f:close()
-  end
 end
 
 local function discover_repos()
