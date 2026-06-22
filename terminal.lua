@@ -313,6 +313,14 @@ end)
 wezterm.on('window-focus-changed', write_active)
 wezterm.on('window-activated',     write_active)
 
+-- Save session on close so Claude process detection is captured even if the
+-- user closes WezTerm without switching away first (avoiding the race where
+-- window-focus-changed fires too late during the shutdown sequence).
+wezterm.on('window-close-requested', function(window)
+  save_session(window)
+  window:close()
+end)
+
 -- Toast on config reload — but NOT on the initial startup load.
 -- wezterm.GLOBAL persists across config reloads within a session and resets
 -- on WezTerm exit, so the first event after each cold start is always silent.
@@ -451,6 +459,7 @@ config.keys = {
   -- ── Pane / tab operations ─────────────────────────────────────────────
   { key = 'z', mods = 'ALT', action = act.TogglePaneZoomState                    },
   { key = 'x', mods = 'ALT', action = act.CloseCurrentPane { confirm = true }    },
+  { key = 'q', mods = 'ALT', action = act.CloseCurrentTab  { confirm = true }    },
   { key = 'c', mods = 'ALT', action = act.SplitHorizontal { domain = 'CurrentPaneDomain' } },
   { key = 'v', mods = 'ALT', action = act.SplitVertical   { domain = 'CurrentPaneDomain' } },
   { key = 't', mods = 'ALT', action = act.SpawnTab 'CurrentPaneDomain'           },

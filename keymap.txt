@@ -1,11 +1,12 @@
  NEXUS  Alt + key
  --------------------------------
- A / D   pane   left / right
+ A / D   pane   prev / next
  W / S   tab    prev / next
  1 - 5   tab    jump to tab
  --------------------------------
  Z       zoom pane
  X       close pane
+ Q       close tab
  C       split left/right
  V       split top/bottom
  T       new tab
