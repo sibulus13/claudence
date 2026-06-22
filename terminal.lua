@@ -132,10 +132,16 @@ local function save_session(window)
     ::continue::
   end
 
-  -- Write session tab list
+  -- Record which tab was active so restore can refocus it
+  local active_title = ''
+  local at = window:mux_window():active_tab()
+  if at then active_title = at:get_title():gsub('"', '\\"') end
+
   local f = io.open(SESSION_PATH, 'w')
   if f then
-    f:write('{"tabs":[' .. table.concat(parts, ',') .. '],"savedAt":' .. tostring(os.time()) .. '}\n')
+    f:write('{"tabs":[' .. table.concat(parts, ',') ..
+            '],"activeTab":"' .. active_title ..
+            '","savedAt":'    .. tostring(os.time()) .. '}\n')
     f:close()
   end
   -- Only flush repos.json when something actually changed
@@ -143,13 +149,14 @@ local function save_session(window)
 end
 
 local function load_session()
+  local empty = { tabs = {}, activeTab = '' }
   local f = io.open(SESSION_PATH, 'r')
-  if not f then return {} end
+  if not f then return empty end
   local raw = f:read('*a'); f:close()
   local ok, data = pcall(wezterm.json_parse, raw)
-  if not ok or type(data) ~= 'table' then return {} end
-  if (os.time() - (data.savedAt or 0)) / 3600 > SESSION_MAX_H then return {} end
-  return data.tabs or {}
+  if not ok or type(data) ~= 'table' then return empty end
+  if (os.time() - (data.savedAt or 0)) / 3600 > SESSION_MAX_H then return empty end
+  return { tabs = data.tabs or {}, activeTab = data.activeTab or '' }
 end
 
 -- ── Nexus sync: write active workspace on focus / tab change ─────────────────
@@ -298,15 +305,36 @@ wezterm.on('gui-startup', function(cmd)
   shell_pane:activate()
 
   -- Restore previously open repo tabs (if session is < 12 h old)
-  for _, title in ipairs(load_session()) do
-    -- Extras (e.g. "~/.claude") are not under REPO_DIR; skip session restore for them.
+  local session    = load_session()
+  local repos_cfg  = load_repos_cfg()
+  local toast_rows = {}
+  for _, title in ipairs(session.tabs) do
     if not title:match('^~/') then
+      local ws  = (repos_cfg.workspaces or {})[title] or {}
+      local cmd = ws.left ~= nil and ws.left or '(shell)'
+      toast_rows[#toast_rows+1] = title .. '  →  ' .. cmd
       make_tab(window, title, REPO_DIR .. '/' .. title)
     end
   end
+  -- Diagnostic toast: shows every restored tab + its left-pane command.
+  -- Remove once Claude restore is confirmed working.
+  if #toast_rows > 0 then
+    window:gui_window():toast_notification(
+      'Nexus restore', table.concat(toast_rows, '\n'), nil, 5000)
+  end
 
-  -- Return focus to the Nexus tab
-  window:tabs()[1]:activate()
+  -- Restore focus to the last active tab; fall back to Nexus (tab 1) if not found.
+  local focused = false
+  if session.activeTab ~= '' and session.activeTab ~= 'Nexus' then
+    for _, tab in ipairs(window:tabs()) do
+      if tab:get_title() == session.activeTab then
+        tab:activate()
+        focused = true
+        break
+      end
+    end
+  end
+  if not focused then window:tabs()[1]:activate() end
   window:gui_window():maximize()
 end)
 
