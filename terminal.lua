@@ -139,6 +139,11 @@ end)
 wezterm.on('window-focus-changed', write_active)
 wezterm.on('window-activated',     write_active)
 
+-- Toast when config hot-reloads so it's obvious the new bindings are live.
+wezterm.on('window-config-reloaded', function(window, _pane)
+  window:toast_notification('WezTerm', 'config reloaded', nil, 1500)
+end)
+
 -- ── Help: opens a persistent "keys" tab showing the keymap ──────────────────
 
 local function show_keymap(win, pane)
