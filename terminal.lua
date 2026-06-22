@@ -299,8 +299,10 @@ wezterm.on('gui-startup', function(cmd)
 
   -- Restore previously open repo tabs (if session is < 12 h old)
   for _, title in ipairs(load_session()) do
-    local cwd = REPO_DIR .. '/' .. title
-    make_tab(window, title, cwd)
+    -- Extras (e.g. "~/.claude") are not under REPO_DIR; skip session restore for them.
+    if not title:match('^~/') then
+      make_tab(window, title, REPO_DIR .. '/' .. title)
+    end
   end
 
   -- Return focus to the Nexus tab
@@ -384,6 +386,10 @@ local function sorted_choices(repos, cfg)
   end)
 
   local choices = {}
+  -- Extras (paths outside D:/repo) pinned above favorites with ~ prefix
+  for _, e in ipairs(cfg.extras or {}) do
+    table.insert(choices, { id = e.path, label = '~ ' .. e.label })
+  end
   for _, r in ipairs(repos) do
     local prefix = fav_idx[r.rel] and '\u{2605} ' or (rec_idx[r.rel] and '' or '  ')
     table.insert(choices, { id = r.path, label = prefix .. r.rel })
@@ -454,7 +460,12 @@ config.keys = {
         fuzzy   = true,
         action  = wezterm.action_callback(function(w, p, id, label)
           if not id then return end
-          -- Strip the visual prefix (★ or leading spaces) to recover rel
+          -- Extras (outside D:/repo) open directly; no recent tracking needed.
+          if not id:match('^[Dd]:[/\\]repo') then
+            local title = label:match('^~%s+(.+)$') or label
+            make_tab(w:mux_window(), title, id)
+            return
+          end
           local rel = label:match('^[%s\u{2605}]*(.+)$') or label
           launch_repo(w, p, { path = id, rel = rel, ws = path_to_ws_name(rel) })
         end),
