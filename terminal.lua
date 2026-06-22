@@ -47,6 +47,35 @@ wezterm.on('update-status', function(window, _pane)
   })
 end)
 
+-- ── Session persistence ───────────────────────────────────────────────────────
+local SESSION_PATH  = wezterm.home_dir .. '/.claude/session.json'
+local SESSION_MAX_H = 12
+
+local function save_session(window)
+  local parts = {}
+  for _, tab in ipairs(window:mux_window():tabs()) do
+    local title = tab:get_title()
+    if title:find('/') then  -- repo tabs have a '/' in the rel-path title
+      parts[#parts + 1] = '"' .. title:gsub('"', '\\"') .. '"'
+    end
+  end
+  local f = io.open(SESSION_PATH, 'w')
+  if f then
+    f:write('{"tabs":[' .. table.concat(parts, ',') .. '],"savedAt":' .. tostring(os.time()) .. '}\n')
+    f:close()
+  end
+end
+
+local function load_session()
+  local f = io.open(SESSION_PATH, 'r')
+  if not f then return {} end
+  local raw = f:read('*a'); f:close()
+  local ok, data = pcall(wezterm.json_parse, raw)
+  if not ok or type(data) ~= 'table' then return {} end
+  if (os.time() - (data.savedAt or 0)) / 3600 > SESSION_MAX_H then return {} end
+  return data.tabs or {}
+end
+
 -- ── Nexus sync: write active workspace on focus / tab change ─────────────────
 -- Cached agent task shown in the right status bar. Updated here (on focus
 -- change) rather than in update-status (every tick) to avoid hammering disk.
@@ -90,6 +119,8 @@ local function write_active(window, pane)
     ))
     f:close()
   end
+
+  save_session(window)
 end
 
 -- ── Default startup layout ────────────────────────────────────────────────────
@@ -131,33 +162,40 @@ local function keymap_args()
     'while true; do sleep 86400; done' }
 end
 
+-- ── Shared helper: create a named tab with shell + keymap split ───────────────
+local function make_tab(mux_win, title, cwd)
+  local tab = mux_win:spawn_tab({ cwd = cwd })
+  if not tab then return end
+  tab:set_title(title)
+  local shell_pane = tab:active_pane()
+  shell_pane:split { direction = 'Right', size = 0.28, args = keymap_args(), cwd = cwd }
+  shell_pane:activate()
+end
+
 wezterm.on('gui-startup', function(cmd)
-  -- cmd is non-nil when WezTerm was launched with an explicit command;
-  -- honour it and only maximise.
   if cmd then
     local _, _, window = wezterm.mux.spawn_window(cmd)
     window:gui_window():maximize()
     return
   end
 
-  -- Default layout:
-  --   Left (main): shell in D:/repo  ~72% width
-  --   Right (strip): persistent keymap reference  ~28% width
-  -- The keymap pane is always visible without any tab switching.
+  -- Create the Nexus home tab (workspace name matches config.default_workspace)
   local _, shell_pane, window = wezterm.mux.spawn_window({
-    cwd = REPO_DIR,
-  })
-
-  shell_pane:split {
-    direction = 'Right',
-    size      = 0.28,
-    args      = keymap_args(),
+    workspace = 'nexus',
     cwd       = REPO_DIR,
-  }
-
-  -- Return focus to the shell (split activates the new pane by default)
+  })
+  window:active_tab():set_title('Nexus')
+  shell_pane:split { direction = 'Right', size = 0.28, args = keymap_args(), cwd = REPO_DIR }
   shell_pane:activate()
 
+  -- Restore previously open repo tabs (if session is < 12 h old)
+  for _, title in ipairs(load_session()) do
+    local cwd = REPO_DIR .. '/' .. title
+    make_tab(window, title, cwd)
+  end
+
+  -- Return focus to the Nexus tab
+  window:tabs()[1]:activate()
   window:gui_window():maximize()
 end)
 
@@ -274,11 +312,7 @@ end
 
 local function launch_repo(win, pane, repo)
   push_recent(repo.rel)
-  -- spawn_tab returns the tab object, letting us set a meaningful title
-  -- immediately — otherwise the tab shows "PowerShell" until the shell
-  -- reports its own title via OSC sequences.
-  local tab = win:mux_window():spawn_tab({ cwd = repo.path })
-  if tab then tab:set_title(repo.rel) end
+  make_tab(win:mux_window(), repo.rel, repo.path)
 end
 
 -- ── Keybindings ───────────────────────────────────────────────────────────────
@@ -391,6 +425,6 @@ config.keys = {
 
 -- ── Scrollback / defaults ─────────────────────────────────────────────────────
 config.scrollback_lines  = 10000
-config.default_workspace = 'default'
+config.default_workspace = 'nexus'
 
 return config
