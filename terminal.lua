@@ -398,9 +398,9 @@ end
 --
 config.keys = {
 
-  -- ── Pane navigation (A/D horizontal only) ────────────────────────────
-  { key = 'a', mods = 'ALT', action = act.ActivatePaneDirection 'Left'  },
-  { key = 'd', mods = 'ALT', action = act.ActivatePaneDirection 'Right' },
+  -- ── Pane navigation (cycle through all panes regardless of split axis) ──
+  { key = 'a', mods = 'ALT', action = act.ActivatePaneDirection 'Prev' },
+  { key = 'd', mods = 'ALT', action = act.ActivatePaneDirection 'Next' },
 
   -- ── Tab navigation (W=prev, S=next) ──────────────────────────────────
   { key = 'w', mods = 'ALT', action = act.ActivateTabRelative(-1) },
