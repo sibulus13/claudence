@@ -72,7 +72,8 @@ end
 -- Tab 2: shell in D:/repo (main working directory)
 -- config.maximized is not valid in this WezTerm build; gui-startup is the
 -- correct hook for window-state setup.
-local REPO_DIR = 'D:/repo'
+local keymap_file = wezterm.home_dir .. '/.claude/keymap.txt'
+local REPO_DIR    = 'D:/repo'
 
 local function keymap_args()
   if wezterm.target_triple:find('windows') then
@@ -111,11 +112,6 @@ wezterm.on('window-focus-changed', write_active)
 wezterm.on('window-activated',     write_active)
 
 -- ── Help: opens a persistent "keys" tab showing the keymap ──────────────────
--- Uses SpawnCommandInNewTab (supported in all WezTerm versions) rather than
--- SplitPane{command=...} which requires a newer build. The keymap uses ASCII
--- art only — no Unicode box chars — so PowerShell reads it without encoding
--- issues regardless of system locale.
-local keymap_file = wezterm.home_dir .. '/.claude/keymap.txt'
 
 local function show_keymap(win, pane)
   win:perform_action(
