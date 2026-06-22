@@ -10,9 +10,9 @@
  V       split top/bottom
  T       new tab
  --------------------------------
- G       repo launcher (fuzzy)
+ O       open repo (launcher)
  F       fuzzy open workspace
- R       rename workspace
+ N       name/rename workspace
  [       cycle left
  ]       cycle right
  --------------------------------

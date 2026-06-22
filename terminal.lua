@@ -244,8 +244,8 @@ config.keys = {
   { key = 't', mods = 'ALT', action = act.SpawnTab 'CurrentPaneDomain'           },
 
   -- ── Workspace management ──────────────────────────────────────────────
-  -- Alt+G: repo launcher — fuzzy-pick any git repo under D:\repo
-  { key = 'g', mods = 'ALT',
+  -- Alt+O: repo launcher — fuzzy-pick any git repo under D:\repo
+  { key = 'o', mods = 'ALT',
     action = wezterm.action_callback(function(win, pane)
       local repos = discover_repos()
       if #repos == 0 then return end
@@ -265,9 +265,9 @@ config.keys = {
     end) },
   { key = 'f', mods = 'ALT',
     action = act.ShowLauncherArgs { flags = 'WORKSPACES|FUZZY' } },
-  { key = 'r', mods = 'ALT',
+  { key = 'n', mods = 'ALT',
     action = act.PromptInputLine {
-      description = 'Rename workspace:',
+      description = 'Name workspace:',
       action = wezterm.action_callback(function(win, pane, line)
         if line and line ~= '' then
           win:perform_action(act.RenameWorkspace { name = line }, pane)
