@@ -90,21 +90,31 @@ end
 
 wezterm.on('gui-startup', function(cmd)
   -- cmd is non-nil when WezTerm was launched with an explicit command;
-  -- in that case honour it and only maximise.
+  -- honour it and only maximise.
   if cmd then
     local _, _, window = wezterm.mux.spawn_window(cmd)
     window:gui_window():maximize()
     return
   end
 
-  -- Default layout: keys tab first, then a shell in D:/repo
-  local _, _, window = wezterm.mux.spawn_window({
-    args = keymap_args(),
-    cwd  = REPO_DIR,
+  -- Default layout:
+  --   Left (main): shell in D:/repo  ~72% width
+  --   Right (strip): persistent keymap reference  ~28% width
+  -- The keymap pane is always visible without any tab switching.
+  local _, shell_pane, window = wezterm.mux.spawn_window({
+    cwd = REPO_DIR,
   })
-  -- Second tab: plain shell, lands in D:/repo
-  window:spawn_tab({ cwd = REPO_DIR })
-  -- Stay on tab 1 (keys) so it's the first thing the user sees
+
+  shell_pane:split {
+    direction = 'Right',
+    size      = 0.28,
+    args      = keymap_args(),
+    cwd       = REPO_DIR,
+  }
+
+  -- Return focus to the shell (split activates the new pane by default)
+  shell_pane:activate()
+
   window:gui_window():maximize()
 end)
 
