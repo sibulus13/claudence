@@ -13,8 +13,6 @@ config.font                      = wezterm.font('JetBrains Mono', { weight = 'Re
 config.font_size                 = 11.0
 config.window_padding            = { left = 6, right = 6, top = 4, bottom = 4 }
 config.window_background_opacity = 0.96
-config.initial_cols              = 220
-config.initial_rows              = 52
 
 -- Left Alt = clean modifier (no special chars); Right Alt still composes é, ñ, etc.
 config.send_composed_key_when_left_alt_is_pressed  = false
@@ -68,6 +66,14 @@ local function write_active(window, pane)
     f:close()
   end
 end
+
+-- Maximize the window on first launch.
+-- config.maximized is not a valid field in this WezTerm build; the gui-startup
+-- event is the correct hook for controlling the initial window state.
+wezterm.on('gui-startup', function(cmd)
+  local _, _, window = wezterm.mux.spawn_window(cmd or {})
+  window:gui_window():maximize()
+end)
 
 wezterm.on('window-focus-changed', write_active)
 wezterm.on('window-activated',     write_active)
