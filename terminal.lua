@@ -33,9 +33,12 @@ wezterm.on('format-tab-title', function(tab, _tabs, _panes, _conf, _hover, _max_
 end)
 
 -- ── Status bar ────────────────────────────────────────────────────────────────
--- _cached_agent_task must be declared BEFORE update-status references it.
--- Lua local scoping: a local is only visible from its declaration line onward.
-local _cached_agent_task = ""
+-- Forward declaration: save_session is defined later in the file, but
+-- update-status needs to call it. Lua closures capture the variable binding,
+-- so by the time the event fires (runtime) the assignment will have happened.
+local save_session
+local _last_session_save  = 0
+local _cached_agent_task  = ""
 
 wezterm.on('update-status', function(window, _pane)
   local ws = window:active_workspace()
@@ -58,6 +61,14 @@ wezterm.on('update-status', function(window, _pane)
     { Foreground = { Color = '#585b70' } },
     { Text = os.date('%H:%M') .. '   Alt+/  keys  ' },
   })
+
+  -- Periodic session save (every 30 s) so the active tab is always current.
+  -- window-focus-changed only fires on OS-level focus loss, not tab switches.
+  local now = os.time()
+  if save_session and now - _last_session_save >= 30 then
+    _last_session_save = now
+    save_session(window)
+  end
 end)
 
 -- ── Repos config (load/save) — declared early; used by save_session + make_tab ─
@@ -106,7 +117,7 @@ end
 local SESSION_PATH  = wezterm.home_dir .. '/.claude/session.json'
 local SESSION_MAX_H = 12
 
-local function save_session(window)
+save_session = function(window)
   local cfg     = load_repos_cfg()
   local changed = false
   local parts   = {}
@@ -267,7 +278,9 @@ local function make_tab(mux_win, title, cwd)
     local safe = cwd:gsub("'", "''")
     left_args = {
       'powershell.exe', '-NoProfile', '-NoLogo', '-Command',
-      "Set-Location '" .. safe .. "'; " .. ws.left .. "; powershell.exe -NoProfile -NoLogo",
+      "Set-Location '" .. safe .. "'; " .. ws.left ..
+      "; if ($LASTEXITCODE -ne 0) { Write-Host '[nexus] ' '" .. ws.left .. " exited $LASTEXITCODE' }" ..
+      "; powershell.exe -NoProfile -NoLogo",
     }
   end
 
@@ -305,22 +318,11 @@ wezterm.on('gui-startup', function(cmd)
   shell_pane:activate()
 
   -- Restore previously open repo tabs (if session is < 12 h old)
-  local session    = load_session()
-  local repos_cfg  = load_repos_cfg()
-  local toast_rows = {}
+  local session = load_session()
   for _, title in ipairs(session.tabs) do
     if not title:match('^~/') then
-      local ws  = (repos_cfg.workspaces or {})[title] or {}
-      local cmd = ws.left ~= nil and ws.left or '(shell)'
-      toast_rows[#toast_rows+1] = title .. '  →  ' .. cmd
       make_tab(window, title, REPO_DIR .. '/' .. title)
     end
-  end
-  -- Diagnostic toast: shows every restored tab + its left-pane command.
-  -- Remove once Claude restore is confirmed working.
-  if #toast_rows > 0 then
-    window:gui_window():toast_notification(
-      'Nexus restore', table.concat(toast_rows, '\n'), nil, 5000)
   end
 
   -- Restore focus to the last active tab; fall back to Nexus (tab 1) if not found.
