@@ -274,15 +274,11 @@ end
 
 local function launch_repo(win, pane, repo)
   push_recent(repo.rel)
-  -- Open as a new tab in the CURRENT workspace so Alt+W/S can cycle back.
-  -- The tab title is set to the repo's relative path for easy identification.
-  win:perform_action(
-    act.SpawnCommandInNewTab {
-      cwd   = repo.path,
-      label = repo.rel,
-    },
-    pane
-  )
+  -- spawn_tab returns the tab object, letting us set a meaningful title
+  -- immediately — otherwise the tab shows "PowerShell" until the shell
+  -- reports its own title via OSC sequences.
+  local tab = win:mux_window():spawn_tab({ cwd = repo.path })
+  if tab then tab:set_title(repo.rel) end
 end
 
 -- ── Keybindings ───────────────────────────────────────────────────────────────
