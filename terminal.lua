@@ -6,17 +6,52 @@ local act     = wezterm.action
 -- WezTerm watches the resolved symlink target, so saving terminal.lua
 -- in ~/.claude/ triggers the reload directly.
 config.automatically_reload_config = true
+-- This file is dofile'd from ~/.wezterm.lua, so WezTerm's reload watcher never
+-- sees it on its own. Register it explicitly so saving terminal.lua reloads.
+if wezterm.add_to_config_reload_watch_list then
+  wezterm.add_to_config_reload_watch_list(wezterm.home_dir .. '/.claude/terminal.lua')
+end
 
 -- ── Appearance ────────────────────────────────────────────────────────────────
-config.color_scheme              = 'Catppuccin Mocha'
+-- Base theme: Catppuccin Mocha, fetched as a mutable table so individual slots
+-- can be tweaked. Built-in schemes don't define tab_bar, so we set it below.
+local theme      = wezterm.color.get_builtin_schemes()['Catppuccin Mocha']
+theme.ansi[5]    = '#7a5cf0'   -- blue (ANSI 4)   → darker, more saturated violet (not reddish)
+theme.brights[5] = '#9d86ff'   -- bright blue (12) → lighter violet for bold/bright text
+
+-- Flat tab bar: active and inactive tabs share one background, so the focused
+-- tab is signalled by BOLD accent text in format-tab-title — not a low-contrast
+-- background swap. (Built-in schemes omit tab_bar, hence the full definition.)
+theme.tab_bar = {
+  background         = '#11111b',
+  active_tab         = { bg_color = '#181825', fg_color = '#f53f8f', intensity = 'Bold' },
+  inactive_tab       = { bg_color = '#181825', fg_color = '#9399b2' },
+  inactive_tab_hover = { bg_color = '#11111b', fg_color = '#cdd6f4' },
+  new_tab            = { bg_color = '#11111b', fg_color = '#585b70' },
+  new_tab_hover      = { bg_color = '#181825', fg_color = '#cdd6f4' },
+}
+config.colors = theme
 config.font                      = wezterm.font('JetBrains Mono', { weight = 'Regular' })
 config.font_size                 = 11.0
 config.window_padding            = { left = 6, right = 6, top = 4, bottom = 4 }
-config.window_background_opacity = 0.96
+config.window_background_opacity = 1.0   -- fully opaque (was 0.96 — that 4% was the "semi-translucent" look)
+
+-- ── Accent palette ──────────────────────────────────────────────────────────
+-- Matched to the keymap section-header accent (rgb 200,70,155 / #c8469b) but
+-- pushed darker, more saturated, and toward the red side of magenta per request.
+local ACCENT    = '#cf1a73'   -- status bar + focused-tab base (reddish-purple)
+local ACCENT_HI = '#f53f8f'   -- focused tab title — brighter tint, pops on active-tab bg
+local ATTN      = '#f9af3a'   -- amber: agent stopped (bell), tab is waiting on you
+local RUNNING   = '#9399b2'   -- agent still producing output
+local IDLE      = '#585b70'   -- inactive, quiet
 
 -- Left Alt = clean modifier (no special chars); Right Alt still composes é, ñ, etc.
 config.send_composed_key_when_left_alt_is_pressed  = false
 config.send_composed_key_when_right_alt_is_pressed = true
+
+-- Bell drives the tab attention indicator (amber ⬤) via the 'bell' event below.
+-- Disabled here only silences WezTerm's own beep — the event still fires.
+config.audible_bell = 'Disabled'
 
 -- ── Tab bar ───────────────────────────────────────────────────────────────────
 config.use_fancy_tab_bar              = false
@@ -25,11 +60,58 @@ config.hide_tab_bar_if_only_one_tab   = false
 config.tab_max_width                  = 28
 config.show_new_tab_button_in_tab_bar = false
 
+-- Tab states — color carries focus; the ● appears ONLY when a tab needs you:
+--   focused   → bold accent text     you are here (no dot, no bg highlight)
+--   attention → amber ⬤ + bold       bell/Stop hook fired: agent done, awaiting input
+--   running   → muted (has output)   agent still working in the background
+--   idle      → dim                  nothing happening
+-- bell_tabs[tab_id] = true is set by the 'bell' handler and cleared the moment
+-- you focus that tab. This is the semantic "agent finished" signal — distinct
+-- from has_unseen_output, which flips on every line of continuous output.
+local bell_tabs = {}
+
+wezterm.on('bell', function(window, pane)
+  local tab = pane:tab()
+  if not tab then return end
+  -- Don't flag the tab you're already looking at.
+  local active = window:active_tab()
+  if active and active:tab_id() == tab:tab_id() then return end
+  bell_tabs[tab:tab_id()] = true
+end)
+
 wezterm.on('format-tab-title', function(tab, _tabs, _panes, _conf, _hover, _max_width)
-  local title  = tab.tab_title ~= '' and tab.tab_title or tab.active_pane.title
-  local idx    = tostring(tab.tab_index + 1)
-  local bullet = tab.is_active and '●' or '○'
-  return { { Text = ' ' .. bullet .. ' ' .. idx .. ':' .. title .. ' ' } }
+  local title = tab.tab_title ~= '' and tab.tab_title or tab.active_pane.title
+  local idx   = tostring(tab.tab_index + 1)
+
+  -- Arriving at a tab clears its attention flag.
+  if tab.is_active then bell_tabs[tab.tab_id] = nil end
+
+  -- Attention: fill the whole tab amber so it's impossible to miss. A glyph is
+  -- capped at one cell, so a filled background is the only way to make it bigger.
+  if not tab.is_active and bell_tabs[tab.tab_id] then
+    return {
+      { Background = { Color = ATTN } },
+      { Foreground = { Color = '#11111b' } },
+      { Attribute  = { Intensity = 'Bold' } },
+      { Text = ' ⬤ ' .. idx .. ':' .. title .. ' ' },
+    }
+  end
+
+  local fg, intensity
+  if tab.is_active then
+    fg, intensity = ACCENT_HI, 'Bold'
+  elseif tab.active_pane.has_unseen_output then
+    fg, intensity = RUNNING, 'Normal'
+  else
+    fg, intensity = IDLE, 'Normal'
+  end
+
+  return {
+    { Background = { Color = '#181825' } },
+    { Foreground = { Color = fg } },
+    { Attribute  = { Intensity = intensity } },
+    { Text = '  ' .. idx .. ':' .. title .. ' ' },
+  }
 end)
 
 -- ── Status bar ────────────────────────────────────────────────────────────────
@@ -39,13 +121,21 @@ end)
 local save_session
 local _last_session_save  = 0
 local _cached_agent_task  = ""
+local _reload_notice_at   = 0   -- os.time() of last config reload; drives the short-lived status pill
+local RELOAD_NOTICE_SECS  = 3   -- how long the "✓ reloaded" pill lingers in the status bar
 
 wezterm.on('update-status', function(window, _pane)
   local ws = window:active_workspace()
 
+  -- Clear the attention flag for whatever tab is now active. format-tab-title
+  -- also clears it, but doing it here guarantees it on every focus change and
+  -- ~1s tick — independent of when the tab title happens to repaint.
+  local _at = window:active_tab()
+  if _at then bell_tabs[_at:tab_id()] = nil end
+
   -- Left: workspace name (line 1); active agent task (line 2, only when present)
   local left_cells = {
-    { Foreground = { Color = '#a6e3a1' } },
+    { Foreground = { Color = ACCENT } },
     { Attribute = { Intensity = 'Bold' } },
     { Text = '  ⬡ ' .. ws .. '  ' },
   }
@@ -64,10 +154,18 @@ wezterm.on('update-status', function(window, _pane)
       { Text = '  split →D  ←A  ↓S  ↑W   esc cancel  ' },
     })
   else
-    window:set_right_status(wezterm.format {
-      { Foreground = { Color = '#585b70' } },
-      { Text = os.date('%H:%M') .. '   Alt+/  keys  ' },
-    })
+    -- Short-lived "reloaded" pill: shown for RELOAD_NOTICE_SECS after a config
+    -- reload, then it vanishes on its own as update-status keeps repainting.
+    local right = {}
+    if os.time() - _reload_notice_at <= RELOAD_NOTICE_SECS then
+      right[#right+1] = { Foreground = { Color = ACCENT } }
+      right[#right+1] = { Attribute  = { Intensity = 'Bold' } }
+      right[#right+1] = { Text = '✓ reloaded   ' }
+      right[#right+1] = { Attribute  = { Intensity = 'Normal' } }
+    end
+    right[#right+1] = { Foreground = { Color = '#585b70' } }
+    right[#right+1] = { Text = os.date('%H:%M') .. '   Alt+/  keys  ' }
+    window:set_right_status(wezterm.format(right))
   end
 
   -- Periodic session save (every 30 s) so the active tab is always current.
@@ -254,6 +352,11 @@ end
 local keymap_file = wezterm.home_dir .. '/.claude/keymap.txt'
 local REPO_DIR    = 'D:/repo'
 
+-- Right-pane width, shared by the Nexus home tab and every repo tab so the
+-- layout is consistent. WezTerm sizes the NEW (right) pane as this fraction of
+-- the pane being split; the ratio is preserved across later window resizes.
+local RIGHT_PANE_FRAC = 0.40
+
 local function keymap_args()
   if wezterm.target_triple:find('windows') then
     local f = keymap_file:gsub('/', '\\')
@@ -318,7 +421,7 @@ local function make_tab(mux_win, title, cwd)
   if not tab then return nil end
   tab:set_title(title)
   local left_pane = tab:active_pane()
-  left_pane:split { direction = split_dir, size = 0.40, args = right_args, cwd = cwd }
+  left_pane:split { direction = split_dir, size = RIGHT_PANE_FRAC, args = right_args, cwd = cwd }
   left_pane:activate()
   return tab
 end
@@ -335,8 +438,12 @@ wezterm.on('gui-startup', function(cmd)
     workspace = 'nexus',
     cwd       = REPO_DIR,
   })
+  -- Maximize BEFORE splitting so the split fraction is computed against the
+  -- full-screen cell grid rather than the small initial spawn size. Splitting
+  -- first could leave the right pane proportionally squeezed.
+  window:gui_window():maximize()
   window:active_tab():set_title('Nexus')
-  shell_pane:split { direction = 'Right', size = 0.28, args = keymap_args(), cwd = REPO_DIR }
+  shell_pane:split { direction = 'Right', size = RIGHT_PANE_FRAC, args = keymap_args(), cwd = REPO_DIR }
   shell_pane:activate()
 
   -- Restore previously open repo tabs (if session is < 12 h old).
@@ -376,12 +483,13 @@ end)
 -- Toast on config reload — but NOT on the initial startup load.
 -- wezterm.GLOBAL persists across config reloads within a session and resets
 -- on WezTerm exit, so the first event after each cold start is always silent.
-wezterm.on('window-config-reloaded', function(window, _pane)
+wezterm.on('window-config-reloaded', function(_window, _pane)
   if not wezterm.GLOBAL.nexus_boot_done then
     wezterm.GLOBAL.nexus_boot_done = true
     return
   end
-  window:toast_notification('Nexus', 'config reloaded', nil, 1500)
+  -- Stamp the reload time; update-status renders a short-lived pill (no toast).
+  _reload_notice_at = os.time()
 end)
 
 -- ── Help: jump to Nexus tab (always tab 0, always has the keymap pane) ───────
@@ -391,8 +499,6 @@ end)
 -- Favorites (★) are pinned to the top; recently opened repos come next;
 -- everything else is below but still fuzzy-searchable.
 -- Alt+P: toggle-pin the current workspace's repo as a favorite.
-
-local OPEN_WS_SCRIPT = (os.getenv('USERPROFILE') or '') .. '\\.claude\\scripts\\open-workspace.ps1'
 
 local function path_to_ws_name(rel)
   return rel:lower()
