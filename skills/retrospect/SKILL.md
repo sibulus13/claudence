@@ -12,13 +12,13 @@ Run a friction retrospective. Analyze accumulated session friction reports, prop
 
 ### 1. Load friction reports
 
-Read all JSON files in `C:/Users/Michael/.claude/telemetry/reports/`. For each report, extract:
+Read all JSON files in `~/.claude/telemetry/reports/`. For each report, extract:
 - `score`, `overrides`, `additions`, `perm_req_count`, `perm_repeat_count`
 - `friction_notes[]`
 - `allow_suggestions[]`
 - `cwd` (which project this session was in)
 
-Also read `C:/Users/Michael/.claude/telemetry/cumulative.json` for the aggregate picture.
+Also read `~/.claude/telemetry/cumulative.json` for the aggregate picture.
 
 ### 2. Identify patterns
 
@@ -32,7 +32,7 @@ Group friction by type across reports:
 For each pattern with 2+ occurrences, propose a concrete fix:
 
 **For repeated permission requests** → add to the appropriate settings.json allow array.
-- Global (`C:/Users/Michael/.claude/settings.json`) if the tool appears across multiple projects
+- Global (`~/.claude/settings.json`) if the tool appears across multiple projects
 - Project-level (`.claude/settings.json`) if it's project-specific
 
 **For override/addition patterns** → propose CLAUDE.md additions:
@@ -40,14 +40,14 @@ For each pattern with 2+ occurrences, propose a concrete fix:
 - If overrides suggest a systematic misunderstanding: add a clarifying rule to the relevant CLAUDE.md section
 - If additions are frequent: suggest Claude ask one clarifying question before beginning complex tasks
 
-**For memory context** → check `C:/Users/Michael/.claude/projects/[project]/memory/MEMORY.md`:
+**For memory context** → check `~/.claude/projects/[project]/memory/MEMORY.md`:
 - If a pattern reveals a consistent preference (e.g., user always overrides a certain approach), add or update the relevant `feedback_*.md` memory file
 
 Ask the user to confirm each change before applying. Group them: "Here are 3 allow-rule additions, 1 CLAUDE.md update, and 1 memory update — apply all?" unless items conflict.
 
 ### 4. Archive addressed reports
 
-After changes are applied, move the analyzed report files to `C:/Users/Michael/.claude/telemetry/reports/archived/` so they don't re-appear in the next retrospective.
+After changes are applied, move the analyzed report files to `~/.claude/telemetry/reports/archived/` so they don't re-appear in the next retrospective.
 
 Reset `cumulative.json`:
 ```json

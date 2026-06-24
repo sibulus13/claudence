@@ -10,6 +10,6 @@ fi
 
 echo "telemetry/ files staged — running classification tests..."
 powershell.exe -NoProfile -ExecutionPolicy Bypass \
-  -File "C:/Users/Michael/.claude/tests/run-tests.ps1"
+  -File "$USERPROFILE/.claude/tests/run-tests.ps1"
 
 exit $?

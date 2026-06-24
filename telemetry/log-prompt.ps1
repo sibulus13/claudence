@@ -24,9 +24,9 @@ $cwd         = if ($env:PWD) { $env:PWD } else { (Get-Location).Path }
 $ts_file = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), 'claude_start.txt')
 [System.DateTime]::UtcNow.Ticks | Set-Content $ts_file
 
-$log_dir      = "C:\Users\Michael\.claude\telemetry\sessions"
+$log_dir      = "$HOME\.claude\telemetry\sessions"
 $session_file = Join-Path $log_dir "$session_id.jsonl"
-$state_file   = "C:\Users\Michael\.claude\telemetry\current-session.json"
+$state_file   = "$HOME\.claude\telemetry\current-session.json"
 
 if (-not (Test-Path $log_dir)) { New-Item $log_dir -ItemType Directory -Force | Out-Null }
 
@@ -82,4 +82,4 @@ switch ($classification) {
 $state | ConvertTo-Json | Set-Content $state_file
 
 # Signal that Claude is now running (statusline spinner reads this)
-"$([datetime]::UtcNow.ToString('o'))" | Set-Content "C:\Users\Michael\.claude\telemetry\running.flag"
+"$([datetime]::UtcNow.ToString('o'))" | Set-Content "$HOME\.claude\telemetry\running.flag"

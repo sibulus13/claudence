@@ -15,7 +15,7 @@ $session_id = if ($data.session_id) { $data.session_id } else { 'unknown' }
 $summary    = if ($data.summary)    { [string]$data.summary } else { '' }
 $trigger    = if ($data.trigger)    { $data.trigger } else { 'unknown' }
 
-$log_dir      = "C:\Users\Michael\.claude\telemetry\sessions"
+$log_dir      = "$HOME\.claude\telemetry\sessions"
 $session_file = Join-Path $log_dir "$session_id.jsonl"
 
 if (-not (Test-Path $log_dir)) { New-Item $log_dir -ItemType Directory -Force | Out-Null }

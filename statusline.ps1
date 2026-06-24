@@ -61,7 +61,7 @@ $cost_usd = if ($ctx_data -and $ctx_data.cost -and ($null -ne $ctx_data.cost.tot
 $stdin_session_id = if ($ctx_data -and $ctx_data.session_id) { [string]$ctx_data.session_id } else { $null }
 
 # --- Read session KPIs ---
-$state_file = "C:\Users\Michael\.claude\telemetry\current-session.json"
+$state_file = "$HOME\.claude\telemetry\current-session.json"
 $state = if (Test-Path $state_file) {
     try { Get-Content $state_file -Raw | ConvertFrom-Json -ErrorAction Stop } catch { $null }
 } else { $null }
@@ -89,7 +89,7 @@ if ($state -and $state.started_at) {
 }
 
 # --- Read rolling averages ---
-$avg_file = "C:\Users\Michael\.claude\telemetry\rolling-averages.json"
+$avg_file = "$HOME\.claude\telemetry\rolling-averages.json"
 $avg_data = if (Test-Path $avg_file) {
     try { Get-Content $avg_file -Raw | ConvertFrom-Json -ErrorAction Stop } catch { $null }
 } else { $null }
@@ -98,7 +98,7 @@ $has_history = $avg_data -and ([int]$avg_data.session_count) -ge 2
 
 # --- Retro check (reads cumulative without cost to context window) ---
 $retro_needed = $false
-$cum_file = "C:\Users\Michael\.claude\telemetry\cumulative.json"
+$cum_file = "$HOME\.claude\telemetry\cumulative.json"
 $cum_data = if (Test-Path $cum_file) {
     try { Get-Content $cum_file -Raw | ConvertFrom-Json -ErrorAction Stop } catch { $null }
 } else { $null }
@@ -158,7 +158,7 @@ if ($null -ne $cost_usd) {
 $meta = if ($meta_parts.Count -gt 0) { "  ${dim}|${reset}  " + ($meta_parts -join '  ') } else { '' }
 
 # --- Spinner when Claude is running ---
-$running_flag = "C:\Users\Michael\.claude\telemetry\running.flag"
+$running_flag = "$HOME\.claude\telemetry\running.flag"
 $spinner = ''
 if (Test-Path $running_flag) {
     $frames = @('|', '/', '-', '\')

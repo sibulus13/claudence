@@ -19,7 +19,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "powershell.exe -NoProfile -File C:/Users/Michael/.claude/telemetry/log-prompt.ps1",
+            "command": "powershell.exe -NoProfile -File $USERPROFILE/.claude/telemetry/log-prompt.ps1",
             "shell": "bash"
           }
         ]
@@ -30,7 +30,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "powershell.exe -NoProfile -File C:/Users/Michael/.claude/telemetry/analyze-session.ps1",
+            "command": "powershell.exe -NoProfile -File $USERPROFILE/.claude/telemetry/analyze-session.ps1",
             "shell": "bash"
           },
           {
@@ -46,7 +46,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "powershell.exe -NoProfile -File C:/Users/Michael/.claude/telemetry/log-tool-done.ps1",
+            "command": "powershell.exe -NoProfile -File $USERPROFILE/.claude/telemetry/log-tool-done.ps1",
             "shell": "bash",
             "async": true
           }
@@ -58,7 +58,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "powershell.exe -NoProfile -File C:/Users/Michael/.claude/telemetry/record-compact.ps1",
+            "command": "powershell.exe -NoProfile -File $USERPROFILE/.claude/telemetry/record-compact.ps1",
             "shell": "bash",
             "async": true
           }
@@ -70,13 +70,13 @@
         "hooks": [
           {
             "type": "command",
-            "command": "powershell.exe -NoProfile -File C:/Users/Michael/.claude/telemetry/log-permission.ps1",
+            "command": "powershell.exe -NoProfile -File $USERPROFILE/.claude/telemetry/log-permission.ps1",
             "shell": "bash",
             "async": true
           },
           {
             "type": "command",
-            "command": "powershell.exe -NoProfile -Command \"(New-Object System.Media.SoundPlayer 'C:/Users/Michael/.claude/sounds/ding-half.wav').PlaySync()\"",
+            "command": "powershell.exe -NoProfile -Command \"(New-Object System.Media.SoundPlayer '$USERPROFILE/.claude/sounds/ding-half.wav').PlaySync()\"",
             "shell": "bash",
             "async": true
           },
@@ -96,7 +96,7 @@
   "enableWorkflows": true,
   "statusLine": {
     "type": "command",
-    "command": "powershell.exe -NoProfile -File C:/Users/Michael/.claude/statusline.ps1",
+    "command": "powershell.exe -NoProfile -File $USERPROFILE/.claude/statusline.ps1",
     "padding": 1
   },
   "enabledPlugins": {

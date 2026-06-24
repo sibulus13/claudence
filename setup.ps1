@@ -20,29 +20,11 @@ $root = "$env:USERPROFILE\.claude"
     }
 }
 
-# ── 2. Patch settings.json with the current user's paths ─────────────────────
+# ── 2. settings.json paths are machine-agnostic — nothing to patch ───────────
 #
-# settings.json is committed with hardcoded C:/Users/Michael paths so that the
-# file works out of the box on the original machine. On any other machine, this
-# step rewrites every occurrence of the original username with $env:USERNAME.
-
-$settings_path = "$root\settings.json"
-if (Test-Path $settings_path) {
-    $content = Get-Content $settings_path -Raw
-    # Replace the literal username embedded in paths
-    $original_user = "Michael"
-    $current_user  = $env:USERNAME
-
-    if ($content -match [regex]::Escape("C:/Users/$original_user") -and $current_user -ne $original_user) {
-        $patched = $content -replace [regex]::Escape("C:/Users/$original_user"), "C:/Users/$current_user"
-        # Also fix backslash variants
-        $patched = $patched -replace [regex]::Escape("C:\Users\$original_user"), "C:\Users\$current_user"
-        Set-Content $settings_path $patched -NoNewline
-        Write-Host "Patched settings.json: replaced $original_user -> $current_user"
-    } else {
-        Write-Host "settings.json already uses correct paths for $current_user"
-    }
-}
+# settings.json hook commands resolve $USERPROFILE at runtime (they run via
+# bash), and the .ps1 scripts resolve $HOME, so there is no hardcoded username
+# left to rewrite per-machine.
 
 # ── 3. Generate sound files from Windows Media at 80% volume ─────────────────
 

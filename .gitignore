@@ -45,3 +45,9 @@ jobs/
 
 # Local overrides — machine-specific
 settings.local.json
+terminal.local.lua
+
+# Launcher / workspace runtime state — machine-specific, leaks cwd & repo names
+repos.json
+session.json
+workspaces/active.json

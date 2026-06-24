@@ -18,7 +18,7 @@ Run the self-improvement loop: extract recurring patterns from recent sessions a
 
 ### 1. Load config
 
-Read `C:/Users/Michael/.claude/improve/config.json`. Use defaults if missing:
+Read `~/.claude/improve/config.json`. Use defaults if missing:
 ```json
 { "frequencyDays": 7, "thresholdOccurrences": 2, "maxSessionsToAnalyze": 10, "autoApply": false }
 ```
@@ -26,9 +26,9 @@ Read `C:/Users/Michael/.claude/improve/config.json`. Use defaults if missing:
 ### 2. Ingest sources
 
 Read in parallel:
-- `C:/Users/Michael/.claude/telemetry/reports/*.json` — friction reports (score, overrides, friction_notes, allow_suggestions)
-- `C:/Users/Michael/.claude/projects/*/memory/MEMORY.md` — accumulated memory index files
-- `C:/Users/Michael/.claude/projects/*/memory/feedback_*.md` — existing feedback memories (to avoid duplicating)
+- `~/.claude/telemetry/reports/*.json` — friction reports (score, overrides, friction_notes, allow_suggestions)
+- `~/.claude/projects/*/memory/MEMORY.md` — accumulated memory index files
+- `~/.claude/projects/*/memory/feedback_*.md` — existing feedback memories (to avoid duplicating)
 - Active project `context.md` files: Helm, Envoy, Crucible — look for drift notes and open decisions
 
 ### 3. Extract patterns
@@ -86,7 +86,7 @@ For each approved proposal:
 
 ### 7. Log run
 
-Append to `C:/Users/Michael/.claude/improve/history.jsonl`:
+Append to `~/.claude/improve/history.jsonl`:
 ```json
 {
   "id": "run-[timestamp]",
@@ -104,7 +104,7 @@ Append to `C:/Users/Michael/.claude/improve/history.jsonl`:
 
 ### 8. Reset telemetry
 
-Archive processed friction reports to `C:/Users/Michael/.claude/telemetry/reports/archived/`.
+Archive processed friction reports to `~/.claude/telemetry/reports/archived/`.
 Reset `cumulative.json` as in `/retrospect`.
 
 ### 9. Summary

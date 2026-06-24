@@ -33,10 +33,10 @@ $ctx_pct = if ($data -and $data.context_window -and ($null -ne $data.context_win
 } else { $null }
 
 # Clear running flag — Claude has stopped
-$running_flag = "C:\Users\Michael\.claude\telemetry\running.flag"
+$running_flag = "$HOME\.claude\telemetry\running.flag"
 if (Test-Path $running_flag) { Remove-Item $running_flag -Force -ErrorAction SilentlyContinue }
 
-$log_dir      = "C:\Users\Michael\.claude\telemetry\sessions"
+$log_dir      = "$HOME\.claude\telemetry\sessions"
 $session_file = Join-Path $log_dir "$session_id.jsonl"
 
 # --- Log the stop event FIRST so the next prompt can detect it ---
@@ -184,7 +184,7 @@ for ($ti = 0; $ti -lt $prompts.Count; $ti++) {
 }
 
 # --- Write per-session report ---
-$report_dir = "C:\Users\Michael\.claude\telemetry\reports"
+$report_dir = "$HOME\.claude\telemetry\reports"
 if (-not (Test-Path $report_dir)) { New-Item $report_dir -ItemType Directory -Force | Out-Null }
 
 $cwd         = if ($prompts.Count -gt 0 -and $prompts[0].cwd) { $prompts[0].cwd } else { '' }
@@ -210,7 +210,7 @@ $report = [PSCustomObject]@{
     perm_req_count    = $perm_reqs.Count
     perm_repeat_count = $perm_repeats.Count
     compact_count     = $compacts.Count
-    transcript_path   = "C:\Users\Michael\.claude\history.jsonl"
+    transcript_path   = "$HOME\.claude\history.jsonl"
     session_jsonl     = $session_file
     friction_notes    = $friction_notes.ToArray()
     allow_suggestions = $allow_suggestions.ToArray()
@@ -219,7 +219,7 @@ $report = [PSCustomObject]@{
 $report | Set-Content (Join-Path $report_dir "${short_id}.json")
 
 # --- Append to cost ledger (time-series, one line per session) ---
-$ledger_file = "C:\Users\Michael\.claude\telemetry\cost-ledger.jsonl"
+$ledger_file = "$HOME\.claude\telemetry\cost-ledger.jsonl"
 $ledger_entry = [PSCustomObject]@{
     ts           = (Get-Date -Format 'o')
     session_id   = $short_id
@@ -233,7 +233,7 @@ $ledger_entry = [PSCustomObject]@{
 Add-Content -Path $ledger_file -Value $ledger_entry
 
 # --- Update rolling averages (O/P and A/P and B/P rates, window=5) ---
-$avg_file = "C:\Users\Michael\.claude\telemetry\rolling-averages.json"
+$avg_file = "$HOME\.claude\telemetry\rolling-averages.json"
 $window   = 5
 
 if ($prompts.Count -gt 0) {
@@ -304,7 +304,7 @@ if ($prompts.Count -gt 0) {
 }
 
 # --- Update cumulative tracker ---
-$cumulative_file = "C:\Users\Michael\.claude\telemetry\cumulative.json"
+$cumulative_file = "$HOME\.claude\telemetry\cumulative.json"
 $cum = if (Test-Path $cumulative_file) {
     try { Get-Content $cumulative_file | ConvertFrom-Json -ErrorAction Stop } catch { $null }
 } else { $null }
@@ -328,7 +328,7 @@ $suggest_str = if ($allow_suggestions.Count -gt 0) {
 } else { '' }
 
 Start-Sleep -Milliseconds 400
-$snd_dir = 'C:/Users/Michael/.claude/sounds/'
+$snd_dir = "$HOME/.claude/sounds/"
 if ($play_ring) {
     (New-Object System.Media.SoundPlayer "${snd_dir}ring-half.wav").PlaySync()
 } else {

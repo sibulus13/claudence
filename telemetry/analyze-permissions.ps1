@@ -1,8 +1,8 @@
 # analyze-permissions.ps1
 # Reads permission-log.jsonl and surfaces patterns for settings optimization.
-# Run manually: powershell.exe -NoProfile -File C:\Users\Michael\.claude\telemetry\analyze-permissions.ps1
+# Run manually: powershell.exe -NoProfile -File $HOME\.claude\telemetry\analyze-permissions.ps1
 
-$log = "C:\Users\Michael\.claude\telemetry\permission-log.jsonl"
+$log = "$HOME\.claude\telemetry\permission-log.jsonl"
 
 if (-not (Test-Path $log)) {
     Write-Host "No permission log found at $log"

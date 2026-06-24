@@ -346,11 +346,32 @@ end
 
 -- ── Default startup layout ────────────────────────────────────────────────────
 -- Tab 1: persistent keys reference (always visible on launch)
--- Tab 2: shell in D:/repo (main working directory)
+-- Tab 2: shell in the repo root (main working directory)
 -- config.maximized is not valid in this WezTerm build; gui-startup is the
 -- correct hook for window-state setup.
 local keymap_file = wezterm.home_dir .. '/.claude/keymap.txt'
-local REPO_DIR    = 'D:/repo'
+
+-- Repo root is machine-specific, so it is NOT committed. It comes from a
+-- gitignored terminal.local.lua (`return { repo_root = '...' }`) or the
+-- CLAUDE_REPO_ROOT env var, falling back to ~/repo. See terminal.local.example.lua.
+local function load_local_cfg()
+  local ok, t = pcall(dofile, wezterm.home_dir .. '/.claude/terminal.local.lua')
+  if ok and type(t) == 'table' then return t end
+  return {}
+end
+local LOCAL       = load_local_cfg()
+local REPO_DIR    = LOCAL.repo_root or os.getenv('CLAUDE_REPO_ROOT') or (wezterm.home_dir .. '/repo')
+local REPO_DIR_BS = REPO_DIR:gsub('/', '\\')
+
+-- Path of `p` relative to REPO_DIR (slash-agnostic, case-insensitive on the
+-- drive letter), or nil if `p` is not under the repo root.
+local function rel_under_repo(p)
+  local norm = p:gsub('\\', '/')
+  if norm:lower():sub(1, #REPO_DIR + 1) == REPO_DIR:lower() .. '/' then
+    return norm:sub(#REPO_DIR + 2)
+  end
+  return nil
+end
 
 -- Right-pane width, shared by the Nexus home tab and every repo tab so the
 -- layout is consistent. WezTerm sizes the NEW (right) pane as this fraction of
@@ -495,7 +516,7 @@ end)
 -- ── Help: jump to Nexus tab (always tab 0, always has the keymap pane) ───────
 
 -- ── Repo launcher ─────────────────────────────────────────────────────────────
--- Alt+O: fuzzy picker over all git repos under D:\repo.
+-- Alt+O: fuzzy picker over all git repos under the repo root.
 -- Favorites (★) are pinned to the top; recently opened repos come next;
 -- everything else is below but still fuzzy-searchable.
 -- Alt+P: toggle-pin the current workspace's repo as a favorite.
@@ -512,7 +533,7 @@ end
 local function discover_repos()
   local ok, stdout = wezterm.run_child_process({
     'powershell.exe', '-NoProfile', '-NoLogo', '-NonInteractive', '-Command',
-    'Get-ChildItem "D:\\repo" -Recurse -Depth 4 -Force -Filter ".git" ' ..
+    'Get-ChildItem "' .. REPO_DIR_BS .. '" -Recurse -Depth 4 -Force -Filter ".git" ' ..
     '| Where-Object { $_.FullName -notmatch ' ..
     '"[\\\\/](\\.worktrees|archive|_Misc|example[s]?)[\\\\/]" } ' ..
     '| ForEach-Object { $_.Parent.FullName } ' ..
@@ -523,7 +544,7 @@ local function discover_repos()
   for line in stdout:gmatch('[^\r\n]+') do
     line = line:match('^%s*(.-)%s*$')
     if line ~= '' then
-      local rel = line:gsub('D:\\repo\\', ''):gsub('D:/repo/', ''):gsub('\\', '/')
+      local rel = rel_under_repo(line) or line:gsub('\\', '/')
       table.insert(repos, { path = line, rel = rel, ws = path_to_ws_name(rel) })
     end
   end
@@ -550,7 +571,7 @@ local function sorted_choices(repos, cfg)
   end)
 
   local choices = {}
-  -- Extras (paths outside D:/repo) pinned above favorites with ~ prefix
+  -- Extras (paths outside the repo root) pinned above favorites with ~ prefix
   for _, e in ipairs(cfg.extras or {}) do
     table.insert(choices, { id = e.path, label = '~ ' .. e.label })
   end
@@ -643,8 +664,8 @@ config.keys = {
         fuzzy   = true,
         action  = wezterm.action_callback(function(w, p, id, label)
           if not id then return end
-          -- Extras (outside D:/repo) open directly; no recent tracking needed.
-          if not id:match('^[Dd]:[/\\]repo') then
+          -- Extras (outside the repo root) open directly; no recent tracking needed.
+          if not rel_under_repo(id) then
             local title = label:match('^~%s+(.+)$') or label
             make_tab(w:mux_window(), title, id)
             return
@@ -662,9 +683,9 @@ config.keys = {
       local cwd = cwd_obj and cwd_obj.file_path or ''
       if cwd:match('^/[A-Za-z]:') then cwd = cwd:sub(2) end
       cwd = cwd:gsub('\\', '/'):gsub('/$', '')
-      local rel = cwd:match('^[Dd]:/repo/(.+)$')
+      local rel = rel_under_repo(cwd)
       if not rel then
-        win:toast_notification('Nexus', 'Not inside D:/repo', nil, 1500)
+        win:toast_notification('Nexus', 'Not inside ' .. REPO_DIR, nil, 1500)
         return
       end
       local cfg = load_repos_cfg()

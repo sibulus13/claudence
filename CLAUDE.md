@@ -196,7 +196,7 @@ Do not play sounds manually or adjust system volume unless explicitly asked.
 
 ## Memory System
 
-Auto-memory is active at `C:\Users\Michael\.claude\projects\[project]\memory\`. When learning something non-obvious about the user, project, or workflow, save it to the appropriate memory file and update `MEMORY.md`. Check existing memories before starting work on a familiar project.
+Auto-memory is active at `~/.claude\projects\[project]\memory\`. When learning something non-obvious about the user, project, or workflow, save it to the appropriate memory file and update `MEMORY.md`. Check existing memories before starting work on a familiar project.
 
 ## Self-Improvement Loop
 

@@ -19,9 +19,9 @@ if ($data.tool_input) {
     elseif ($data.tool_input.pattern)    { $input_preview = $data.tool_input.pattern }
 }
 
-$log_dir      = "C:\Users\Michael\.claude\telemetry\sessions"
+$log_dir      = "$HOME\.claude\telemetry\sessions"
 $session_file = Join-Path $log_dir "$session_id.jsonl"
-$state_file   = "C:\Users\Michael\.claude\telemetry\current-session.json"
+$state_file   = "$HOME\.claude\telemetry\current-session.json"
 
 if (-not (Test-Path $log_dir)) { New-Item $log_dir -ItemType Directory -Force | Out-Null }
 

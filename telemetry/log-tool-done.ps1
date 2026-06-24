@@ -18,7 +18,7 @@ if ($data.tool_input) {
     elseif ($data.tool_input.query)      { $input_preview = $data.tool_input.query }
 }
 
-$log_dir = "C:\Users\Michael\.claude\telemetry\sessions"
+$log_dir = "$HOME\.claude\telemetry\sessions"
 if (-not (Test-Path $log_dir)) { New-Item $log_dir -ItemType Directory -Force | Out-Null }
 
 $entry = [PSCustomObject]@{

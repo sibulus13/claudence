@@ -7,7 +7,7 @@
 # Or manually: Invoke-Pester tests/system.tests.ps1 -Output Detailed
 
 BeforeAll {
-    $script:ClaudeRoot  = 'C:\Users\Michael\.claude'
+    $script:ClaudeRoot  = "$HOME\.claude"
     $script:StateFile   = "$script:ClaudeRoot\telemetry\current-session.json"
     $script:CumFile     = "$script:ClaudeRoot\telemetry\cumulative.json"
     $script:SessionsDir = "$script:ClaudeRoot\telemetry\sessions"
