@@ -218,9 +218,14 @@ if ($model_name) {
 # --- Agent breadcrumb (extra rows): from THIS session's helm-status.json ---
 # stdin carries the session's own cwd, so this is inherently per-session/per-tab —
 # no staleness or wrong-project bug like a shared terminal status bar had. Each row
-# gets its own full width (multi-line statusLine): ▸ currentTask, then ⚠ blockers
-# (amber) only when something is actually stuck.
-$HELM_FRESH_HOURS = 24   # hide tasks older than this (tune to taste)
+# gets its own full width (multi-line statusLine):
+#   ▸ currentTask  (dim; greyed + "(Nh ago)" once it ages past the stale hint)
+#   ⚠ blockers     (amber, one row each, capped with "+N more")
+#   → nextPlanned  (dim)
+$HELM_FRESH_HOURS = 24   # hide entirely once older than this
+$STALE_HINT_HOURS = 4    # past this, grey the task row + append an age hint
+$MAX_BLOCKER_ROWS = 3    # cap blocker rows; overflow collapses to "+N more"
+$grey = "${E}[38;5;240m" # extra-recessed tone for a stale task row
 $status_rows = @()
 $cwd = if ($ctx_data -and $ctx_data.workspace -and $ctx_data.workspace.current_dir) {
     [string]$ctx_data.workspace.current_dir
@@ -232,13 +237,11 @@ if ($cwd) {
         # try/catch: the file may be mid-write by an agent — a partial read just skips this tick.
         $helm = try { Get-Content $helm_file -Raw | ConvertFrom-Json -ErrorAction Stop } catch { $null }
         if ($helm) {
-            $fresh = $true
+            $age_h = $null
             if ($helm.updatedAt) {
-                try {
-                    $age_h = ([DateTime]::UtcNow - [DateTimeOffset]::Parse([string]$helm.updatedAt).UtcDateTime).TotalHours
-                    $fresh = $age_h -lt $HELM_FRESH_HOURS
-                } catch { $fresh = $true }
+                try { $age_h = ([DateTime]::UtcNow - [DateTimeOffset]::Parse([string]$helm.updatedAt).UtcDateTime).TotalHours } catch { $age_h = $null }
             }
+            $fresh = ($null -eq $age_h) -or ($age_h -lt $HELM_FRESH_HOURS)
             if ($fresh) {
                 # Size each row to the terminal width (Claude Code sets $env:COLUMNS) so it never wraps.
                 $cols = 100
@@ -247,14 +250,32 @@ if ($cwd) {
                 $Fit = { param($s) $s = ([string]$s) -replace '\s+', ' '
                          if ($s.Length -gt $max) { $s.Substring(0, $max - 1) + [char]0x2026 } else { $s } }
 
-                if ($helm.currentTask) {
-                    $status_rows += "${dim}" + [char]0x25B8 + ' ' + (& $Fit $helm.currentTask) + "${reset}"
+                # Stale hint: grey the task row + append "(Nh ago)" once it ages past the threshold.
+                $aging = ($null -ne $age_h) -and ($age_h -ge $STALE_HINT_HOURS)
+                $task_col = if ($aging) { $grey } else { $dim }
+                $age_sfx  = ''
+                if ($aging) {
+                    $ah = if ($age_h -lt 24) { '{0}h' -f [int]$age_h } else { '{0}d' -f [int]($age_h / 24) }
+                    $age_sfx = " ${grey}(${ah} ago)${reset}"
                 }
-                # Blockers row (amber) — surfaced only when present; shows count + the first one.
+
+                if ($helm.currentTask) {
+                    $status_rows += "${task_col}" + [char]0x25B8 + ' ' + (& $Fit $helm.currentTask) + "${reset}" + $age_sfx
+                }
+                # Blockers (amber) — one row each, capped; overflow collapses to "+N more".
                 $blk = @($helm.blockers | Where-Object { $_ })
                 if ($blk.Count -gt 0) {
-                    $label = if ($blk.Count -gt 1) { "$($blk.Count) blockers: " } else { '' }
-                    $status_rows += "${yellow}" + [char]0x26A0 + ' ' + (& $Fit ($label + [string]$blk[0])) + "${reset}"
+                    $show = [Math]::Min($blk.Count, $MAX_BLOCKER_ROWS)
+                    for ($i = 0; $i -lt $show; $i++) {
+                        $status_rows += "${yellow}" + [char]0x26A0 + ' ' + (& $Fit $blk[$i]) + "${reset}"
+                    }
+                    if ($blk.Count -gt $show) {
+                        $status_rows += "${yellow}" + [char]0x26A0 + ' +' + ($blk.Count - $show) + " more${reset}"
+                    }
+                }
+                # Next planned (dim, distinct → marker).
+                if ($helm.nextPlanned) {
+                    $status_rows += "${dim}" + [char]0x2192 + ' ' + (& $Fit $helm.nextPlanned) + "${reset}"
                 }
             }
         }
