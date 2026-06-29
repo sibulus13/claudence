@@ -176,7 +176,8 @@ end
 
 -- Map A.tab_style's semantic fg tokens to colours, plus the constant tab bg.
 local TAB_BG = '#181825'
-local TAB_FG = { focus = ACCENT_HI, attn = ATTN, running = RUNNING, idle = IDLE }
+local TAB_FG = { focus = ACCENT_HI, attn = ATTN, running = RUNNING, idle = IDLE,
+                 noclaude = NOCLAUDE, noclaude_hi = NOCLAUDE_HI }
 
 -- A program running in a pane (notably Claude Code) bakes a decorative brand/
 -- attention glyph into its OSC window title — e.g. the ✳ sparkle. When a tab has
@@ -305,20 +306,13 @@ wezterm.on('format-tab-title', function(tab, _tabs, _panes, _conf, _hover, _max_
   -- BACKGROUND constant in every state, so focusing or clearing a flag never
   -- flips the bg (no flicker). Attention = an amber ⬤ + amber title; focusing a
   -- flagged tab only swaps the title colour to the accent, dot and bg unchanged.
-  local flagged = flagged_tabs[tab.tab_id] ~= nil
-  local st      = A.tab_style(tab.is_active, flagged, tab.active_pane.has_unseen_output)
-
-  -- Dim tabs with no live Claude session so agent tabs stand out. A flagged tab
-  -- (amber ⬤ — agent finished / needs you) is NEVER dimmed even if its process
-  -- already exited: attention has to stay loud. Otherwise no Claude → low-contrast
-  -- grey, with a softer focused tone so the current tab is still findable.
+  -- A.tab_paint picks the look AND applies no-Claude dimming in one tested call:
+  -- a tab with no live Claude session is dimmed (low-contrast token) so agent
+  -- tabs dominate; a flagged tab (amber ⬤) is never dimmed (attention stays loud).
+  local flagged    = flagged_tabs[tab.tab_id] ~= nil
   local has_claude = claude_tabs[tab.tab_id] == true
-  local title_fg, title_bold
-  if flagged or has_claude then
-    title_fg, title_bold = TAB_FG[st.fg], st.bold
-  else
-    title_fg, title_bold = (tab.is_active and NOCLAUDE_HI or NOCLAUDE), false
-  end
+  local st         = A.tab_paint(tab.is_active, flagged, has_claude, tab.active_pane.has_unseen_output)
+  local title_fg   = TAB_FG[st.fg]
 
   local cells = { { Background = { Color = TAB_BG } } }
   if st.dot then
@@ -326,11 +320,11 @@ wezterm.on('format-tab-title', function(tab, _tabs, _panes, _conf, _hover, _max_
     cells[#cells + 1] = { Attribute  = { Intensity = 'Bold' } }
     cells[#cells + 1] = { Text = ' ⬤ ' }
     cells[#cells + 1] = { Foreground = { Color = title_fg } }
-    cells[#cells + 1] = { Attribute  = { Intensity = title_bold and 'Bold' or 'Normal' } }
+    cells[#cells + 1] = { Attribute  = { Intensity = st.bold and 'Bold' or 'Normal' } }
     cells[#cells + 1] = { Text = idx .. ':' .. title .. ' ' }
   else
     cells[#cells + 1] = { Foreground = { Color = title_fg } }
-    cells[#cells + 1] = { Attribute  = { Intensity = title_bold and 'Bold' or 'Normal' } }
+    cells[#cells + 1] = { Attribute  = { Intensity = st.bold and 'Bold' or 'Normal' } }
     cells[#cells + 1] = { Text = '  ' .. idx .. ':' .. title .. ' ' }
   end
   return cells
@@ -395,9 +389,11 @@ wezterm.on('update-status', function(window, pane)
       if do_claude_scan then scan_tabs[#scan_tabs + 1] = t end
       for _, p in ipairs(t:panes()) do
         pane_tab[p:pane_id()] = tid
-        if do_claude_scan and not claude_seen[tid] then
-          local proc = p:get_foreground_process_name() or ''
-          if proc:lower():find('claude') then claude_seen[tid] = true end
+        -- Detect by title-or-process (A.is_claude_pane): the process name alone
+        -- reads bash/pwsh/cmd mid-tool, but Claude owns the title throughout.
+        if do_claude_scan and not claude_seen[tid]
+           and A.is_claude_pane(p:get_foreground_process_name(), p:get_title()) then
+          claude_seen[tid] = true
         end
       end
     end

@@ -163,6 +163,58 @@ do
   check('active+dwell-boundary -> no flag', count(r.flagged_tabs) == 0)
 end
 
+-- 15. is_claude_pane: the title is the reliable signal. The REGRESSION case —
+-- Claude running a bash/pwsh tool, so the foreground process is the shell, NOT
+-- claude.exe — must still read as Claude because Claude owns the OSC title.
+do
+  -- idle: process IS claude.exe
+  check('claude by proc', A.is_claude_pane('C:\\Users\\m\\.local\\bin\\claude.exe', '✳ Claude Code') == true)
+  -- working under a tool: proc is the shell, title carries the braille spinner
+  check('claude by title (bash tool)', A.is_claude_pane('C:\\Program Files\\Git\\usr\\bin\\bash.exe', '⠂ Reduce terminal name contrast') == true)
+  -- working under a tool: proc is pwsh, title has the ✳ sparkle
+  check('claude by title (pwsh tool)', A.is_claude_pane('...\\powershell.exe', '✳ Dedup and standardize resume') == true)
+  -- "Claude Code" substring catches it regardless of glyph
+  check('claude by substring', A.is_claude_pane('node.exe', 'Claude Code — building') == true)
+  -- a plain shell pane is NOT Claude (no marker, no claude in proc/title)
+  check('shell pane not claude', A.is_claude_pane('...\\powershell.exe', 'powershell.exe') == false)
+  check('cmd pane not claude', A.is_claude_pane('C:\\Windows\\System32\\cmd.exe', 'cmd.exe') == false)
+  check('cmd-with-args not claude', A.is_claude_pane('...\\powershell.exe', 'C:\\WINDOWS\\system32\\cmd.exe - .\\services') == false)
+  -- nil/empty inputs are safe and negative
+  check('nil/empty not claude', A.is_claude_pane(nil, nil) == false and A.is_claude_pane('', '') == false)
+end
+
+-- 16. title_has_claude_marker: sparkle + braille spinner lead glyphs only;
+-- generic markers (bullets/stars) are intentionally NOT treated as Claude.
+do
+  check('marker sparkle', A.title_has_claude_marker('✳ x') == true)
+  check('marker braille ⠂', A.title_has_claude_marker('⠂ x') == true)
+  check('marker braille ⠋ (spinner frame)', A.title_has_claude_marker('⠋ x') == true)
+  check('marker none (plain text)', A.title_has_claude_marker('powershell.exe') == false)
+  check('marker none (bullet not claude)', A.title_has_claude_marker('• x') == false)
+  check('marker empty/nil', A.title_has_claude_marker('') == false and A.title_has_claude_marker(nil) == false)
+end
+
+-- 17. tab_paint: no-Claude tabs dim; flagged tabs NEVER dim (attention stays).
+do
+  -- has Claude: identical to tab_style (no override)
+  local hc_focus = A.tab_paint(true,  false, true,  false)  -- focused, claude
+  local hc_run   = A.tab_paint(false, false, true,  true)   -- bg, claude, running
+  check('paint claude focused == focus/bold', hc_focus.fg == 'focus' and hc_focus.bold == true)
+  check('paint claude running unchanged', hc_run.fg == 'running')
+  -- no Claude: dimmed, never bold, never a dot
+  local nc_bg    = A.tab_paint(false, false, false, true)   -- bg, no claude (even w/ output)
+  local nc_focus = A.tab_paint(true,  false, false, false)  -- focused, no claude
+  check('paint no-claude bg -> noclaude dim', nc_bg.fg == 'noclaude' and nc_bg.bold == false and nc_bg.dot == false)
+  check('paint no-claude focused -> noclaude_hi', nc_focus.fg == 'noclaude_hi' and nc_focus.bold == false)
+  check('paint no-claude overrides running', nc_bg.fg ~= 'running')
+  -- flagged (attention) is NEVER dimmed, even with no Claude process left
+  local fl_bg    = A.tab_paint(false, true,  false, false)  -- bg, flagged, no claude
+  local fl_focus = A.tab_paint(true,  true,  false, false)  -- focused, flagged, no claude
+  check('paint flagged+no-claude stays attn', fl_bg.fg == 'attn' and fl_bg.dot == true)
+  check('paint flagged+focused stays focus', fl_focus.fg == 'focus' and fl_focus.dot == true)
+  check('paint flagged never dimmed', fl_bg.fg ~= 'noclaude' and fl_focus.fg ~= 'noclaude_hi')
+end
+
 log[#log + 1] = ('---- %d passed, %d failed ----'):format(pass, fail)
 local f = io.open(OUT, 'w')
 if f then f:write(table.concat(log, '\n') .. '\n'); f:close() end

@@ -88,4 +88,53 @@ function M.tab_style(is_active, flagged, has_unseen)
   return s
 end
 
+-- ── Claude-session detection (drives no-Claude tab dimming) ──────────────────
+-- A pane's foreground PROCESS name is an unreliable "is Claude here?" signal:
+-- while Claude runs a tool the foreground process is the tool's shell
+-- (bash/pwsh/cmd), not claude.exe, so a process-only check flickers and reads
+-- "no Claude" mid-tool. Claude owns the pane's OSC TITLE the entire time it runs
+-- though — "✳ Claude Code" when idle, "✳ <activity>" / "⠂ <activity>" (braille
+-- spinner) when working — and that title is STABLE across tool execution. So we
+-- treat a pane as Claude when EITHER the process or the title says so. These are
+-- pure string predicates → unit-tested, so the runtime detection is the tested one.
+
+-- Claude's brand/spinner lead glyphs: the ✳ sparkle family and the braille
+-- spinner block (U+2800–U+28FF). Generic bullets/stars are deliberately excluded
+-- to avoid false positives from ordinary shell prompts.
+local CLAUDE_SPARKS = {
+  '\u{2733}', '\u{2734}', '\u{2731}', '\u{2732}', '\u{2736}', '\u{2737}',
+  '\u{2726}', '\u{2728}', '\u{273B}', '\u{273D}', '\u{2742}', '\u{2743}',
+  '\u{2748}', '\u{2749}', '\u{274A}', '\u{274B}',
+}
+
+-- True when a title STARTS with a Claude marker glyph (sparkle or braille frame).
+function M.title_has_claude_marker(title)
+  if not title or title == '' then return false end
+  for _, m in ipairs(CLAUDE_SPARKS) do
+    if title:sub(1, #m) == m then return true end
+  end
+  local b1, b2 = title:byte(1, 2)                  -- braille U+2800–U+28FF = E2 A0..A3 xx
+  return b1 == 0xE2 and b2 ~= nil and b2 >= 0xA0 and b2 <= 0xA3
+end
+
+-- True when a pane is running Claude Code, by process name OR OSC title.
+function M.is_claude_pane(proc, title)
+  if proc and proc:lower():find('claude', 1, true) then return true end
+  if title and title:lower():find('claude', 1, true) then return true end
+  return M.title_has_claude_marker(title)
+end
+
+-- Final tab paint: tab_style picks the base look, then a tab with no live Claude
+-- session is DIMMED (low-contrast tokens) so agent tabs dominate the bar. A
+-- flagged tab (amber attention) is never dimmed — attention must stay loud. The
+-- focused-but-no-Claude tab keeps a softer, still-readable token so "you are
+-- here" survives. Returns { bg, fg, dot, bold } with fg possibly 'noclaude'(_hi).
+function M.tab_paint(is_active, flagged, has_claude, has_unseen)
+  local s = M.tab_style(is_active, flagged, has_unseen)
+  if not flagged and not has_claude then
+    s.fg, s.bold = (is_active and 'noclaude_hi' or 'noclaude'), false
+  end
+  return s
+end
+
 return M
