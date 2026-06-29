@@ -52,6 +52,12 @@ local ACCENT_HI = '#f53f8f'   -- focused tab title — brighter tint, pops on ac
 local ATTN      = '#f9af3a'   -- amber: agent stopped (bell), tab is waiting on you
 local RUNNING   = '#9399b2'   -- agent still producing output
 local IDLE      = '#585b70'   -- inactive, quiet
+-- No-Claude dimming: a tab/workspace with no live Claude session reads in a
+-- LOW-contrast grey so the ones that DO have an agent dominate the bar. Both are
+-- dimmer than IDLE (a tab can be idle yet still have Claude open); the *_HI tone
+-- is for the focused tab so "you are here" stays legible without the loud accent.
+local NOCLAUDE    = '#3a3c4e'   -- no Claude, unfocused: barely-there, recedes into the bar
+local NOCLAUDE_HI = '#7f849c'   -- no Claude, focused (or the off-home chip): muted but readable
 
 -- Left Alt = clean modifier (no special chars); Right Alt still composes é, ñ, etc.
 config.send_composed_key_when_left_alt_is_pressed  = false
@@ -104,6 +110,9 @@ local ATTN_DIR        = wezterm.home_dir .. '/.claude/workspaces/attention'
 local ATTN_DWELL_SECS = 5
 local ATTN_MAX_AGE    = 12 * 3600   -- auto-expire zombie flags after 12 h
 local flagged_tabs    = {}          -- [tab_id] = repo  (tabs with a pending flag; refilled each tick)
+local claude_tabs      = {}         -- [tab_id] = true when a pane in the tab runs Claude (drives no-Claude dimming)
+local _claude_scan_at  = 0          -- last os.time() the foreground-process scan ran (throttled below)
+local CLAUDE_SCAN_SECS = 2          -- min secs between scans — a per-pane proc lookup isn't free at 4 ticks/s
 local REPO_DIR_NORM   = ''          -- normalized repo root; set once REPO_DIR is known (labels the home flag "Nexus")
 local _attn_active_tab   = nil      -- focused tab_id; drives the dwell-clear timer
 local _attn_active_since = 0
@@ -299,17 +308,29 @@ wezterm.on('format-tab-title', function(tab, _tabs, _panes, _conf, _hover, _max_
   local flagged = flagged_tabs[tab.tab_id] ~= nil
   local st      = A.tab_style(tab.is_active, flagged, tab.active_pane.has_unseen_output)
 
+  -- Dim tabs with no live Claude session so agent tabs stand out. A flagged tab
+  -- (amber ⬤ — agent finished / needs you) is NEVER dimmed even if its process
+  -- already exited: attention has to stay loud. Otherwise no Claude → low-contrast
+  -- grey, with a softer focused tone so the current tab is still findable.
+  local has_claude = claude_tabs[tab.tab_id] == true
+  local title_fg, title_bold
+  if flagged or has_claude then
+    title_fg, title_bold = TAB_FG[st.fg], st.bold
+  else
+    title_fg, title_bold = (tab.is_active and NOCLAUDE_HI or NOCLAUDE), false
+  end
+
   local cells = { { Background = { Color = TAB_BG } } }
   if st.dot then
     cells[#cells + 1] = { Foreground = { Color = ATTN } }
     cells[#cells + 1] = { Attribute  = { Intensity = 'Bold' } }
     cells[#cells + 1] = { Text = ' ⬤ ' }
-    cells[#cells + 1] = { Foreground = { Color = TAB_FG[st.fg] } }
-    cells[#cells + 1] = { Attribute  = { Intensity = st.bold and 'Bold' or 'Normal' } }
+    cells[#cells + 1] = { Foreground = { Color = title_fg } }
+    cells[#cells + 1] = { Attribute  = { Intensity = title_bold and 'Bold' or 'Normal' } }
     cells[#cells + 1] = { Text = idx .. ':' .. title .. ' ' }
   else
-    cells[#cells + 1] = { Foreground = { Color = TAB_FG[st.fg] } }
-    cells[#cells + 1] = { Attribute  = { Intensity = st.bold and 'Bold' or 'Normal' } }
+    cells[#cells + 1] = { Foreground = { Color = title_fg } }
+    cells[#cells + 1] = { Attribute  = { Intensity = title_bold and 'Bold' or 'Normal' } }
     cells[#cells + 1] = { Text = '  ' .. idx .. ':' .. title .. ' ' }
   end
   return cells
@@ -329,15 +350,16 @@ local RELOAD_NOTICE_SECS  = 3   -- how long the "✓ reloaded" pill lingers in t
 -- rename handler can repaint it IMMEDIATELY with the new name instead of waiting
 -- up to one status_update_interval for the next tick — that wait is the source of
 -- the post-rename name flicker. 'nexus' is aliased to 'home' (display only).
-local function left_status_cells(ws)
+local function left_status_cells(ws, dim)
   local cells = {}
   -- Show the workspace name ONLY when you've left the home workspace. On home it's
   -- noise (everything lives here as tabs); off-home it doubles as a "you're not in
-  -- Nexus" signal so a stray workspace switch is immediately obvious.
+  -- Nexus" signal so a stray workspace switch is immediately obvious. `dim` softens
+  -- the chip to the no-Claude grey when no tab in the workspace has a live session.
   local has_chip = ws ~= 'nexus'
   if has_chip then
-    cells[#cells + 1] = { Foreground = { Color = ACCENT } }
-    cells[#cells + 1] = { Attribute  = { Intensity = 'Bold' } }
+    cells[#cells + 1] = { Foreground = { Color = dim and NOCLAUDE_HI or ACCENT } }
+    cells[#cells + 1] = { Attribute  = { Intensity = dim and 'Normal' or 'Bold' } }
     cells[#cells + 1] = { Text = '  ⬡ ' .. ws .. '  ' }
   end
   if _cached_agent_task ~= "" then
@@ -359,13 +381,40 @@ wezterm.on('update-status', function(window, pane)
     _attn_active_tab, _attn_active_since = active_tab_id, now
   end
 
-  -- Map every live pane id -> its tab id, across all workspaces.
-  local pane_tab = {}
+  -- Map every live pane id -> its tab id, across all workspaces. The SAME sweep
+  -- records which tabs have a live Claude session (any pane), throttled to
+  -- CLAUDE_SCAN_SECS since a per-pane foreground-process lookup isn't free at 4
+  -- ticks/s. format-tab-title reads claude_tabs to dim the ones without.
+  local pane_tab       = {}
+  local do_claude_scan = (now - _claude_scan_at >= CLAUDE_SCAN_SECS)
+  local claude_seen    = do_claude_scan and {} or nil
+  local scan_tabs      = do_claude_scan and {} or nil
   for _, mw in ipairs(wezterm.mux.all_windows()) do
     for _, t in ipairs(mw:tabs()) do
       local tid = t:tab_id()
-      for _, p in ipairs(t:panes()) do pane_tab[p:pane_id()] = tid end
+      if do_claude_scan then scan_tabs[#scan_tabs + 1] = t end
+      for _, p in ipairs(t:panes()) do
+        pane_tab[p:pane_id()] = tid
+        if do_claude_scan and not claude_seen[tid] then
+          local proc = p:get_foreground_process_name() or ''
+          if proc:lower():find('claude') then claude_seen[tid] = true end
+        end
+      end
     end
+  end
+  if do_claude_scan then
+    -- Force a repaint for any tab whose Claude presence flipped — WezTerm caches
+    -- tab titles and won't re-run format-tab-title for an idle tab on its own, so
+    -- the dim/brighten would otherwise lag until the next interaction (cf. the
+    -- attention dwell-clear nudge below).
+    for _, t in ipairs(scan_tabs) do
+      local tid = t:tab_id()
+      if (claude_seen[tid] == true) ~= (claude_tabs[tid] == true) then
+        t:set_title(t:get_title())
+      end
+    end
+    _claude_scan_at = now
+    claude_tabs     = claude_seen
   end
 
   -- Cross-tab attention — all rules live in the tested module A.decide(); here we
@@ -396,8 +445,13 @@ wezterm.on('update-status', function(window, pane)
   -- signalled per-tab in the tab bar (amber ⬤), so the left status does NOT
   -- duplicate it — no name chips, and the label keeps its normal colour.
   -- Built by left_status_cells() (shared with the Alt+N rename handler); the
-  -- home workspace keeps the internal id 'nexus' but READS as "home".
-  window:set_left_status(wezterm.format(left_status_cells(ws)))
+  -- home workspace keeps the internal id 'nexus' but READS as "home". The chip
+  -- dims when no tab in the active workspace has a live Claude session.
+  local ws_has_claude = false
+  for _, t in ipairs(window:mux_window():tabs()) do
+    if claude_tabs[t:tab_id()] then ws_has_claude = true; break end
+  end
+  window:set_left_status(wezterm.format(left_status_cells(ws, not ws_has_claude)))
 
   -- Right: show directional split hint when split_dir key table is active
   if window:active_key_table() == 'split_dir' then
