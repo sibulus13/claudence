@@ -336,7 +336,6 @@ end)
 -- so by the time the event fires (runtime) the assignment will have happened.
 local save_session
 local _last_session_save  = 0
-local _cached_agent_task  = ""
 local _reload_notice_at   = 0   -- os.time() of last config reload; drives the short-lived status pill
 local RELOAD_NOTICE_SECS  = 3   -- how long the "✓ reloaded" pill lingers in the status bar
 
@@ -355,11 +354,6 @@ local function left_status_cells(ws, dim)
     cells[#cells + 1] = { Foreground = { Color = dim and NOCLAUDE_HI or ACCENT } }
     cells[#cells + 1] = { Attribute  = { Intensity = dim and 'Normal' or 'Bold' } }
     cells[#cells + 1] = { Text = '  ⬡ ' .. ws .. '  ' }
-  end
-  if _cached_agent_task ~= "" then
-    cells[#cells + 1] = { Foreground = { Color = '#585b70' } }
-    cells[#cells + 1] = { Attribute  = { Intensity = 'Normal' } }
-    cells[#cells + 1] = { Text = (has_chip and '\n  · ' or '  · ') .. _cached_agent_task:sub(1, 60) .. '  ' }
   end
   return cells
 end
@@ -437,7 +431,7 @@ wezterm.on('update-status', function(window, pane)
   -- active tab, so the active tab is exactly the one that needs the repaint).
   if #res.remove > 0 and at then at:set_title(at:get_title()) end
 
-  -- Left: just the workspace name + active agent task. Attention is already
+  -- Left: just the workspace name (off-home only). Attention is already
   -- signalled per-tab in the tab bar (amber ⬤), so the left status does NOT
   -- duplicate it — no name chips, and the label keeps its normal colour.
   -- Built by left_status_cells() (shared with the Alt+N rename handler); the
@@ -597,8 +591,7 @@ local function load_session()
 end
 
 -- ── Nexus sync: write active workspace on focus / tab change ─────────────────
--- _cached_agent_task is declared at the top of the file (before update-status).
--- write_active updates it here on focus change, keeping update-status disk-free.
+-- Records the focused workspace/cwd/branch to active.json for external tooling.
 local function write_active(window, pane)
   if not window:is_focused() then return end
   local workspace = window:active_workspace()
@@ -613,28 +606,6 @@ local function write_active(window, pane)
     'git', '-C', cwd:gsub('/', '\\'), 'branch', '--show-current',
   })
   if ok then branch = stdout:match('^%s*(.-)%s*$') or "" end
-
-  -- Read helm-status.json — only show if written within the last 2 hours.
-  -- Stale entries from completed agent sessions are silently suppressed.
-  local status_file = cwd:gsub('/$', '') .. '/helm-status.json'
-  local sf = io.open(status_file, 'r')
-  _cached_agent_task = ""
-  if sf then
-    local raw = sf:read('*a'); sf:close()
-    local task    = raw:match('"currentTask"%s*:%s*"([^"]*)"')
-    local updated = raw:match('"updatedAt"%s*:%s*"([^"]*)"')
-    if task and updated then
-      local y, mo, d, h, m = updated:match('(%d+)-(%d+)-(%d+)T(%d+):(%d+)')
-      if y then
-        local age = os.time() - os.time({
-          year = tonumber(y), month = tonumber(mo), day = tonumber(d),
-          hour = tonumber(h), min  = tonumber(m),   sec = 0,
-          isdst = false,
-        })
-        if age < 7200 then _cached_agent_task = task end
-      end
-    end
-  end
 
   local path = wezterm.home_dir .. '/.claude/workspaces/active.json'
   local f = io.open(path, 'w')

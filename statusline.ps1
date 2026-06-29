@@ -215,4 +215,41 @@ if ($model_name) {
     $model_str = "${mcol}${tier}${ver}${reset}${eff_str}  "
 }
 
+# --- Agent breadcrumb (2nd row): currentTask from THIS session's helm-status.json ---
+# stdin carries the session's own cwd, so this is inherently per-session/per-tab —
+# no staleness or wrong-project bug like a shared terminal status bar had. Gets its
+# own full-width row (multi-line statusLine), so the full task text fits.
+$HELM_FRESH_HOURS = 24   # hide tasks older than this (tune to taste)
+$task_line = ''
+$cwd = if ($ctx_data -and $ctx_data.workspace -and $ctx_data.workspace.current_dir) {
+    [string]$ctx_data.workspace.current_dir
+} elseif ($ctx_data -and $ctx_data.cwd) { [string]$ctx_data.cwd } else { $null }
+
+if ($cwd) {
+    $helm_file = Join-Path $cwd 'helm-status.json'
+    if (Test-Path $helm_file) {
+        # try/catch: the file may be mid-write by an agent — a partial read just skips this tick.
+        $helm = try { Get-Content $helm_file -Raw | ConvertFrom-Json -ErrorAction Stop } catch { $null }
+        if ($helm -and $helm.currentTask) {
+            $fresh = $true
+            if ($helm.updatedAt) {
+                try {
+                    $age_h = ([DateTime]::UtcNow - [DateTimeOffset]::Parse([string]$helm.updatedAt).UtcDateTime).TotalHours
+                    $fresh = $age_h -lt $HELM_FRESH_HOURS
+                } catch { $fresh = $true }
+            }
+            if ($fresh) {
+                $task = ([string]$helm.currentTask) -replace '\s+', ' '
+                # Size to the terminal width (Claude Code sets $env:COLUMNS) so the row never wraps.
+                $cols = 100
+                if ($env:COLUMNS) { $tmp = 0; if ([int]::TryParse($env:COLUMNS, [ref]$tmp)) { $cols = $tmp } }
+                $max = [Math]::Max(20, $cols - 4)
+                if ($task.Length -gt $max) { $task = $task.Substring(0, $max - 1) + [char]0x2026 }
+                $task_line = "${dim}" + [char]0x25B8 + " ${task}${reset}"
+            }
+        }
+    }
+}
+
 Write-Host "${model_str}${retro_pfx}${p_str}${friction_str}${meta}${runtime_str}${spinner}"
+if ($task_line) { Write-Host $task_line }
