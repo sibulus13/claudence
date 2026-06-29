@@ -2,6 +2,11 @@ local wezterm = require 'wezterm'
 local config  = wezterm.config_builder()
 local act     = wezterm.action
 
+-- Pure notification decision logic (unit-tested in tests/attention.test.lua).
+-- terminal.lua does only the impure I/O; all the rules live in this module, so
+-- the tested logic IS the runtime logic.
+local A = dofile(wezterm.home_dir .. '/.claude/attention.lua')
+
 -- Auto-reload on file save — no Ctrl+Shift+R needed after edits.
 -- WezTerm watches the resolved symlink target, so saving terminal.lua
 -- in ~/.claude/ triggers the reload directly.
@@ -10,6 +15,9 @@ config.automatically_reload_config = true
 -- sees it on its own. Register it explicitly so saving terminal.lua reloads.
 if wezterm.add_to_config_reload_watch_list then
   wezterm.add_to_config_reload_watch_list(wezterm.home_dir .. '/.claude/terminal.lua')
+  -- attention.lua is dofile'd too, so watch it as well — otherwise editing the
+  -- notification logic alone wouldn't trigger a reload (stale-config trap).
+  wezterm.add_to_config_reload_watch_list(wezterm.home_dir .. '/.claude/attention.lua')
 end
 
 -- ── Appearance ────────────────────────────────────────────────────────────────
@@ -53,6 +61,19 @@ config.send_composed_key_when_right_alt_is_pressed = true
 -- Disabled here only silences WezTerm's own beep — the event still fires.
 config.audible_bell = 'Disabled'
 
+-- New panes (Alt+T / Alt+C / the split_dir table) inherit this. Without it,
+-- WezTerm's Windows default is cmd.exe, which keeps NO cross-session command
+-- history — so ↑-recall is empty after a restart. PowerShell + PSReadLine
+-- persists history incrementally to ConsoleHost_history.txt. Only ARG-LESS
+-- spawns use this; every explicit `powershell.exe {...}` spawn below is
+-- unaffected. -NoProfile keeps parity with the rest of the file; PSReadLine
+-- auto-loads on the first Set-PSReadLineOption call, then -NoExit drops to the
+-- interactive shell.
+config.default_prog = {
+  'powershell.exe', '-NoProfile', '-NoLogo', '-NoExit', '-Command',
+  'Set-PSReadLineOption -HistorySaveStyle SaveIncrementally -MaximumHistoryCount 10000',
+}
+
 -- ── Tab bar ───────────────────────────────────────────────────────────────────
 config.use_fancy_tab_bar              = false
 config.tab_bar_at_bottom              = true
@@ -60,58 +81,238 @@ config.hide_tab_bar_if_only_one_tab   = false
 config.tab_max_width                  = 28
 config.show_new_tab_button_in_tab_bar = false
 
--- Tab states — color carries focus; the ● appears ONLY when a tab needs you:
+-- Tab states — color carries focus; the ⬤ appears ONLY when a tab needs you:
 --   focused   → bold accent text     you are here (no dot, no bg highlight)
---   attention → amber ⬤ + bold       bell/Stop hook fired: agent done, awaiting input
+--   attention → amber ⬤ + bold       Stop/permission hook flagged it: agent done
 --   running   → muted (has output)   agent still working in the background
 --   idle      → dim                  nothing happening
--- bell_tabs[tab_id] = true is set by the 'bell' handler and cleared the moment
--- you focus that tab. This is the semantic "agent finished" signal — distinct
--- from has_unseen_output, which flips on every line of continuous output.
-local bell_tabs = {}
+-- "attention" is driven by the per-session flag files (attn_set), not a terminal
+-- bell — distinct from has_unseen_output, which flips on every line of output.
 
-wezterm.on('bell', function(window, pane)
-  local tab = pane:tab()
-  if not tab then return end
-  -- Don't flag the tab you're already looking at.
-  local active = window:active_tab()
-  if active and active:tab_id() == tab:tab_id() then return end
-  bell_tabs[tab:tab_id()] = true
-end)
+-- ── Cross-workspace attention (file-bridge) — shared state ──────────────────
+-- WezTerm's tab bar only renders the ACTIVE workspace's tabs, so the bell can't
+-- show that a *background* workspace's agent finished. The Stop / Permission-
+-- Request hooks drop one flag file PER SESSION here (keyed by cwd + session id,
+-- so two sessions in the same repo stay independent):
+--   ~/.claude/workspaces/attention/<cwd>__<sid>.json = {cwd,repo,session,ts}
+-- update-status refills attn_set each tick so format-tab-title can paint the
+-- matching TAB amber (tabs are clickable). Matching is EXACT per directory, so
+-- every workspace/tab — including the Nexus home (the repo root) — is treated
+-- independently: a flag colors only its own tab and clears only when you DWELL
+-- in that exact tab for ATTN_DWELL_SECS. Alt+G jumps to whatever is waiting.
+local ATTN_DIR        = wezterm.home_dir .. '/.claude/workspaces/attention'
+local ATTN_DWELL_SECS = 5
+local ATTN_MAX_AGE    = 12 * 3600   -- auto-expire zombie flags after 12 h
+local flagged_tabs    = {}          -- [tab_id] = repo  (tabs with a pending flag; refilled each tick)
+local REPO_DIR_NORM   = ''          -- normalized repo root; set once REPO_DIR is known (labels the home flag "Nexus")
+local _attn_active_tab   = nil      -- focused tab_id; drives the dwell-clear timer
+local _attn_active_since = 0
+
+local norm_path = A.norm_path  -- alias the tested normalizer
+
+-- Read every flag file into raw records. All filtering (stale/orphan/dwell) is
+-- A.decide's job; here we just surface what's on disk (the `now` arg is unused,
+-- kept for call-site compatibility).
+local function read_attention(now)
+  local out = {}
+  local ok, entries = pcall(wezterm.read_dir, ATTN_DIR)
+  if not ok then return out end
+  for _, path in ipairs(entries) do
+    if path:match('%.json$') then
+      local f = io.open(path, 'r')
+      if f then
+        local raw = f:read('*a'); f:close()
+        raw = raw:gsub('^\239\187\191', '')  -- strip UTF-8 BOM if present
+        local ok2, data = pcall(wezterm.json_parse, raw)
+        if ok2 and type(data) == 'table' and data.cwd then
+          out[#out+1] = { path = path, cwd = norm_path(data.cwd), repo = data.repo or '?',
+                          pane = data.pane, ts = data.ts }
+        end
+      end
+    end
+  end
+  return out
+end
+
+-- On load/reload: purge legacy (pre-pane-id) attention flags so a stale chip
+-- from the old cwd-keyed format can't ghost. Only pane-*.json is valid now.
+do
+  local ok, entries = pcall(wezterm.read_dir, ATTN_DIR)
+  if ok then
+    for _, p in ipairs(entries) do
+      if A.is_legacy_name(p:match('[^/\\]+$') or '') then os.remove(p) end
+    end
+  end
+end
+
+-- Locate the workspace + tab that owns a pending flag, by matching the flag's
+-- recorded WezTerm pane id to a live pane. Powers Alt+G — the cross-workspace
+-- analogue of clicking an on-screen amber tab. Pane id is reliable even when a
+-- pane's reported cwd (OSC-7) is stale. Reads fresh so it works before tick 1.
+local function attention_target()
+  local pend = read_attention(os.time())
+  if not pend[1] then return nil end
+  local want = {}
+  for _, fl in ipairs(pend) do if fl.pane then want[fl.pane] = true end end
+  for _, mw in ipairs(wezterm.mux.all_windows()) do
+    local wsname = mw:get_workspace()
+    for _, tab in ipairs(mw:tabs()) do
+      for _, p in ipairs(tab:panes()) do
+        if want[p:pane_id()] then return wsname, tab end
+      end
+    end
+  end
+  return nil
+end
+
+-- Map A.tab_style's semantic fg tokens to colours, plus the constant tab bg.
+local TAB_BG = '#181825'
+local TAB_FG = { focus = ACCENT_HI, attn = ATTN, running = RUNNING, idle = IDLE }
+
+-- A program running in a pane (notably Claude Code) bakes a decorative brand/
+-- attention glyph into its OSC window title — e.g. the ✳ sparkle. When a tab has
+-- no explicit title (Alt+T spawns, or the brief pre-set_title window on restore)
+-- format-tab-title falls back to that pane title, so the glyph leaks into the tab
+-- bar and reads like a SECOND, competing notification marker. Attention is ours
+-- to signal (the amber ⬤), so strip any leading run of these markers + spaces.
+-- Plain anchored compares (not a byte-class) so multibyte glyphs match cleanly.
+-- NOTE: \u{FE0F} (emoji variation selector-16) is listed so an emoji-style
+-- "✳️" (U+2733 U+FE0F) is fully consumed — stripping only the 2733 would leave
+-- the invisible 3-byte FE0F as the new leading "char", which display_name's
+-- byte-wise capitalize then mangles into mojibake.
+local TITLE_MARKERS = {
+  '\u{2733}', '\u{2734}', '\u{2731}', '\u{2732}', '\u{2736}', '\u{2737}',
+  '\u{2726}', '\u{2605}', '\u{2606}', '\u{25CF}', '\u{2B24}', '\u{2022}', '*',
+  '\u{2728}', '\u{273B}', '\u{273D}', '\u{2742}', '\u{2743}', '\u{2748}',
+  '\u{2749}', '\u{274A}', '\u{274B}', '\u{FE0F}',
+}
+local function strip_title_markers(t)
+  while true do
+    t = t:match('^%s*(.-)%s*$') or t                 -- trim surrounding whitespace
+    local hit = false
+    for _, m in ipairs(TITLE_MARKERS) do
+      if t:sub(1, #m) == m then t = t:sub(#m + 1); hit = true; break end
+    end
+    if not hit then return t end
+  end
+end
+
+-- Repo display aliases + leaf-only naming. Both are PURELY cosmetic: they change
+-- only what format-tab-title PAINTS. The tab's real title (tab:get_title()) stays
+-- the full rel, so session save (the ':find("/")' sentinel), restore (which
+-- rebuilds the cwd as REPO_DIR/<title>), workspaces[title] config lookup, and
+-- pane-id notification/Alt+G targeting are all untouched — none of them read the
+-- rendered text. Keys are the repo path RELATIVE to the repo root, forward-
+-- slashed + lowercased. No entry => the leaf folder name (last path segment).
+local REPO_ALIASES = {
+  ['web/cashcow']         = 'Tarive',        -- legacy folder name; product rebranded to Tarive (web app)
+  ['web/tarive']          = 'Tarive (app)',  -- the Expo mobile app — disambiguated from the web tab above
+  ['stock/research 2026'] = 'Crucible',      -- algo-trading paper-gate project (#37); folder predates the name
+  ['life/second-brain']   = 'Cortex',        -- #31 second brain + Helm dashboard; product name = Cortex
+}
+
+-- ── Custom tab names (persistent) ───────────────────────────────────────────
+-- A tab's identity stays its repo-relative path (so session-restore + attention
+-- keep working); this map overlays a user-chosen DISPLAY label on top, keyed by
+-- that same identity. The home tab is keyed by its title 'Nexus'. Persisted to
+-- disk so a rename survives a restart, and loaded into memory ONCE —
+-- format-tab-title reads it on every repaint, so it must never touch disk.
+local TAB_NAMES_PATH = wezterm.home_dir .. '/.claude/workspaces/tab-names.json'
+local tab_names = {}
+
+local function load_tab_names()
+  local f = io.open(TAB_NAMES_PATH, 'r')
+  if not f then return end
+  local raw = f:read('*a'); f:close()
+  local ok, data = pcall(wezterm.json_parse, raw)
+  if ok and type(data) == 'table' then tab_names = data end
+end
+
+local function save_tab_names()
+  local f = io.open(TAB_NAMES_PATH, 'w')
+  if f then f:write(wezterm.json_encode(tab_names)); f:close() end
+end
+
+load_tab_names()
+
+-- Cosmetic tab label for a repo identity `rel`. Alias wins (brand names shown
+-- verbatim); otherwise the leaf folder name with its first letter capitalized,
+-- so every tab reads uniformly Title-cased regardless of the folder's own casing:
+--   'web/cashcow'  -> 'Tarive'    (alias hit, verbatim)
+--   'Life/vantage' -> 'Vantage'   (leaf, first letter capitalized)
+--   'Nexus'        -> 'Nexus'     (no slash: leaf is the whole thing)
+local function display_name(rel)
+  if not rel or rel == '' then return rel end
+  local key   = rel:gsub('\\', '/'):lower()
+  local alias = REPO_ALIASES[key]
+  if alias then return alias end
+  local leaf = rel:match('[^/\\]+$') or rel
+  -- Capitalize ONLY a leading ASCII letter. If the first byte is non-ASCII (a
+  -- marker glyph that slipped past strip_title_markers, or a multibyte head),
+  -- pass it through untouched — byte-slicing :upper() on a multibyte head
+  -- produces mojibake, which is exactly the "title-capping gets messed up" bug.
+  if leaf:sub(1, 1):match('%a') then
+    return leaf:sub(1, 1):upper() .. leaf:sub(2)
+  end
+  return leaf
+end
+
+-- Pick the tab's display source from data WE control — never the program's
+-- decorative OSC title (Claude Code's "✳ <activity>"). Priority:
+--   1. tab.tab_title — the repo rel path we set via tab:set_title (source of truth)
+--   2. the active pane's cwd, mapped repo-relative — survives an empty tab title
+--      (Alt+T spawns, the brief pre-set_title window on restore) without ever
+--      surfacing the program's title or its sparkle glyph
+--   3. last resort: the OSC pane title, with leading marker glyphs stripped
+local function tab_label_src(tab)
+  if tab.tab_title and tab.tab_title ~= '' then return tab.tab_title end
+  local u = tab.active_pane and tab.active_pane.current_working_dir
+  if u then
+    local p = (u.file_path or tostring(u)):gsub('\\', '/')
+    if p:match('^/[A-Za-z]:') then p = p:sub(2) end
+    p = p:gsub('/+$', '')
+    -- The repo ROOT itself is "Nexus", not its path leaf ("repo"). Honor the same
+    -- alias chip_label/gui-startup use, so a root tab with no explicit title reads
+    -- "Nexus" instead of the literal folder name.
+    if REPO_DIR_NORM ~= '' and p:lower() == REPO_DIR_NORM then return 'Nexus' end
+    if REPO_DIR_NORM ~= '' and p:lower():sub(1, #REPO_DIR_NORM + 1) == REPO_DIR_NORM .. '/' then
+      return p:sub(#REPO_DIR_NORM + 2)            -- repo-relative, e.g. web/cashcow
+    end
+    local leaf = p:match('[^/]+$')
+    if leaf and leaf ~= '' then return leaf end
+  end
+  return strip_title_markers(tab.active_pane.title or '')
+end
 
 wezterm.on('format-tab-title', function(tab, _tabs, _panes, _conf, _hover, _max_width)
-  local title = tab.tab_title ~= '' and tab.tab_title or tab.active_pane.title
+  -- A user-set custom label (Alt+R) wins over the derived repo name. Keyed by the
+  -- tab's identity (repo-rel path, or 'Nexus' for home) so it survives restore.
+  local src   = tab_label_src(tab)
+  local title = tab_names[src] or display_name(src)
   local idx   = tostring(tab.tab_index + 1)
 
-  -- Arriving at a tab clears its attention flag.
-  if tab.is_active then bell_tabs[tab.tab_id] = nil end
+  -- flagged_tabs is keyed by tab id (matched by pane id in update-status), so
+  -- it's immune to stale OSC-7 cwd. A.tab_style picks the look — and keeps the
+  -- BACKGROUND constant in every state, so focusing or clearing a flag never
+  -- flips the bg (no flicker). Attention = an amber ⬤ + amber title; focusing a
+  -- flagged tab only swaps the title colour to the accent, dot and bg unchanged.
+  local flagged = flagged_tabs[tab.tab_id] ~= nil
+  local st      = A.tab_style(tab.is_active, flagged, tab.active_pane.has_unseen_output)
 
-  -- Attention: fill the whole tab amber so it's impossible to miss. A glyph is
-  -- capped at one cell, so a filled background is the only way to make it bigger.
-  if not tab.is_active and bell_tabs[tab.tab_id] then
-    return {
-      { Background = { Color = ATTN } },
-      { Foreground = { Color = '#11111b' } },
-      { Attribute  = { Intensity = 'Bold' } },
-      { Text = ' ⬤ ' .. idx .. ':' .. title .. ' ' },
-    }
-  end
-
-  local fg, intensity
-  if tab.is_active then
-    fg, intensity = ACCENT_HI, 'Bold'
-  elseif tab.active_pane.has_unseen_output then
-    fg, intensity = RUNNING, 'Normal'
+  local cells = { { Background = { Color = TAB_BG } } }
+  if st.dot then
+    cells[#cells + 1] = { Foreground = { Color = ATTN } }
+    cells[#cells + 1] = { Attribute  = { Intensity = 'Bold' } }
+    cells[#cells + 1] = { Text = ' ⬤ ' }
+    cells[#cells + 1] = { Foreground = { Color = TAB_FG[st.fg] } }
+    cells[#cells + 1] = { Attribute  = { Intensity = st.bold and 'Bold' or 'Normal' } }
+    cells[#cells + 1] = { Text = idx .. ':' .. title .. ' ' }
   else
-    fg, intensity = IDLE, 'Normal'
+    cells[#cells + 1] = { Foreground = { Color = TAB_FG[st.fg] } }
+    cells[#cells + 1] = { Attribute  = { Intensity = st.bold and 'Bold' or 'Normal' } }
+    cells[#cells + 1] = { Text = '  ' .. idx .. ':' .. title .. ' ' }
   end
-
-  return {
-    { Background = { Color = '#181825' } },
-    { Foreground = { Color = fg } },
-    { Attribute  = { Intensity = intensity } },
-    { Text = '  ' .. idx .. ':' .. title .. ' ' },
-  }
+  return cells
 end)
 
 -- ── Status bar ────────────────────────────────────────────────────────────────
@@ -124,27 +325,79 @@ local _cached_agent_task  = ""
 local _reload_notice_at   = 0   -- os.time() of last config reload; drives the short-lived status pill
 local RELOAD_NOTICE_SECS  = 3   -- how long the "✓ reloaded" pill lingers in the status bar
 
-wezterm.on('update-status', function(window, _pane)
-  local ws = window:active_workspace()
-
-  -- Clear the attention flag for whatever tab is now active. format-tab-title
-  -- also clears it, but doing it here guarantees it on every focus change and
-  -- ~1s tick — independent of when the tab title happens to repaint.
-  local _at = window:active_tab()
-  if _at then bell_tabs[_at:tab_id()] = nil end
-
-  -- Left: workspace name (line 1); active agent task (line 2, only when present)
-  local left_cells = {
-    { Foreground = { Color = ACCENT } },
-    { Attribute = { Intensity = 'Bold' } },
-    { Text = '  ⬡ ' .. ws .. '  ' },
-  }
-  if _cached_agent_task ~= "" then
-    table.insert(left_cells, { Foreground = { Color = '#585b70' } })
-    table.insert(left_cells, { Attribute = { Intensity = 'Normal' } })
-    table.insert(left_cells, { Text = '\n  · ' .. _cached_agent_task:sub(1, 60) .. '  ' })
+-- Build the left-status cells for a workspace name. Factored out so the Alt+N
+-- rename handler can repaint it IMMEDIATELY with the new name instead of waiting
+-- up to one status_update_interval for the next tick — that wait is the source of
+-- the post-rename name flicker. 'nexus' is aliased to 'home' (display only).
+local function left_status_cells(ws)
+  local cells = {}
+  -- Show the workspace name ONLY when you've left the home workspace. On home it's
+  -- noise (everything lives here as tabs); off-home it doubles as a "you're not in
+  -- Nexus" signal so a stray workspace switch is immediately obvious.
+  local has_chip = ws ~= 'nexus'
+  if has_chip then
+    cells[#cells + 1] = { Foreground = { Color = ACCENT } }
+    cells[#cells + 1] = { Attribute  = { Intensity = 'Bold' } }
+    cells[#cells + 1] = { Text = '  ⬡ ' .. ws .. '  ' }
   end
-  window:set_left_status(wezterm.format(left_cells))
+  if _cached_agent_task ~= "" then
+    cells[#cells + 1] = { Foreground = { Color = '#585b70' } }
+    cells[#cells + 1] = { Attribute  = { Intensity = 'Normal' } }
+    cells[#cells + 1] = { Text = (has_chip and '\n  · ' or '  · ') .. _cached_agent_task:sub(1, 60) .. '  ' }
+  end
+  return cells
+end
+
+wezterm.on('update-status', function(window, pane)
+  local ws  = window:active_workspace()
+  local now = os.time()
+
+  -- The focused TAB drives the dwell-clear timer.
+  local at            = window:active_tab()
+  local active_tab_id = at and at:tab_id() or nil
+  if active_tab_id ~= _attn_active_tab then
+    _attn_active_tab, _attn_active_since = active_tab_id, now
+  end
+
+  -- Map every live pane id -> its tab id, across all workspaces.
+  local pane_tab = {}
+  for _, mw in ipairs(wezterm.mux.all_windows()) do
+    for _, t in ipairs(mw:tabs()) do
+      local tid = t:tab_id()
+      for _, p in ipairs(t:panes()) do pane_tab[p:pane_id()] = tid end
+    end
+  end
+
+  -- Cross-tab attention — all rules live in the tested module A.decide(); here we
+  -- only feed it live state and apply its verdict (delete files, repaint tabs).
+  local res = A.decide(read_attention(now), {
+    pane_to_tab   = pane_tab,
+    active_tab_id = active_tab_id,
+    active_since  = _attn_active_since,
+    now           = now,
+    dwell_secs    = ATTN_DWELL_SECS,
+    max_age       = ATTN_MAX_AGE,
+    repo_dir_norm = REPO_DIR_NORM,
+  })
+  for _, path in ipairs(res.remove) do os.remove(path) end
+  for k in pairs(flagged_tabs) do flagged_tabs[k] = nil end
+  for tid, label in pairs(res.flagged_tabs) do flagged_tabs[tid] = label end
+
+  -- A dwell-clear deletes the flag in memory, but WezTerm caches each tab's
+  -- rendered title and won't re-run format-tab-title for an idle focused tab —
+  -- so the just-cleared amber dot would linger until the next tab switch forces
+  -- a redraw. Re-setting the active tab's title to itself marks it dirty and
+  -- forces the repaint in place. Guard on res.remove so we only nudge on the
+  -- tick a flag actually cleared (the dwell-clear path only removes flags on the
+  -- active tab, so the active tab is exactly the one that needs the repaint).
+  if #res.remove > 0 and at then at:set_title(at:get_title()) end
+
+  -- Left: just the workspace name + active agent task. Attention is already
+  -- signalled per-tab in the tab bar (amber ⬤), so the left status does NOT
+  -- duplicate it — no name chips, and the label keeps its normal colour.
+  -- Built by left_status_cells() (shared with the Alt+N rename handler); the
+  -- home workspace keeps the internal id 'nexus' but READS as "home".
+  window:set_left_status(wezterm.format(left_status_cells(ws)))
 
   -- Right: show directional split hint when split_dir key table is active
   if window:active_key_table() == 'split_dir' then
@@ -170,7 +423,6 @@ wezterm.on('update-status', function(window, _pane)
 
   -- Periodic session save (every 30 s) so the active tab is always current.
   -- window-focus-changed only fires on OS-level focus loss, not tab switches.
-  local now = os.time()
   if save_session and now - _last_session_save >= 30 then
     _last_session_save = now
     save_session(window)
@@ -222,6 +474,12 @@ end
 -- ── Session persistence ───────────────────────────────────────────────────────
 local SESSION_PATH  = wezterm.home_dir .. '/.claude/session.json'
 local SESSION_MAX_H = 12
+-- Command used to re-launch a detected Claude session on restore. --permission-mode
+-- auto starts it in Auto mode (the classifier-driven mode, distinct from acceptEdits)
+-- so restored agents don't sit in the normal ask-everything mode. Stored verbatim in
+-- repos.json by save_session; any older 'claude --continue' value is rewritten to this
+-- on the next save (so repos.json already holds the auto form by the next restart).
+local CLAUDE_RESTORE_CMD = 'claude --continue --permission-mode auto'
 
 save_session = function(window)
   local cfg     = load_repos_cfg()
@@ -241,8 +499,8 @@ save_session = function(window)
       local proc = pinfo[1].pane:get_foreground_process_name() or ''
       if proc:lower():find('claude') then
         cfg.workspaces[title] = cfg.workspaces[title] or {}
-        if cfg.workspaces[title].left ~= 'claude --continue' then
-          cfg.workspaces[title].left = 'claude --continue'
+        if cfg.workspaces[title].left ~= CLAUDE_RESTORE_CMD then
+          cfg.workspaces[title].left = CLAUDE_RESTORE_CMD
           changed = true
         end
       end
@@ -362,6 +620,7 @@ end
 local LOCAL       = load_local_cfg()
 local REPO_DIR    = LOCAL.repo_root or os.getenv('CLAUDE_REPO_ROOT') or (wezterm.home_dir .. '/repo')
 local REPO_DIR_BS = REPO_DIR:gsub('/', '\\')
+REPO_DIR_NORM     = norm_path(REPO_DIR)   -- forward-declared by the attention block; labels the home flag "Nexus"
 
 -- Path of `p` relative to REPO_DIR (slash-agnostic, case-insensitive on the
 -- drive letter), or nil if `p` is not under the repo root.
@@ -377,6 +636,13 @@ end
 -- layout is consistent. WezTerm sizes the NEW (right) pane as this fraction of
 -- the pane being split; the ratio is preserved across later window resizes.
 local RIGHT_PANE_FRAC = 0.40
+
+-- Nexus keymap pane only. WezTerm panes are RATIO-preserving across resizes, so
+-- to guarantee every keymap row stays on ONE line down to a half-monitor window
+-- we can't pin a cell count — we derive the fraction at startup from the live
+-- full-screen column width (see gui-startup) so the pane is >= this many cells
+-- when the window is half-screen. Longest keymap row is ~28 cells; +margin.
+local KEYMAP_TARGET_CELLS = 32
 
 local function keymap_args()
   if wezterm.target_triple:find('windows') then
@@ -464,7 +730,18 @@ wezterm.on('gui-startup', function(cmd)
   -- first could leave the right pane proportionally squeezed.
   window:gui_window():maximize()
   window:active_tab():set_title('Nexus')
-  shell_pane:split { direction = 'Right', size = RIGHT_PANE_FRAC, args = keymap_args(), cwd = REPO_DIR }
+  -- Half-screen-safe keymap width: measure the now-maximized full-screen column
+  -- count from the single un-split pane, then size the split so the keymap pane
+  -- is >= KEYMAP_TARGET_CELLS even when the window is later snapped to HALF the
+  -- monitor (frac * full_cols/2 >= TARGET). Ratio is preserved on resize, so at
+  -- full screen it's ~2x that (wider, but never wraps). Clamped, with a fallback
+  -- if the width reads 0 (e.g. maximize hasn't settled).
+  local full_cols = (window:active_tab():panes_with_info()[1] or {}).width or 0
+  local keymap_frac = 0.32
+  if full_cols > 0 then
+    keymap_frac = math.max(0.12, math.min(0.45, (KEYMAP_TARGET_CELLS * 2) / full_cols))
+  end
+  shell_pane:split { direction = 'Right', size = keymap_frac, args = keymap_args(), cwd = REPO_DIR }
   shell_pane:activate()
 
   -- Restore previously open repo tabs (if session is < 12 h old).
@@ -531,13 +808,30 @@ local function path_to_ws_name(rel)
 end
 
 local function discover_repos()
+  -- Pruned breadth-first walk over a manual stack. Records any directory that
+  -- has a .git child (and keeps descending, so nested repos are still found),
+  -- but never descends into node_modules / .git internals / build output. The
+  -- old `Get-ChildItem -Recurse -Depth 4` walked ~24k dirs (mostly
+  -- node_modules) on EVERY Alt+O — ~400ms of the ~500ms latency. Pruning at the
+  -- directory door cuts the walk to ~150ms and returns the identical repo set.
+  -- 'example[s]' is pruned by segment name to match the old regex exclusion.
+  local ps =
+    "$r='" .. REPO_DIR_BS .. "';$md=4;" ..
+    "$p=@{'node_modules'=1;'.git'=1;'dist'=1;'.next'=1;'build'=1;'out'=1;" ..
+    "'.worktrees'=1;'archive'=1;'_Misc'=1;'example'=1;'examples'=1;'.venv'=1;" ..
+    "'venv'=1;'__pycache__'=1;'target'=1;'obj'=1;'.turbo'=1;'.cache'=1};" ..
+    "$o=New-Object System.Collections.Generic.List[string];" ..
+    "$s=New-Object System.Collections.Generic.Stack[object];" ..
+    "$s.Push(@{P=$r;D=0});" ..
+    "while($s.Count){$c=$s.Pop();" ..
+    "if(Test-Path (Join-Path $c.P '.git')){$o.Add($c.P)};" ..
+    "if($c.D -ge $md){continue};" ..
+    "try{foreach($d in [System.IO.Directory]::EnumerateDirectories($c.P)){" ..
+    "$n=[System.IO.Path]::GetFileName($d);" ..
+    "if($p.ContainsKey($n)){continue};$s.Push(@{P=$d;D=$c.D+1})}}catch{}};" ..
+    "$o|Sort-Object -Unique"
   local ok, stdout = wezterm.run_child_process({
-    'powershell.exe', '-NoProfile', '-NoLogo', '-NonInteractive', '-Command',
-    'Get-ChildItem "' .. REPO_DIR_BS .. '" -Recurse -Depth 4 -Force -Filter ".git" ' ..
-    '| Where-Object { $_.FullName -notmatch ' ..
-    '"[\\\\/](\\.worktrees|archive|_Misc|example[s]?)[\\\\/]" } ' ..
-    '| ForEach-Object { $_.Parent.FullName } ' ..
-    '| Sort-Object -Unique',
+    'powershell.exe', '-NoProfile', '-NoLogo', '-NonInteractive', '-Command', ps,
   })
   if not ok then return {} end
   local repos = {}
@@ -606,9 +900,9 @@ end
 --  Nominal usage: 1–3 horizontal panes per tab, 1–3 tabs per workspace.
 --
 --  PANE NAV   A=left  D=right
---  TAB NAV    W=prev  S=next
+--  TAB NAV    W=prev  S=next   ⇧W/⇧S=move tab   R=rename tab
 --  PANE OPS   Z=zoom  X=close  C=split-H  V=split-V  T=new-tab
---  WORKSPACES F=fuzzy  R=rename  [/]=cycle  G=repo launcher
+--  WORKSPACES F=fuzzy  N=rename-ws  [/]=cycle  G=jump-to-alert  (O=repo launcher)
 --  HELP       /=keymap pane
 --
 -- Alt+B activates this table; press one of WASD to split in that direction.
@@ -632,6 +926,11 @@ config.keys = {
   -- ── Tab navigation (W=prev, S=next) ──────────────────────────────────
   { key = 'w', mods = 'ALT', action = act.ActivateTabRelative(-1) },
   { key = 's', mods = 'ALT', action = act.ActivateTabRelative(1)  },
+
+  -- ── Move (reorder) the current tab: Shift + the same W/S nav keys ──────
+  -- (WezTerm has no drag-to-reorder; this is the supported way.)
+  { key = 'W', mods = 'ALT|SHIFT', action = act.MoveTabRelative(-1) },
+  { key = 'S', mods = 'ALT|SHIFT', action = act.MoveTabRelative(1)  },
 
   -- ── Jump to tab by number ─────────────────────────────────────────────
   { key = '1', mods = 'ALT', action = act.ActivateTab(0) },
@@ -710,11 +1009,46 @@ config.keys = {
       action = wezterm.action_callback(function(win, pane, line)
         if line and line ~= '' then
           win:perform_action(act.RenameWorkspace { name = line }, pane)
+          -- Repaint the workspace name NOW so it doesn't linger on the old name
+          -- until the next update-status tick (the flicker). Paint `line` directly
+          -- — the name we just set — rather than re-reading active_workspace(),
+          -- which may not have committed the rename yet on this same frame.
+          win:set_left_status(wezterm.format(left_status_cells(line)))
         end
       end),
     }},
+  -- Alt+R: rename the CURRENT TAB (persistent; blank input resets to default).
+  -- Stores a display override keyed by the tab's identity (its repo-rel path, or
+  -- 'Nexus' for home) — the title itself is left intact so session-restore and
+  -- attention keep working. Re-setting the title to itself forces an in-place
+  -- repaint so the new label shows immediately.
+  { key = 'r', mods = 'ALT',
+    action = act.PromptInputLine {
+      description = 'Rename tab (blank = reset):',
+      action = wezterm.action_callback(function(win, _pane, line)
+        if line == nil then return end          -- Esc cancels — leave as-is
+        local tab = win:active_tab()
+        if not tab then return end
+        local key = tab:get_title()             -- repo-rel path, or 'Nexus' (home)
+        if key == nil or key == '' then return end
+        if line == '' then tab_names[key] = nil else tab_names[key] = line end
+        save_tab_names()
+        tab:set_title(tab:get_title())          -- mark dirty → repaint with new label
+      end),
+    }},
+
   { key = '[', mods = 'ALT', action = act.SwitchWorkspaceRelative(-1) },
   { key = ']', mods = 'ALT', action = act.SwitchWorkspaceRelative(1)  },
+
+  -- Alt+G: jump to the workspace/tab whose agent is waiting on you (the cross-
+  -- workspace analogue of clicking an on-screen amber tab).
+  { key = 'g', mods = 'ALT',
+    action = wezterm.action_callback(function(win, pane)
+      local target_ws, target_tab = attention_target()
+      if not target_ws then return end
+      if target_tab then pcall(function() target_tab:activate() end) end
+      win:perform_action(act.SwitchToWorkspace { name = target_ws }, pane)
+    end) },
 
   -- ── Scrollback ────────────────────────────────────────────────────────
   { key = 'u', mods = 'ALT', action = act.ScrollByPage(-0.5) },
@@ -729,7 +1063,49 @@ config.keys = {
 }
 
 -- ── Scrollback / defaults ─────────────────────────────────────────────────────
+-- ── Clickable links over TUIs (Claude Code etc.) ────────────────────────────
+-- A full-screen TUI enables mouse reporting, so plain clicks are delivered to
+-- the app and never reach WezTerm's link opener — which is why links looked
+-- dead. mouse_reporting = true lets these fire anyway: Ctrl+Click opens the URL
+-- / OSC-8 file link under the cursor, and the Ctrl press-down is swallowed so it
+-- doesn't begin a text selection. (With no TUI running, the built-in Ctrl+Click
+-- rule already handles it.)
+config.mouse_bindings = {
+  { event = { Down = { streak = 1, button = 'Left' } }, mods = 'CTRL',
+    mouse_reporting = true, action = act.Nop },
+  { event = { Up = { streak = 1, button = 'Left' } }, mods = 'CTRL',
+    mouse_reporting = true, action = act.OpenLinkAtMouseCursor },
+}
+
+-- Make bare Windows file paths (e.g. D:\repo\foo.ts:12) clickable too, on top of
+-- the built-in URL rules. The matched text is handed verbatim to open-uri below.
+config.hyperlink_rules = wezterm.default_hyperlink_rules()
+table.insert(config.hyperlink_rules, {
+  regex  = [[[A-Za-z]:[\\/](?:[^\s"'<>|:*?]+[\\/])*[^\s"'<>|:*?]+\.[A-Za-z0-9]+(?::\d+(?::\d+)?)?]],
+  format = '$0',
+})
+
+-- Route opened links: web/mail use the OS default (browser); anything that looks
+-- like a local file opens in Cursor at its line via open-in-cursor.ps1 (which
+-- also flips markdown into preview mode).
+wezterm.on('open-uri', function(_window, _pane, uri)
+  if not (uri:match('^file:') or uri:match('^/?%a:[/\\]')) then
+    return  -- not a local file → let WezTerm open it (browser, etc.)
+  end
+  local target = uri:gsub('^file://', ''):gsub('^/([A-Za-z]:)', '%1')  -- file:///D:/x → D:/x
+  wezterm.background_child_process({
+    'powershell.exe', '-NoProfile', '-WindowStyle', 'Hidden', '-File',
+    wezterm.home_dir .. '/.claude/scripts/open-in-cursor.ps1', '-Target', target,
+  })
+  return false  -- handled; don't let WezTerm try to open the raw path
+end)
+
 config.scrollback_lines  = 10000
 config.default_workspace = 'nexus'
+-- Repaint the status bar 4x/s instead of the 1s default so a workspace
+-- switch/rename converges fast (backstop to the immediate repaint in Alt+N).
+-- update-status only scans the small attention dir + in-memory mux state, so
+-- the extra ticks are cheap.
+config.status_update_interval = 250
 
 return config
