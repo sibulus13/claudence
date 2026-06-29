@@ -19,6 +19,18 @@ These instructions apply to every project on this machine. Project-level CLAUDE.
 - When phrasing is ambiguous in a way that would change a design or implementation decision (e.g., "rebalancing" could mean calendar-, threshold-, or event-driven), ask for clarification immediately rather than guessing.
 - This behavior was originally scoped to one project (quant finance terminology) — it is now a standing global rule, not project-specific. The End-of-Response Contract's "Vocabulary / domain knowledge" gloss is the fallback for terms not already corrected inline.
 
+## Rule Scope & Placement (global vs project)
+
+Whenever a new rule, convention, or operating contract is established, **explicitly classify its scope and write it to the right file** — don't default everything to the project.
+
+| Scope | Lives in | Examples |
+|-------|----------|----------|
+| **Global / user-preference** | `~/.claude/CLAUDE.md` (+ a feedback memory) | response & doc style, execution contracts, security defaults |
+| **Stack** | global if the stack is used across repos; else the project | pnpm, Next.js / Supabase conventions |
+| **Project** | `<repo>/CLAUDE.md` or that project's memory | domain rules, architecture, goals (e.g. a studio's "productize-first") |
+
+**Test:** *would this rule be desirable in an unrelated project?* Yes → global; only-makes-sense-here → project. **State the chosen scope when adopting the rule**, and **promote** a project rule to global once it proves generally applicable (leave a memory note when you do — cf. Domain Literacy above).
+
 ## Response Style
 
 - Be concise — lead with the answer, not the reasoning
@@ -27,6 +39,13 @@ These instructions apply to every project on this machine. Project-level CLAUDE.
 - Do not add emojis unless explicitly asked
 - Reference code by `file:line` pattern so the user can navigate directly
 - **Action-biased** — when a clear implementation path exists, take it. Do not present options or ask which approach to use. Make the call, implement it, then summarize the design choices and trade-offs made at the end of the response.
+
+## Documentation Style — Visual-First (Mermaid)
+
+Write every doc / spec / context **visual-first**: lead with **Mermaid diagrams**; use text only for what a diagram can't carry (data/code contracts, exact copy, pricing tables, fine nuance).
+- Maps: architecture → `flowchart` · runtime/data flow → `sequenceDiagram` · branching/decision → `flowchart`/`stateDiagram` · schemas + relationships → `erDiagram`/`classDiagram`.
+- **≤ 5 elements per row** — lay out for portrait/vertical space; prefer top-down (`flowchart TD`); ≤5 participants per sequence diagram; wrap/stack wide chains.
+- A doc opens with a diagram, not a paragraph. (Promoted from a project rule 2026-06-27. Exemplar: `D:\repo\Life\pylon\Catalog\chatbox-assistant\ASK-BOT-SPEC.md`.)
 
 ## End-of-Response Contract
 
@@ -171,6 +190,8 @@ Before touching code in any repo, read the state doc first (`context.md`, `todo.
 ## Source of Truth Files
 
 Repos with multiple living docs (todo, roadmap, knowledge base) must have a table mapping each doc to its purpose and update trigger. Without it, docs accumulate as undifferentiated sprawl. When working in a repo with multiple docs but no table, propose adding one.
+
+**One canonical per concern — augment, don't proliferate.** Before creating a new spec/doc, check for an existing one covering the same concern and **update/augment the canonical** instead. When two docs overlap, designate **one** as the single source of truth and mark the other **superseded** with a banner pointer (don't maintain parallel specs — they drift). New docs only for a genuinely new concern.
 
 ## Hang Prevention
 

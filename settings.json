@@ -35,8 +35,9 @@
           },
           {
             "type": "command",
-            "command": "printf '\\a'",
-            "shell": "bash"
+            "command": "powershell.exe -NoProfile -File $USERPROFILE/.claude/telemetry/notify-attention.ps1 -Reason stop -Silent",
+            "shell": "bash",
+            "async": true
           }
         ]
       }
@@ -76,13 +77,7 @@
           },
           {
             "type": "command",
-            "command": "powershell.exe -NoProfile -Command \"(New-Object System.Media.SoundPlayer '$USERPROFILE/.claude/sounds/ding-half.wav').PlaySync()\"",
-            "shell": "bash",
-            "async": true
-          },
-          {
-            "type": "command",
-            "command": "printf '\\a'",
+            "command": "powershell.exe -NoProfile -File $USERPROFILE/.claude/telemetry/notify-attention.ps1 -Reason permission -Sound ding-half.wav",
             "shell": "bash",
             "async": true
           }
@@ -108,7 +103,7 @@
     "remember@claude-plugins-official": true,
     "notion@claude-plugins-official": true
   },
-  "effortLevel": "xhigh",
+  "effortLevel": "high",
   "autoUpdatesChannel": "latest",
   "skipDangerousModePermissionPrompt": true,
   "skipWorkflowUsageWarning": true,
@@ -118,5 +113,6 @@
   "remoteControlAtStartup": true,
   "inputNeededNotifEnabled": true,
   "agentPushNotifEnabled": true,
-  "voiceEnabled": true
+  "voiceEnabled": true,
+  "tui": "fullscreen"
 }

@@ -18,7 +18,9 @@
  [1;38;2;200;70;155mTABS[0m
  [90m─────────────────────────[0m
   [97mT[0m       new tab
+  [97mR[0m       rename tab
   [97mQ[0m       close tab
+  [97m⇧W ⇧S[0m  move tab
 
  [1;38;2;200;70;155mREPOS[0m
  [90m─────────────────────────[0m
@@ -28,8 +30,9 @@
  [1;38;2;200;70;155mWORKSPACES[0m
  [90m─────────────────────────[0m
   [97mF[0m       fuzzy pick
-  [97mN[0m       rename
+  [97mN[0m       rename ws
   [97m[ / ][0m   cycle
+  [97mG[0m       jump to alert
 
 [90m ─────────────────────────[0m
   [2m/   goto nexus[0m
