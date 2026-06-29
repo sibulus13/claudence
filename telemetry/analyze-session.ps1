@@ -32,8 +32,8 @@ $ctx_pct = if ($data -and $data.context_window -and ($null -ne $data.context_win
     [int]$data.context_window.used_percentage
 } else { $null }
 
-# Clear running flag — Claude has stopped
-$running_flag = "$HOME\.claude\telemetry\running.flag"
+# Clear running flag — Claude has stopped (per-session)
+$running_flag = "$HOME\.claude\telemetry\running-$session_id.flag"
 if (Test-Path $running_flag) { Remove-Item $running_flag -Force -ErrorAction SilentlyContinue }
 
 $log_dir      = "$HOME\.claude\telemetry\sessions"
@@ -327,12 +327,25 @@ $suggest_str = if ($allow_suggestions.Count -gt 0) {
     " Suggested allow rules: $($allow_suggestions -join ', ')."
 } else { '' }
 
-Start-Sleep -Milliseconds 400
-$snd_dir = "$HOME/.claude/sounds/"
-if ($play_ring) {
-    (New-Object System.Media.SoundPlayer "${snd_dir}ring-half.wav").PlaySync()
-} else {
-    (New-Object System.Media.SoundPlayer "${snd_dir}notify-half.wav").PlaySync()
+# Throttle: at most one Stop chime per 60s across ALL sessions, via a shared
+# on-disk stamp (separate hook processes can't share memory). Stops ding-storms
+# when several sessions finish together. The visual flags (notify-attention.ps1)
+# are NOT throttled, so every finished session still shows on the status/tab bar.
+$ding_window = 60
+$ding_stamp  = "$HOME/.claude/workspaces/.last-ding-stop"
+$ding_now    = [int][DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+$ding_last   = 0
+try { $ding_last = [int]((Get-Content $ding_stamp -Raw).Trim()) } catch { $ding_last = 0 }
+
+if (($ding_now - $ding_last) -ge $ding_window) {
+    [System.IO.File]::WriteAllText($ding_stamp, "$ding_now")
+    Start-Sleep -Milliseconds 400
+    $snd_dir = "$HOME/.claude/sounds/"
+    if ($play_ring) {
+        (New-Object System.Media.SoundPlayer "${snd_dir}ring-half.wav").PlaySync()
+    } else {
+        (New-Object System.Media.SoundPlayer "${snd_dir}notify-half.wav").PlaySync()
+    }
 }
 
 if ($retrospect_needed) {

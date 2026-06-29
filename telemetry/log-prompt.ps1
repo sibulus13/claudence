@@ -18,7 +18,7 @@ $data = try { $rawInput | ConvertFrom-Json -ErrorAction Stop } catch { $null }
 
 $session_id  = if ($data -and $data.session_id) { $data.session_id } else { 'unknown' }
 $prompt_text = if ($data -and $data.prompt)      { [string]$data.prompt } else { '' }
-$cwd         = if ($env:PWD) { $env:PWD } else { (Get-Location).Path }
+$cwd         = if ($data -and $data.cwd) { [string]$data.cwd } elseif ($env:PWD) { $env:PWD } else { (Get-Location).Path }
 
 # Refresh elapsed-time file (Stop sound hook reads this)
 $ts_file = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), 'claude_start.txt')
@@ -26,7 +26,7 @@ $ts_file = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), 'claude_st
 
 $log_dir      = "$HOME\.claude\telemetry\sessions"
 $session_file = Join-Path $log_dir "$session_id.jsonl"
-$state_file   = "$HOME\.claude\telemetry\current-session.json"
+$state_file   = "$HOME\.claude\telemetry\state-$session_id.json"
 
 if (-not (Test-Path $log_dir)) { New-Item $log_dir -ItemType Directory -Force | Out-Null }
 
@@ -79,7 +79,55 @@ switch ($classification) {
     'denial_context'  { $state.denial_contexts  += 1 }
 }
 
-$state | ConvertTo-Json | Set-Content $state_file
+# Track cwd so the recall viewer can scope themes to this repo
+if ($state.PSObject.Properties['cwd']) { $state.cwd = $cwd } else { $state | Add-Member -NotePropertyName 'cwd' -NotePropertyValue $cwd }
 
-# Signal that Claude is now running (statusline spinner reads this)
-"$([datetime]::UtcNow.ToString('o'))" | Set-Content "$HOME\.claude\telemetry\running.flag"
+# --- Recent distinct themes (ZERO-TOKEN, reverse-chronological, max 3) ---
+# A "different thing" = a direction change. The classifier already labels that as 'override'
+# (and the session's first prompt as 'first_prompt'). So: push a new theme on those;
+# follow-ups/additions continue the current theme (bump turn count, keep the anchor label).
+$theme_label = (($prompt_text -split "`n") | Where-Object { $_.Trim() -ne '' } | Select-Object -First 1)
+if ($null -eq $theme_label) { $theme_label = '' }
+$theme_label = $theme_label.Trim()
+if ($theme_label.Length -gt 60) { $theme_label = $theme_label.Substring(0, 60).TrimEnd() + '...' }
+
+if (-not $state.PSObject.Properties['themes']) { $state | Add-Member -NotePropertyName 'themes' -NotePropertyValue @() }
+$themes = [System.Collections.Generic.List[object]]::new()
+foreach ($t in @($state.themes)) { if ($t) { $themes.Add($t) } }
+
+$is_new = ($classification -eq 'override') -or ($classification -eq 'first_prompt') -or ($themes.Count -eq 0)
+# Topic-shift safety net (zero-token): if not already flagged new and not a mid-run
+# addition, start a new theme when the prompt shares little vocabulary with the current
+# theme. Catches genuine new scopes the classifier didn't label as an explicit override.
+if (-not $is_new -and $classification -ne 'addition' -and $themes.Count -gt 0 -and $theme_label -ne '') {
+    $cur = @(($themes[0].label).ToLower() -split '\W+' | Where-Object { $_.Length -gt 2 })
+    $new = @($theme_label.ToLower()       -split '\W+' | Where-Object { $_.Length -gt 2 })
+    if ($new.Count -gt 0 -and $cur.Count -gt 0) {
+        $inter = @($cur | Where-Object { $new -contains $_ }).Count
+        $union = @($cur + $new | Select-Object -Unique).Count
+        $jac   = if ($union -gt 0) { $inter / $union } else { 0 }
+        if ($jac -lt 0.2) { $is_new = $true }
+    }
+}
+if ($is_new -and $theme_label -ne '') {
+    $themes.Insert(0, [PSCustomObject]@{ label = $theme_label; ts = (Get-Date -Format 'o'); turns = 1 })
+    while ($themes.Count -gt 3) { $themes.RemoveAt(3) }
+} elseif ($themes.Count -gt 0) {
+    $themes[0].turns = [int]$themes[0].turns + 1
+}
+$state.themes = $themes.ToArray()
+
+$state | ConvertTo-Json -Depth 5 | Set-Content $state_file
+
+# Signal that Claude is now running (statusline spinner reads this) — per-session
+"$([datetime]::UtcNow.ToString('o'))" | Set-Content "$HOME\.claude\telemetry\running-$session_id.flag"
+
+# Opportunistic cleanup so per-session files don't accumulate:
+#   - state files older than 7 days (ended sessions)
+#   - running flags older than 6 hours (crashed sessions that never cleared → stuck spinner)
+Get-ChildItem "$HOME\.claude\telemetry\state-*.json" -ErrorAction SilentlyContinue |
+    Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-7) } |
+    Remove-Item -Force -ErrorAction SilentlyContinue
+Get-ChildItem "$HOME\.claude\telemetry\running-*.flag" -ErrorAction SilentlyContinue |
+    Where-Object { $_.LastWriteTime -lt (Get-Date).AddHours(-6) } |
+    Remove-Item -Force -ErrorAction SilentlyContinue

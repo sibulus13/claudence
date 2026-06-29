@@ -59,17 +59,14 @@ $cost_usd = if ($ctx_data -and $ctx_data.cost -and ($null -ne $ctx_data.cost.tot
     $ctx_data.cost.total_cost_usd
 } else { $null }
 $stdin_session_id = if ($ctx_data -and $ctx_data.session_id) { [string]$ctx_data.session_id } else { $null }
+$model_name = if ($ctx_data -and $ctx_data.model -and $ctx_data.model.display_name) { [string]$ctx_data.model.display_name } else { $null }
 
 # --- Read session KPIs ---
-$state_file = "$HOME\.claude\telemetry\current-session.json"
-$state = if (Test-Path $state_file) {
+# Per-session state file (keyed by session_id) so parallel terminals don't collide.
+$state_file = if ($stdin_session_id) { "$HOME\.claude\telemetry\state-$stdin_session_id.json" } else { $null }
+$state = if ($state_file -and (Test-Path $state_file)) {
     try { Get-Content $state_file -Raw | ConvertFrom-Json -ErrorAction Stop } catch { $null }
 } else { $null }
-
-# Discard stale state from a previous session
-if ($stdin_session_id -and $state -and $state.session_id -ne $stdin_session_id) {
-    $state = $null
-}
 
 $p  = if ($state) { [int]$state.prompts         } else { 0 }
 $o  = if ($state) { [int]$state.overrides       } else { 0 }
@@ -148,8 +145,17 @@ if ($has_history -and $p -gt 0) {
 # --- Format meta (ctx%, cost) ---
 $meta_parts = @()
 if ($null -ne $ctx_pct) {
-    $ctx_val = if ($ctx_pct -ge 80) { $red } elseif ($ctx_pct -ge 50) { $yellow } else { $green }
-    $meta_parts += "${ctx_val}${ctx_pct}%${reset}"
+    # Context zones (informed by context-rot research + proactive-compact practice):
+    #   < 60%  green  — healthy
+    #   60-79% yellow — warning: compact at the next logical boundary
+    #   >= 80% red    — red zone: compact now (shows "ctx" label)
+    if ($ctx_pct -ge 80) {
+        $meta_parts += "${red}ctx ${ctx_pct}% COMPACT${reset}"
+    } elseif ($ctx_pct -ge 60) {
+        $meta_parts += "${yellow}ctx ${ctx_pct}%${reset}"
+    } else {
+        $meta_parts += "${green}ctx ${ctx_pct}%${reset}"
+    }
 }
 if ($null -ne $cost_usd) {
     $cost_str = '$' + ([Math]::Round($cost_usd, 2).ToString('F2'))
@@ -158,7 +164,7 @@ if ($null -ne $cost_usd) {
 $meta = if ($meta_parts.Count -gt 0) { "  ${dim}|${reset}  " + ($meta_parts -join '  ') } else { '' }
 
 # --- Spinner when Claude is running ---
-$running_flag = "$HOME\.claude\telemetry\running.flag"
+$running_flag = if ($stdin_session_id) { "$HOME\.claude\telemetry\running-$stdin_session_id.flag" } else { "$HOME\.claude\telemetry\running.flag" }
 $spinner = ''
 if (Test-Path $running_flag) {
     $frames = @('|', '/', '-', '\')
@@ -167,6 +173,46 @@ if (Test-Path $running_flag) {
 }
 
 $retro_pfx = if ($retro_needed) { "${red}!retro${reset}  " } else { '' }
-$p_str     = "${cyan}${p} Prompts${reset}"
+# Only show the prompt count when we have a real positive number for THIS session;
+# otherwise omit it rather than display a misleading 0.
+$p_str     = if ($p -gt 0) { "${cyan}${p} Prompts${reset}" } else { '' }
 
-Write-Host "${retro_pfx}${p_str}${friction_str}${meta}${runtime_str}${spinner}"
+# Effort: stdin `effort` is a string or {level:"high"} object (live, per-session); fall back to settings.json.
+# IMPORTANT: capture values by assignment — never put `$ctx_data.effort` bare in a condition,
+# or PowerShell 5.1 emits it to the success stream (leaked "@{level=high}" into the bar).
+$effort  = $null
+$eff_val = $null
+if ($ctx_data -and $ctx_data.PSObject.Properties['effort']) { $eff_val = $ctx_data.effort }
+if ($null -ne $eff_val) {
+    if ($eff_val -is [string]) { $effort = $eff_val }
+    elseif ($eff_val.PSObject.Properties['level']) { $effort = [string]$eff_val.level }
+}
+if (-not $effort) {
+    $cfg = try { Get-Content "$HOME\.claude\settings.json" -Raw | ConvertFrom-Json -ErrorAction Stop } catch { $null }
+    $cfg_eff = if ($cfg) { $cfg.effortLevel } else { $null }
+    if ($null -ne $cfg_eff) {
+        if ($cfg_eff -is [string]) { $effort = $cfg_eff }
+        elseif ($cfg_eff.PSObject.Properties['level']) { $effort = [string]$cfg_eff.level }
+    }
+}
+# Abbreviate effort: low=L med=M high=H xhigh=XH max=MX auto=A
+$eff_abbr = $null
+if ($effort) {
+    $el = $effort.ToString().ToLower()
+    $eff_abbr = switch -Exact ($el) {
+        'low' { 'L' } 'medium' { 'M' } 'high' { 'H' } 'xhigh' { 'XH' } 'max' { 'MX' } 'auto' { 'A' }
+        default { $el.Substring(0, [Math]::Min(2, $el.Length)).ToUpper() }
+    }
+}
+
+# Short model label: tier code + version, with effort suffix (e.g. "OP 4.8-high")
+$model_str = ''
+if ($model_name) {
+    $tier = if ($model_name -match 'Opus') { 'OP' } elseif ($model_name -match 'Sonnet') { 'SN' } elseif ($model_name -match 'Haiku') { 'HK' } elseif ($model_name -match 'Fable') { 'FB' } else { ($model_name.Substring(0, [Math]::Min(2, $model_name.Length))).ToUpper() }
+    $mcol = if ($model_name -match 'Opus') { "${E}[35m" } elseif ($model_name -match 'Sonnet') { "${E}[34m" } elseif ($model_name -match 'Haiku') { $green } else { $cyan }
+    $ver  = if ($model_name -match '(\d+(?:\.\d+)?)') { $Matches[1] } else { '' }
+    $eff_str = if ($eff_abbr) { "${dim} ${eff_abbr}${reset}" } else { '' }
+    $model_str = "${mcol}${tier}${ver}${reset}${eff_str}  "
+}
+
+Write-Host "${model_str}${retro_pfx}${p_str}${friction_str}${meta}${runtime_str}${spinner}"

@@ -55,148 +55,122 @@ Describe "Skill File: /retrospect" {
 # ---------------------------------------------------------------------------
 
 Describe "Statusline: running spinner" {
-
-    BeforeAll {
-        $script:RunningFlag = "$script:ClaudeRoot\telemetry\running.flag"
-    }
-    BeforeEach {
-        if (Test-Path $script:RunningFlag) { Remove-Item $script:RunningFlag -Force }
-    }
+    # Spinner now reads a PER-SESSION flag (running-<session_id>.flag), so the flag
+    # name must match the session_id sent on stdin.
     AfterEach {
-        if (Test-Path $script:RunningFlag) { Remove-Item $script:RunningFlag -Force }
+        Get-ChildItem "$script:ClaudeRoot\telemetry\running-spin-test.flag", `
+                      "$script:ClaudeRoot\telemetry\running-idle-test.flag" -ErrorAction SilentlyContinue |
+            Remove-Item -Force -ErrorAction SilentlyContinue
     }
 
-    It "appends extra content when running.flag exists" {
+    It "appends extra content when running-<session>.flag exists" {
         # Braille chars corrupt when captured through subprocess pipe encoding.
         # Instead verify the spinner adds length to the output (ANSI-stripped).
-        $stdin = '{"session_id":"spin-test","context_window":{"used_percentage":5}}'
+        $sid   = 'spin-test'
+        $flag  = "$script:ClaudeRoot\telemetry\running-$sid.flag"
+        $stdin = "{`"session_id`":`"$sid`",`"context_window`":{`"used_percentage`":5}}"
 
-        Remove-Item $script:RunningFlag -Force -ErrorAction SilentlyContinue
+        Remove-Item $flag -Force -ErrorAction SilentlyContinue
         $without = script:Strip-Ansi (($stdin | powershell.exe -NoProfile -File "$script:ClaudeRoot\statusline.ps1") -join '')
 
-        'running' | Set-Content $script:RunningFlag
+        'running' | Set-Content $flag
         $with = script:Strip-Ansi (($stdin | powershell.exe -NoProfile -File "$script:ClaudeRoot\statusline.ps1") -join '')
 
+        Remove-Item $flag -Force -ErrorAction SilentlyContinue
         $with.Length | Should -BeGreaterThan $without.Length
     }
 
-    It "shows no spinner when running.flag is absent" {
-        # Flag is absent (removed in BeforeEach) — baseline length
-        $stdin   = '{"session_id":"idle-test","context_window":{"used_percentage":5}}'
+    It "shows no spinner when the per-session flag is absent" {
+        $sid   = 'idle-test'
+        $flag  = "$script:ClaudeRoot\telemetry\running-$sid.flag"
+        $stdin = "{`"session_id`":`"$sid`",`"context_window`":{`"used_percentage`":5}}"
+
+        Remove-Item $flag -Force -ErrorAction SilentlyContinue
         $without = script:Strip-Ansi (($stdin | powershell.exe -NoProfile -File "$script:ClaudeRoot\statusline.ps1") -join '')
         # Add flag — output must grow
-        'running' | Set-Content $script:RunningFlag
+        'running' | Set-Content $flag
         $with = script:Strip-Ansi (($stdin | powershell.exe -NoProfile -File "$script:ClaudeRoot\statusline.ps1") -join '')
+
+        Remove-Item $flag -Force -ErrorAction SilentlyContinue
         $without.Length | Should -BeLessThan $with.Length
     }
 }
 
 # ---------------------------------------------------------------------------
 
-Describe "Statusline: session staleness detection" {
-    # CAVEAT: Claude Code runs the statusline command after each assistant response, NOT at
-    # startup. This means there is a window between terminal restart and the first assistant
-    # response where stale data from the previous session may still be visible. The fix
-    # below is defence-in-depth (handles race conditions and future startup-invocation
-    # scenarios) but does not eliminate the startup gap. The existing log-prompt.ps1
-    # session reset is what corrects the state before the statusline next fires.
-    #
+Describe "Statusline: per-session prompt count" {
+    # Staleness is now STRUCTURAL: statusline reads telemetry/state-<session_id>.json,
+    # so a different session has no file to read (no count shown) and a matching session
+    # reads its own file. The old shared current-session.json + staleness check is gone.
 
-    BeforeEach { script:Backup-File $script:StateFile }
-    AfterEach  { script:Restore-File $script:StateFile }
+    AfterEach {
+        Get-ChildItem "$script:ClaudeRoot\telemetry\state-old-session-aaa.json", `
+                      "$script:ClaudeRoot\telemetry\state-brand-new.json", `
+                      "$script:ClaudeRoot\telemetry\state-matching-session-xyz.json" -ErrorAction SilentlyContinue |
+            Remove-Item -Force -ErrorAction SilentlyContinue
+    }
 
-    It "shows '0 Prompts' when stdin session_id differs from current-session.json" {
-        # Seed stale state from a previous session
+    It "does not show a stale count from a different session" {
+        # State exists for an OLD session; statusline is invoked for a DIFFERENT session,
+        # which has no state file of its own → it must not surface the old count.
+        $old = 'old-session-aaa'
         [PSCustomObject]@{
-            session_id   = 'old-session-aaa'
-            prompts      = 7
-            overrides    = 3
-            additions    = 2
-            perm_reqs    = 1
-            perm_repeats = 0
-            started_at   = (Get-Date).AddHours(-2).ToString('o')
-        } | ConvertTo-Json | Set-Content $script:StateFile
+            session_id = $old; prompts = 7; overrides = 3; additions = 2
+            started_at = (Get-Date).AddHours(-2).ToString('o')
+        } | ConvertTo-Json | Set-Content "$script:ClaudeRoot\telemetry\state-$old.json"
 
         $stdin = '{"session_id":"new-session-bbb","context_window":{"used_percentage":2},"cost":{"total_cost_usd":0.00}}'
-        $raw   = $stdin | powershell.exe -NoProfile -File "$script:ClaudeRoot\statusline.ps1"
-        $out   = script:Strip-Ansi ($raw -join '')
+        $out   = script:Strip-Ansi (($stdin | powershell.exe -NoProfile -File "$script:ClaudeRoot\statusline.ps1") -join '')
 
-        $out | Should -Match '0 Prompts'
         $out | Should -Not -Match '7 Prompts'
+        $out | Should -Not -Match '\d+ Prompts'
     }
 
-    It "shows '0 Prompts' when current-session.json does not exist" {
-        if (Test-Path $script:StateFile) { Remove-Item $script:StateFile -Force }
+    It "shows no prompt count when no state file exists for the session" {
+        $sid = 'brand-new'
+        Remove-Item "$script:ClaudeRoot\telemetry\state-$sid.json" -Force -ErrorAction SilentlyContinue
 
         $stdin = '{"session_id":"brand-new","context_window":{"used_percentage":1}}'
-        $raw   = $stdin | powershell.exe -NoProfile -File "$script:ClaudeRoot\statusline.ps1"
-        $out   = script:Strip-Ansi ($raw -join '')
+        $out   = script:Strip-Ansi (($stdin | powershell.exe -NoProfile -File "$script:ClaudeRoot\statusline.ps1") -join '')
 
-        $out | Should -Match '0 Prompts'
+        $out | Should -Not -Match '\d+ Prompts'
     }
 
-    It "shows actual counts when session_id matches current-session.json" {
+    It "shows actual counts when a state file exists for the session" {
         $sid = 'matching-session-xyz'
         [PSCustomObject]@{
-            session_id      = $sid
-            prompts         = 4
-            overrides       = 1
-            additions       = 0
-            denial_contexts = 0
-            perm_reqs       = 0
-            perm_repeats    = 0
+            session_id      = $sid; prompts = 4; overrides = 1; additions = 0; denial_contexts = 0
             started_at      = (Get-Date).AddMinutes(-15).ToString('o')
-        } | ConvertTo-Json | Set-Content $script:StateFile
+        } | ConvertTo-Json | Set-Content "$script:ClaudeRoot\telemetry\state-$sid.json"
 
         $stdin = "{`"session_id`":`"$sid`",`"context_window`":{`"used_percentage`":10},`"cost`":{`"total_cost_usd`":0.03}}"
-        $raw   = $stdin | powershell.exe -NoProfile -File "$script:ClaudeRoot\statusline.ps1"
-        $out   = script:Strip-Ansi ($raw -join '')
+        $out   = script:Strip-Ansi (($stdin | powershell.exe -NoProfile -File "$script:ClaudeRoot\statusline.ps1") -join '')
 
         $out | Should -Match '4 Prompts'
     }
 
-    It "does NOT discard state when stdin has no session_id (graceful degradation)" {
-        # If Claude Code doesn't send session_id in statusline stdin, the fix must be inert
-        # and existing stored data must still be shown.
-        [PSCustomObject]@{
-            session_id   = 'any-session'
-            prompts      = 3
-            overrides    = 0
-            additions    = 0
-            perm_reqs    = 0
-            perm_repeats = 0
-            started_at   = (Get-Date).AddMinutes(-5).ToString('o')
-        } | ConvertTo-Json | Set-Content $script:StateFile
-
+    It "renders without a prompt count when stdin has no session_id" {
+        # All state is keyed on session_id; without one there is no file to read, so it
+        # degrades to ctx-only rather than showing a misleading count. Must not crash.
         $stdin = '{"context_window":{"used_percentage":5}}'
-        $raw   = $stdin | powershell.exe -NoProfile -File "$script:ClaudeRoot\statusline.ps1"
-        $out   = script:Strip-Ansi ($raw -join '')
+        $out   = script:Strip-Ansi (($stdin | powershell.exe -NoProfile -File "$script:ClaudeRoot\statusline.ps1") -join '')
 
-        # Without session_id in stdin the staleness check is skipped — show as-is
-        $out | Should -Match '3 Prompts'
+        $out | Should -Match 'ctx 5%'
+        $out | Should -Not -Match '\d+ Prompts'
     }
 }
 
 # ---------------------------------------------------------------------------
 
-Describe "log-prompt.ps1: session state reset on new session_id" {
+Describe "log-prompt.ps1: per-session state file" {
+    # Each session has its own telemetry/state-<session_id>.json. A brand-new session
+    # therefore starts at 1/0/0 in its OWN file (no shared file to "reset"); an existing
+    # session's file is incremented in place.
 
-    BeforeEach { script:Backup-File $script:StateFile }
-    AfterEach  { script:Restore-File $script:StateFile }
-
-    It "resets counts to 1/0/0 when session_id in hook input differs from stored state" {
-        $newSid = 'reset-test-' + [guid]::NewGuid().ToString('N').Substring(0, 8)
-
-        # Pre-seed state from a different session
-        [PSCustomObject]@{
-            session_id   = 'previous-session'
-            prompts      = 50
-            overrides    = 5
-            additions    = 3
-            perm_reqs    = 2
-            perm_repeats = 1
-            started_at   = (Get-Date).AddHours(-3).ToString('o')
-        } | ConvertTo-Json | Set-Content $script:StateFile
+    It "creates a fresh state-<sid>.json with counts 1/0/0 for a new session" {
+        $newSid    = 'reset-test-' + [guid]::NewGuid().ToString('N').Substring(0, 8)
+        $stateFile = "$script:ClaudeRoot\telemetry\state-$newSid.json"
+        Remove-Item $stateFile -Force -ErrorAction SilentlyContinue
 
         $hookInput = [PSCustomObject]@{
             session_id = $newSid
@@ -204,20 +178,22 @@ Describe "log-prompt.ps1: session state reset on new session_id" {
         } | ConvertTo-Json -Compress
         $hookInput | powershell.exe -NoProfile -File "$script:ClaudeRoot\telemetry\log-prompt.ps1" | Out-Null
 
-        $s = Get-Content $script:StateFile -Raw | ConvertFrom-Json
+        $s = Get-Content $stateFile -Raw | ConvertFrom-Json
         $s.session_id | Should -Be $newSid
         $s.prompts    | Should -Be 1
         $s.overrides  | Should -Be 0
         $s.additions  | Should -Be 0
         $s.perm_reqs  | Should -Be 0
 
-        # Cleanup session JSONL written by the hook
+        Remove-Item $stateFile -Force -ErrorAction SilentlyContinue
+        Remove-Item "$script:ClaudeRoot\telemetry\running-$newSid.flag" -Force -ErrorAction SilentlyContinue
         $f = Join-Path $script:SessionsDir "$newSid.jsonl"
         if (Test-Path $f) { Remove-Item $f -Force }
     }
 
-    It "increments prompt count when session_id matches stored state" {
-        $sid = 'continuing-' + [guid]::NewGuid().ToString('N').Substring(0, 8)
+    It "increments prompt count when the session's state file already exists" {
+        $sid       = 'continuing-' + [guid]::NewGuid().ToString('N').Substring(0, 8)
+        $stateFile = "$script:ClaudeRoot\telemetry\state-$sid.json"
 
         [PSCustomObject]@{
             session_id   = $sid
@@ -227,7 +203,7 @@ Describe "log-prompt.ps1: session state reset on new session_id" {
             perm_reqs    = 0
             perm_repeats = 0
             started_at   = (Get-Date).AddMinutes(-5).ToString('o')
-        } | ConvertTo-Json | Set-Content $script:StateFile
+        } | ConvertTo-Json | Set-Content $stateFile
 
         # Seed session JSONL so classification has a prior stop to work with
         $sessionFile = Join-Path $script:SessionsDir "$sid.jsonl"
@@ -239,10 +215,12 @@ Describe "log-prompt.ps1: session state reset on new session_id" {
         $hookInput = [PSCustomObject]@{ session_id = $sid; prompt = 'Keep going' } | ConvertTo-Json -Compress
         $hookInput | powershell.exe -NoProfile -File "$script:ClaudeRoot\telemetry\log-prompt.ps1" | Out-Null
 
-        $s = Get-Content $script:StateFile -Raw | ConvertFrom-Json
+        $s = Get-Content $stateFile -Raw | ConvertFrom-Json
         $s.session_id | Should -Be $sid
         $s.prompts    | Should -Be 3   # was 2, incremented to 3
 
+        Remove-Item $stateFile -Force -ErrorAction SilentlyContinue
+        Remove-Item "$script:ClaudeRoot\telemetry\running-$sid.flag" -Force -ErrorAction SilentlyContinue
         if (Test-Path $sessionFile) { Remove-Item $sessionFile -Force }
     }
 }
