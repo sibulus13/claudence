@@ -66,6 +66,7 @@ Keep this compact — bullets, not prose. If everything in a turn was simple and
 - **Error handling**: only handle errors at system boundaries (user input, external APIs). Do not add try/catch defensively around internal code that shouldn't fail
 - **No over-engineering**: three similar lines of code is better than a premature abstraction. No helpers for one-time operations
 - **Secrets**: never hardcode secrets, API keys, or credentials. Always use environment variables. Never commit `.env` files
+- **Reuse established patterns — check before you build**: before implementing any UI element, component, or convention, search the repo for an existing one and reuse it. This applies especially to recurring visual primitives — **status/"live" tags, badges, pills, buttons, cards, spacing, color tokens** — but also to data shapes, naming, and file layout. Do NOT invent a parallel style when an established one exists (e.g. a project's "live" tag already has a defined color/shape — match it; don't create a second look). If unsure whether a pattern exists, grep first. Inventing a near-duplicate is a defect, not a feature.
 
 ## Security
 
@@ -97,7 +98,7 @@ For any multi-stage implementation task, the default operating mode is **continu
 **Hard blockers** (the only valid reason to pause mid-loop):
 - External credentials not present, AND no MCP tool or CLI exists to obtain/configure them agentically
 - A destructive irreversible action requiring explicit approval (schema drop, billing change)
-- Genuine architectural ambiguity where two valid paths have materially different trade-offs
+- Genuine architectural ambiguity where two valid paths have materially different trade-offs **and the choice is hard to reverse**. **Reversibility is the test:** a decision you can change later (pricing anchors, copy, config defaults, naming) is NEVER a blocker — pick a sensible default, record it as an assumption in the project's decision log (see Source of Truth Files), and proceed. Only *irreversible / costly-to-undo* choices (schema drop, sending outreach, incurring a charge, a one-way API migration) justify pausing.
 
 **Credential orchestration (NOT a hard blocker):**
 Before classifying a missing credential as a hard blocker, check whether an agentic path exists:
@@ -106,7 +107,7 @@ Before classifying a missing credential as a hard blocker, check whether an agen
 3. If either exists: treat it as an orchestration step — authenticate via MCP OAuth or CLI, then proceed
 4. Only escalate to the user if no agentic path exists (e.g., Google Cloud Console, manual Stripe dashboard)
 
-Do NOT pause for: build warnings, lint noise, test scaffolding gaps, "should I continue?", cosmetic decisions, or anything resolvable by reading existing code. Do NOT pause for credentials that have MCP or CLI paths.
+Do NOT pause for: build warnings, lint noise, test scaffolding gaps, "should I continue?", cosmetic decisions, **reversible/adjustable decisions (pick a sensible default, log it in the decision journal with a revisit-trigger, and proceed)**, or anything resolvable by reading existing code. Do NOT pause for credentials that have MCP or CLI paths.
 
 ### Testing contract
 Tests alongside implementation, never after. Unit (Vitest/pytest) on every function and handler; Integration (Vitest+MSW / pytest fixtures) at external boundaries; E2E (Playwright) for critical journeys. Priority: correctness → regression surface → happy path. Mock all external services in CI.
@@ -116,6 +117,9 @@ At loop completion OR any natural stop not caused by user interruption, emit: **
 
 ### Orchestration
 For tasks spanning ≥ 3 files or ≥ 2 independent concerns, default to the `orchestrate` skill or `Workflow` tool to fan out work in parallel. Single-file tasks execute inline.
+
+### Scope & Backlog Discipline
+Stay on the critical path. Work that does **not** directly advance the current goal (e.g. the GTM timeline) **and** wasn't explicitly requested should be **backlogged**, not executed inline — add it to the roadmap/backlog with a priority and surface it, rather than gold-plating. **Propose freely; execute selectively.** Improvements you discover (hardening, tooling, polish, "while I'm here" refactors) get logged, not done, unless they block the critical path or the user asks. Caveat: a bug that breaks the critical path (a failing build, a broken user flow) is not "extra" — fix it. The signal to backlog: "this would be nice / safer / cleaner" with no user ask and no critical-path impact.
 
 ## Windows-Specific Conventions
 
@@ -134,6 +138,12 @@ For tasks spanning ≥ 3 files or ≥ 2 independent concerns, default to the `or
 - Use `isolation: worktree` for any subagent that writes files, to prevent conflicts
 - Sequential only when: output of step N is required input for step N+1, or both steps touch the same file
 - Safe concurrency: up to 3–5 background subagents on Max plan before rate limits become a constraint
+
+**Decouple-by-default → parallel worktrees.** When work can be decoupled with minimal risk, prefer running the strands in parallel to minimize shared context contracts. Pick the decomposition along the *natural isolation boundary*:
+- **Separate repos** are already isolated — one agent per repo, **no worktree needed** (different working trees entirely).
+- **Same repo, parallel writers** → give each agent its own `isolation: worktree` so they don't collide on shared files.
+- Decoupling by *concern* (e.g. feature A vs feature B) only helps if the concerns don't touch the same files; if they do, either serialize them or isolate via worktrees. Per-repo / per-module splits usually beat per-concern splits because they share less state.
+Test before parallelizing: would the strands touch the same files or depend on each other's output? If no → parallelize. If yes → serialize or worktree-isolate.
 
 ## Agent Personas — Model Tier Allocation
 
@@ -192,6 +202,15 @@ Before touching code in any repo, read the state doc first (`context.md`, `todo.
 Repos with multiple living docs (todo, roadmap, knowledge base) must have a table mapping each doc to its purpose and update trigger. Without it, docs accumulate as undifferentiated sprawl. When working in a repo with multiple docs but no table, propose adding one.
 
 **One canonical per concern — augment, don't proliferate.** Before creating a new spec/doc, check for an existing one covering the same concern and **update/augment the canonical** instead. When two docs overlap, designate **one** as the single source of truth and mark the other **superseded** with a banner pointer (don't maintain parallel specs — they drift). New docs only for a genuinely new concern.
+
+**Decision journal — the uniform convention (every project).** Each project keeps a **`docs/DECISIONS.md`** (an ADR-lite log) as the single home for design choices and assumptions, so the doc experience is uniform across repos and reversible decisions can be *made now, revisited later* instead of blocking. Scattered "DECIDED:" notes in todo/roadmap get consolidated here. Each entry is one row/block:
+
+| id | date | decision | status | rationale | revisit-when |
+|----|------|----------|--------|-----------|--------------|
+
+- **status** = `assumed` (a default chosen to keep moving — safe to change) · `confirmed` (owner-ratified) · `superseded` (with pointer).
+- **revisit-when** = the trigger that should re-open it (e.g., "first 3 sales", "niche chosen", "volume > X"). An `assumed` decision with a revisit-trigger is how you proceed through reversible ambiguity.
+- When you make an assumption to unblock, **write it here** (don't escalate). Surface the list in your run summary. If a project has no `docs/DECISIONS.md` and is accumulating decisions, create it.
 
 ## Hang Prevention
 
