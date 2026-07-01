@@ -658,42 +658,35 @@ end
 -- the pane being split; the ratio is preserved across later window resizes.
 local RIGHT_PANE_FRAC = 0.40
 
--- Nexus keymap pane only. WezTerm panes are RATIO-preserving across resizes, so
--- to guarantee every keymap row stays on ONE line down to a half-monitor window
--- we can't pin a cell count — we derive the fraction at startup from the live
--- full-screen column width (see gui-startup) so the pane is >= this many cells
--- when the window is half-screen. Longest keymap row is ~28 cells; +margin.
-local KEYMAP_TARGET_CELLS = 32
-
-local function keymap_args()
+-- Nexus keymap pop-up (Alt+/). Draws the cheat sheet, then blocks on a single
+-- keypress and exits. WezTerm's default exit_behavior closes a pane when its
+-- process exits, so the zoomed overlay dismisses itself on any key — no state
+-- to track. No resize loop needed either: the pane is transient and spawned
+-- zoomed (full tab), so every row already fits without wrapping.
+local function keymap_popup_args()
   if wezterm.target_triple:find('windows') then
     local f = keymap_file:gsub('/', '\\')
-    -- ESC[2J = erase screen, ESC[H = cursor home (row 1 col 1).
-    -- More reliable than Clear-Host in non-interactive pane contexts.
+    -- ESC[3J+2J+H = wipe scrollback+screen, home cursor. -NonInteractive is
+    -- omitted so [Console]::ReadKey can block for the dismiss keypress.
     return {
-      'powershell.exe', '-NoProfile', '-NoLogo', '-NonInteractive', '-Command',
-      -- Poll window dimensions every 500ms; redraw only when they change.
-      -- This handles all resize events (split, zoom, window drag) without
-      -- relying on SIGWINCH, which PowerShell on Windows does not expose.
+      'powershell.exe', '-NoProfile', '-NoLogo', '-Command',
       '[Console]::OutputEncoding=[Text.Encoding]::UTF8; ' ..
-      '$e=[char]27; $lh=0; $lw=0; ' ..
-      'while ($true) { ' ..
-        '$h=[Console]::WindowHeight; $w=[Console]::WindowWidth; ' ..
-        'if ($h -ne $lh -or $w -ne $lw) { ' ..
-          '$lh=$h; $lw=$w; ' ..
-          'Write-Host "${e}[3J${e}[2J${e}[H" -NoNewline; ' ..
-          'Get-Content "' .. f .. '" -Encoding UTF8 ' ..
-        '}; ' ..
-        'Start-Sleep -Milliseconds 500 ' ..
-      '}',
+      '$e=[char]27; $b=[char]7; ' ..
+      -- OSC 1337 SetUserVar tags this pane keymap_popup=1 (MQ== is base64 "1")
+      -- so the Alt+/ handler can find an already-open pop-up and toggle it shut
+      -- instead of stacking another. BEL ($b) terminates the OSC string.
+      'Write-Host "${e}]1337;SetUserVar=keymap_popup=MQ==${b}" -NoNewline; ' ..
+      'Write-Host "${e}[3J${e}[2J${e}[H" -NoNewline; ' ..
+      'Get-Content "' .. f .. '" -Encoding UTF8; ' ..
+      'Write-Host "  ${e}[2mpress any key to close${e}[0m"; ' ..
+      '$null = [Console]::ReadKey($true)',
     }
   end
-  -- SIGWINCH fires on every terminal resize; trap redraws immediately.
   return { 'bash', '-c',
-    'f="' .. keymap_file .. '"; ' ..
-    'draw() { printf "\\033[3J\\033[2J\\033[H"; cat "$f"; }; ' ..
-    'trap draw WINCH; draw; ' ..
-    'while true; do sleep 86400; done' }
+    'printf "\\033]1337;SetUserVar=keymap_popup=MQ==\\007"; ' ..
+    'printf "\\033[3J\\033[2J\\033[H"; cat "' .. keymap_file .. '"; ' ..
+    'printf "  \\033[2mpress any key to close\\033[0m\\n"; ' ..
+    'read -rsn1' }
 end
 
 -- ── Shared helper: create a repo tab (NO keymap — that's Nexus-only) ─────────
@@ -741,29 +734,15 @@ wezterm.on('gui-startup', function(cmd)
     return
   end
 
-  -- Create the Nexus home tab (workspace name matches config.default_workspace)
-  local _, shell_pane, window = wezterm.mux.spawn_window({
+  -- Create the Nexus home tab (workspace name matches config.default_workspace).
+  -- Home is a single maximized shell pane now: the keymap lives in the on-demand
+  -- Alt+/ pop-up (a zoomed, self-dismissing pane) instead of a permanent column.
+  local _, _, window = wezterm.mux.spawn_window({
     workspace = 'nexus',
     cwd       = REPO_DIR,
   })
-  -- Maximize BEFORE splitting so the split fraction is computed against the
-  -- full-screen cell grid rather than the small initial spawn size. Splitting
-  -- first could leave the right pane proportionally squeezed.
   window:gui_window():maximize()
   window:active_tab():set_title('Nexus')
-  -- Half-screen-safe keymap width: measure the now-maximized full-screen column
-  -- count from the single un-split pane, then size the split so the keymap pane
-  -- is >= KEYMAP_TARGET_CELLS even when the window is later snapped to HALF the
-  -- monitor (frac * full_cols/2 >= TARGET). Ratio is preserved on resize, so at
-  -- full screen it's ~2x that (wider, but never wraps). Clamped, with a fallback
-  -- if the width reads 0 (e.g. maximize hasn't settled).
-  local full_cols = (window:active_tab():panes_with_info()[1] or {}).width or 0
-  local keymap_frac = 0.32
-  if full_cols > 0 then
-    keymap_frac = math.max(0.12, math.min(0.45, (KEYMAP_TARGET_CELLS * 2) / full_cols))
-  end
-  shell_pane:split { direction = 'Right', size = keymap_frac, args = keymap_args(), cwd = REPO_DIR }
-  shell_pane:activate()
 
   -- Restore previously open repo tabs (if session is < 12 h old).
   -- Capture the tab object that matches activeTab so we can activate it directly
@@ -1079,8 +1058,28 @@ config.keys = {
   { key = 'C', mods = 'CTRL|SHIFT', action = act.CopyTo 'Clipboard'    },
   { key = 'V', mods = 'CTRL|SHIFT', action = act.PasteFrom 'Clipboard' },
 
-  -- ── Help: jump to Nexus tab (tab 0) where the keymap pane lives ──────
-  { key = '/', mods = 'ALT', action = act.ActivateTab(0) },
+  -- ── Help: Alt+/ toggles the keymap as a zoomed, self-dismissing overlay ──
+  -- Single instance: first scan every pane in the window for the keymap_popup
+  -- user-var tag. If one is already open, close it (toggle off) instead of
+  -- stacking another. Otherwise split a transient pane running the cheat sheet,
+  -- activate + zoom it to fill the tab. Any keypress also exits its process, so
+  -- it self-dismisses; zoom auto-releases back to where you were. Works from
+  -- ANY tab, not just home.
+  { key = '/', mods = 'ALT', action = wezterm.action_callback(function(win, pane)
+      for _, tab in ipairs(win:mux_window():tabs()) do
+        for _, p in ipairs(tab:panes()) do
+          if p:get_user_vars()['keymap_popup'] == '1' then
+            win:perform_action(act.CloseCurrentPane { confirm = false }, p)
+            return
+          end
+        end
+      end
+      local popup = pane:split { direction = 'Right', size = 0.5, args = keymap_popup_args() }
+      if popup then
+        popup:activate()
+        popup:tab():set_zoomed(true)
+      end
+    end) },
 }
 
 -- ── Scrollback / defaults ─────────────────────────────────────────────────────
