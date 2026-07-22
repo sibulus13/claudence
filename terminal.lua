@@ -483,36 +483,24 @@ local function load_repos_cfg()
   local raw = f:read('*a'); f:close()
   local ok, data = pcall(wezterm.json_parse, raw)
   if not ok or type(data) ~= 'table' then return { favorites = {}, recents = {}, workspaces = {} } end
-  return {
-    favorites  = data.favorites  or {},
-    recents    = data.recents    or {},
-    workspaces = data.workspaces or {},
-  }
+  -- Preserve the WHOLE table (favorites/recents/workspaces + frequency/extras)
+  -- so a save round-trips every field. The old whitelist rebuild silently
+  -- dropped frequency (written by record_open, read by sorted_choices) and any
+  -- extras, and — combined with the hand-rolled serializer — split geometry too.
+  data.favorites  = data.favorites  or {}
+  data.recents    = data.recents    or {}
+  data.workspaces = data.workspaces or {}
+  return data
 end
 
+-- Serialize the whole cfg with wezterm.json_encode (already used for
+-- tab-names.json). The previous per-field hand-roller only wrote left/right,
+-- silently dropping split_direction, split_size, frequency and extras — the
+-- root cause of layout never restoring. json_encode emits every field, so the
+-- recipe round-trips faithfully.
 local function save_repos_cfg(cfg)
-  local function arr(t)
-    local parts = {}
-    for _, v in ipairs(t) do parts[#parts+1] = '"' .. v:gsub('"', '\\"') .. '"' end
-    return '[' .. table.concat(parts, ',') .. ']'
-  end
-  local function ws_json(ws)
-    local kv = {}
-    for k, v in pairs(ws) do
-      local fields = {}
-      if v.left  then fields[#fields+1] = '"left":"'  .. v.left:gsub('"', '\\"')  .. '"' end
-      if v.right then fields[#fields+1] = '"right":"' .. v.right:gsub('"', '\\"') .. '"' end
-      kv[#kv+1] = '"' .. k:gsub('"', '\\"') .. '":{' .. table.concat(fields, ',') .. '}'
-    end
-    return '{' .. table.concat(kv, ',') .. '}'
-  end
   local f = io.open(REPOS_CFG_PATH, 'w')
-  if f then
-    f:write('{"favorites":' .. arr(cfg.favorites) ..
-            ',"recents":'   .. arr(cfg.recents)   ..
-            ',"workspaces":' .. ws_json(cfg.workspaces or {}) .. '}\n')
-    f:close()
-  end
+  if f then f:write(wezterm.json_encode(cfg) .. '\n'); f:close() end
 end
 
 -- ── Session persistence ───────────────────────────────────────────────────────
@@ -525,6 +513,63 @@ local SESSION_MAX_H = 12
 -- on the next save (so repos.json already holds the auto form by the next restart).
 local CLAUDE_RESTORE_CMD = 'claude --continue --permission-mode auto'
 
+-- Programs worth re-launching on restore. Claude is matched by name (its
+-- own --continue recipe below); everything here is a long-running dev process
+-- whose exact invocation we reconstruct from argv. Keyed by the executable's
+-- leaf name, lower-cased, sans .exe. The interactive SHELLS (pwsh/powershell/
+-- cmd/bash) are deliberately absent — an idle prompt must NOT be captured as a
+-- command, or restore would relaunch a shell inside a shell. Extend freely.
+local RESUMABLE = {
+  node = true, python = true, python3 = true, bun = true, deno = true,
+  pnpm = true, npm = true, yarn = true, vite = true, next = true,
+  vim = true, nvim = true, nano = true, jupyter = true, ssh = true,
+  cargo = true, go = true, docker = true, ['docker-compose'] = true,
+}
+
+-- Quote a single argv token for a PowerShell single-quoted context (only when
+-- it contains whitespace, to keep the common case readable). Embedded single
+-- quotes are doubled per PowerShell escaping.
+local function quote_arg(a)
+  if a:find('%s') then return "'" .. a:gsub("'", "''") .. "'" end
+  return a
+end
+
+-- The command to relaunch in a pane on restore, or nil if the pane holds an
+-- idle shell / a transient command not worth resuming. Claude keeps its proven
+-- name-based detection (its foreground name contains "claude" throughout the
+-- session, even while shelling out mid-tool); other whitelisted programs are
+-- reconstructed verbatim from argv. Wrapped in pcall so an unsupported build or
+-- a dead pane degrades to "no command" instead of breaking the whole config.
+local function pane_resume_cmd(pane)
+  local name = (pane:get_foreground_process_name() or ''):lower()
+  if name:find('claude') then return CLAUDE_RESTORE_CMD end
+  local ok, info = pcall(function() return pane:get_foreground_process_info() end)
+  if not ok or type(info) ~= 'table' then return nil end
+  local leaf = ((info.executable or info.name or ''):gsub('\\', '/')
+                 :match('[^/]+$') or ''):lower():gsub('%.exe$', '')
+  if not RESUMABLE[leaf] then return nil end
+  local argv = info.argv
+  if type(argv) ~= 'table' or #argv == 0 then return nil end
+  local parts = {}
+  for _, a in ipairs(argv) do parts[#parts + 1] = quote_arg(a) end
+  return table.concat(parts, ' ')
+end
+
+-- Build the PowerShell spawn args for a restored pane: cd into the repo, then
+-- run the saved command with -NoExit so the pane drops to an interactive shell
+-- once the command exits (a dev server that crashes leaves a usable prompt, not
+-- a dead pane). Returns nil for an empty command → caller spawns a plain shell.
+-- Shared by both panes so quoting is handled uniformly by PowerShell (the old
+-- right-pane path split on whitespace, which broke any quoted argument).
+local function pane_launch_args(cmd, cwd)
+  if not cmd or cmd == '' then return nil end
+  local safe = cwd:gsub("'", "''")
+  return {
+    'powershell.exe', '-NoProfile', '-NoLogo', '-NoExit', '-Command',
+    "Set-Location '" .. safe .. "'; " .. cmd,
+  }
+end
+
 save_session = function(window)
   local cfg     = load_repos_cfg()
   local changed = false
@@ -535,31 +580,47 @@ save_session = function(window)
     if not title:find('/') then goto continue end  -- skip Nexus/shell-named tabs
     parts[#parts + 1] = '"' .. title:gsub('"', '\\"') .. '"'
 
-    -- panes_with_info gives position data needed for layout detection.
+    -- panes_with_info gives per-pane geometry (cells) + the MuxPane handle.
     local pinfo = tab:panes_with_info()
-
-    -- Auto-detect Claude running in the leftmost/topmost pane.
-    if pinfo[1] then
-      local proc = pinfo[1].pane:get_foreground_process_name() or ''
-      if proc:lower():find('claude') then
-        cfg.workspaces[title] = cfg.workspaces[title] or {}
-        if cfg.workspaces[title].left ~= CLAUDE_RESTORE_CMD then
-          cfg.workspaces[title].left = CLAUDE_RESTORE_CMD
-          changed = true
-        end
-      end
+    if #pinfo > 2 then
+      -- Honest bound: the restore path rebuilds a single left/right split, so a
+      -- 3+-pane tab loses its extra panes. Log it (no silent truncation) rather
+      -- than pretend the whole layout came back.
+      wezterm.log_info('nexus: tab "' .. title .. '" has ' .. #pinfo ..
+        ' panes; only the first split is captured for restore')
     end
 
-    -- Detect split direction from pane positions: if pane 2 is below pane 1
-    -- it's a top/bottom split (Down); otherwise side-by-side (Right).
+    -- Capture a FRESH recipe from live state each save, so closing Claude or a
+    -- service, or resizing the split, is reflected on restore (the old code only
+    -- ever ADDED fields, so stale commands lingered forever). left/right are
+    -- each detected independently, so Claude in EITHER pane is now captured.
+    local rec = { split = pinfo[2] ~= nil }
+    if pinfo[1] then rec.left = pane_resume_cmd(pinfo[1].pane) end
     if pinfo[2] then
-      local dir = (pinfo[2].top > pinfo[1].top) and 'Down' or 'Right'
-      cfg.workspaces[title] = cfg.workspaces[title] or {}
-      if cfg.workspaces[title].split_direction ~= dir then
-        cfg.workspaces[title].split_direction = dir
-        changed = true
+      rec.right = pane_resume_cmd(pinfo[2].pane)
+      -- Direction + size from the actual pane rectangle. size = the new (second)
+      -- pane's fraction of the split axis — exactly what pane:split{size=..}
+      -- expects — so restore reproduces the real proportions, not a fixed 40%.
+      if pinfo[2].top > pinfo[1].top then
+        rec.split_direction = 'Down'
+        local tot = pinfo[1].height + pinfo[2].height
+        if tot > 0 then rec.split_size = math.floor(pinfo[2].height / tot * 100 + 0.5) / 100 end
+      else
+        rec.split_direction = 'Right'
+        local tot = pinfo[1].width + pinfo[2].width
+        if tot > 0 then rec.split_size = math.floor(pinfo[2].width / tot * 100 + 0.5) / 100 end
       end
     end
+
+    -- Write only when the recipe actually changed, to keep the 30 s autosave
+    -- from churning repos.json every tick.
+    local prev = cfg.workspaces[title] or {}
+    if prev.left ~= rec.left or prev.right ~= rec.right
+       or prev.split ~= rec.split or prev.split_direction ~= rec.split_direction
+       or prev.split_size ~= rec.split_size then
+      changed = true
+    end
+    cfg.workspaces[title] = rec
     ::continue::
   end
 
@@ -696,33 +757,30 @@ end
 local function make_tab(mux_win, title, cwd)
   local ws  = (load_repos_cfg().workspaces or {})[title] or {}
 
-  -- Left pane: use -NoExit so the same PS session becomes the interactive shell
-  -- once the restore command exits. Avoids the nested-PS TUI issue where
-  -- -Command "...; child_ps" breaks interactive apps like Claude Code.
-  local left_args
-  if ws.left and ws.left ~= '' then
-    local safe = cwd:gsub("'", "''")
-    left_args = {
-      'powershell.exe', '-NoProfile', '-NoLogo', '-NoExit', '-Command',
-      "Set-Location '" .. safe .. "'; " .. ws.left,
-    }
-  end
+  -- Both panes go through pane_launch_args: cd + saved command under a -NoExit
+  -- shell, so an exited command leaves a live prompt. nil command → plain shell.
+  local left_args  = pane_launch_args(ws.left,  cwd)
+  local right_args = pane_launch_args(ws.right, cwd)
 
-  -- Right pane: run service/tool directly (no wrapper needed)
-  local right_args
-  if ws.right and ws.right ~= '' then
-    local parts = {}
-    for p in ws.right:gmatch('%S+') do parts[#parts+1] = p end
-    right_args = parts
-  end
-
-  local split_dir = ws.split_direction or 'Right'
   local spawn_cfg = left_args and { cwd = cwd, args = left_args } or { cwd = cwd }
   local tab = mux_win:spawn_tab(spawn_cfg)
   if not tab then return nil end
   tab:set_title(title)
   local left_pane = tab:active_pane()
-  left_pane:split { direction = split_dir, size = RIGHT_PANE_FRAC, args = right_args, cwd = cwd }
+
+  -- Split unless the saved recipe explicitly recorded a single-pane tab
+  -- (ws.split == false). A tab with no recipe yet (freshly opened via Alt+O)
+  -- has ws.split == nil → still gets the default 60/40 work+service layout.
+  -- Size + direction come from the recorded geometry, falling back to the
+  -- shared defaults for a brand-new tab.
+  if ws.split ~= false then
+    left_pane:split {
+      direction = ws.split_direction or 'Right',
+      size      = ws.split_size or RIGHT_PANE_FRAC,
+      args      = right_args,
+      cwd       = cwd,
+    }
+  end
   left_pane:activate()
   return tab
 end
