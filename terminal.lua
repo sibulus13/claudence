@@ -511,7 +511,34 @@ local SESSION_MAX_H = 12
 -- so restored agents don't sit in the normal ask-everything mode. Stored verbatim in
 -- repos.json by save_session; any older 'claude --continue' value is rewritten to this
 -- on the next save (so repos.json already holds the auto form by the next restart).
+-- Fallback restore command when the pane's exact session id is unknown:
+-- --continue resumes the cwd's MOST RECENT conversation (wrong when a repo has
+-- several — see pane_session_id below for the precise path). --permission-mode
+-- auto starts it in the classifier-driven Auto mode so restored agents don't
+-- sit in ask-everything mode.
 local CLAUDE_RESTORE_CMD = 'claude --continue --permission-mode auto'
+
+-- The exact Claude session id bound to a pane, or nil. record-pane-session.ps1
+-- (SessionStart hook) writes pane-sessions/pane-<WEZTERM_PANE>.json while the
+-- session runs; here we read it back by the pane's id (p:pane_id() == the
+-- WEZTERM_PANE the hook saw). This is what lets N tabs in the SAME repo each
+-- resume THEIR conversation instead of all colliding on --continue's guess.
+local PANE_SESSIONS_DIR = wezterm.home_dir .. '/.claude/workspaces/pane-sessions'
+local function pane_session_id(pane)
+  local ok, pid = pcall(function() return pane:pane_id() end)
+  if not ok or not pid then return nil end
+  local f = io.open(PANE_SESSIONS_DIR .. '/pane-' .. tostring(pid) .. '.json', 'r')
+  if not f then return nil end
+  local raw = f:read('*a'); f:close()
+  raw = raw:gsub('^\239\187\191', '')                 -- strip UTF-8 BOM if present
+  local ok2, data = pcall(wezterm.json_parse, raw)
+  if not ok2 or type(data) ~= 'table' then return nil end
+  local sid = data.session
+  -- Only trust a UUID-shaped id (guards against a malformed file injecting shell
+  -- text — the id is interpolated into the launch command).
+  if type(sid) == 'string' and sid:match('^[%w%-]+$') then return sid end
+  return nil
+end
 
 -- Programs worth re-launching on restore. Claude is matched by name (its
 -- own --continue recipe below); everything here is a long-running dev process
@@ -542,7 +569,14 @@ end
 -- a dead pane degrades to "no command" instead of breaking the whole config.
 local function pane_resume_cmd(pane)
   local name = (pane:get_foreground_process_name() or ''):lower()
-  if name:find('claude') then return CLAUDE_RESTORE_CMD end
+  if name:find('claude') then
+    -- Prefer the pane's exact session (claude --resume <id>); fall back to the
+    -- most-recent guess only when no binding was captured (older session, hook
+    -- not yet fired, or restore reaped the file).
+    local sid = pane_session_id(pane)
+    if sid then return 'claude --resume ' .. sid .. ' --permission-mode auto' end
+    return CLAUDE_RESTORE_CMD
+  end
   local ok, info = pcall(function() return pane:get_foreground_process_info() end)
   if not ok or type(info) ~= 'table' then return nil end
   local leaf = ((info.executable or info.name or ''):gsub('\\', '/')
