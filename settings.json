@@ -1,4 +1,7 @@
 {
+  "env": {
+    "BROWSER": "cmd.exe /c start \"\""
+  },
   "permissions": {
     "allow": [
       "Bash",
@@ -14,6 +17,22 @@
   },
   "model": "opus",
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell.exe -NoProfile -File $USERPROFILE/.claude/startup-reminder.ps1",
+            "shell": "bash"
+          },
+          {
+            "type": "command",
+            "command": "powershell.exe -NoProfile -File $USERPROFILE/.claude/scripts/record-pane-session.ps1",
+            "shell": "bash"
+          }
+        ]
+      }
+    ],
     "UserPromptSubmit": [
       {
         "hooks": [
@@ -101,10 +120,12 @@
     "typescript-lsp@claude-plugins-official": true,
     "explanatory-output-style@claude-plugins-official": true,
     "remember@claude-plugins-official": true,
-    "notion@claude-plugins-official": true
+    "notion@claude-plugins-official": true,
+    "stripe@claude-plugins-official": true
   },
   "effortLevel": "high",
   "autoUpdatesChannel": "latest",
+  "tui": "fullscreen",
   "skipDangerousModePermissionPrompt": true,
   "skipWorkflowUsageWarning": true,
   "theme": "dark-daltonized",
@@ -113,6 +134,5 @@
   "remoteControlAtStartup": true,
   "inputNeededNotifEnabled": true,
   "agentPushNotifEnabled": true,
-  "voiceEnabled": true,
-  "tui": "fullscreen"
+  "voiceEnabled": true
 }
