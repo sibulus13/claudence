@@ -13,6 +13,35 @@ These instructions apply to every project on this machine. Project-level CLAUDE.
 - **Python**: available at `python` (not `python3`)
 - **Path separators**: use forward slashes in code; backslashes only when required by Windows APIs
 
+## Repository Organization (D:\repo)
+
+- **Every repo lives inside a categorized subfolder** of `D:\repo` — `D:\repo\<Category>\<project>`, never bare at `D:\repo\<project>`.
+- **Existing categories:** `AI\` (AI/ML tools & pipelines), `web\` (web apps/products), `Bot\`, `Data\`, `Experiment\` (spikes/POCs), `_Misc\`. Reuse an existing category before inventing one.
+- **New repos:** when creating or cloning a repo, **deem its category** and place it in that subfolder. State the chosen category when you do. If none fit, propose a new category rather than dropping it bare at the root.
+- **Make repos relocatable:** never hardcode absolute repo paths in code — derive in-repo paths from `__file__`/repo-root so a repo can be moved between categories without breakage.
+- **Known placement:** Nüwa (beat-synced short-form video editor) → `D:\repo\AI\nuwa` (AI media pipeline). Its v2 rebuild stays under `AI\`.
+
+## Production Application Governance (design → review → gate → build)
+
+For any **production-grade application**, enforce this phased gate *before* writing implementation code. It is layered on purpose — the **principle lives here (awareness)**, the **enforcement lives in orchestration (non-bypassable)**.
+
+1. **Standardized documentation suite = the source of truth for the project's initial state.** Before implementation, author (visual-first, Mermaid): `SPEC.md` (vision/GTM/non-goals) · `DESIGN.md` (system design, **schema**, **data relations**, runtime sequences, **state machine**, **user-flow core branching**, **edge cases**, **error boundaries**, **graceful fallback loops**) · `DECISIONS.md` (ADR-lite journal). The implementation is checked *against* this suite; the suite must be internally consistent across docs.
+
+2. **Adversarial review of the complete suite** before any code — agentic fan-out (dimensional reviewers → independent skeptic refutes each finding → synthesis → go/no-go). It must also check **cross-doc consistency**. A weak/non-convincing review → revise the docs and re-review; do not treat "found little" as "approved."
+
+3. **Human approval is a HARD BLOCKER between design and implementation.** Enforcement is dual: this principle (memory/CLAUDE.md, always in context) makes me *propose and require* the gate; the **orchestration/implementation workflow must not advance design→code without recorded human approval**. Memory = awareness; orchestration = enforcement. Never skip the gate for "production" work because it seems obvious.
+
+4. **Deterministic gates are designed as foresight, per project.** During *scoping* (not after building), define the deterministic gate per implementation layer: **sanity/unit → regression (golden/snapshot) → integration**. It is a **deploy blocker** to production; every new feature adds its own gate rows; **green-before-complete** (extends the existing test-gate rule). Design the gate proactively to protect the production environment, per project.
+
+**Scope — gate strength scales with BLAST RADIUS, not the word "production".** Blast radius = *live users × real/irreversible data or money*. Calibrate to the tier, and **each app declares its tier** in its own CLAUDE.md (`deploymentTier:`) so orchestration can differentiate rather than treating every "prod" app identically:
+
+| Tier | Signal | Gate |
+|------|--------|------|
+| **pre-traffic** | no real users yet; pre-dogfood/dogfood; data reversible; no money movement | **May modify straight to prod.** Skip the human-approval-*before-code* hard blocker; still gate on `build` + `test` green and log decisions. A late-stage prototype in practice. |
+| **live** | real users/traffic **or** real payments/PII/irreversible data | Full phased gate above — doc suite → adversarial review → **human-approval hard blocker** → deterministic deploy gate. |
+
+The human-approval-before-code blocker (item 3) is **tier-`live` only**. For tier-`pre-traffic`, proceed autonomously; the build+test gate is still a deploy blocker. Prototypes/spikes/one-offs run lighter still, but must say so explicitly. When a `pre-traffic` app gains real users, **promote it to `live`** and re-instate the full gate.
+
 ## Domain Literacy (Global)
 
 - When the user describes a concept in lay/informal language, proactively surface the correct technical term **inline, in the same response** — not as a footnote or end-of-response glossary entry. Applies across every domain a task touches: engineering, finance, PM, marketing, sales, business strategy.
@@ -52,6 +81,7 @@ Write every doc / spec / context **visual-first**: lead with **Mermaid diagrams*
 Applies to every project. At the end of the final response in a turn, surface anything not yet addressed — skip any section with nothing outstanding, don't restate what's already been fully resolved/acknowledged earlier in the same response:
 
 - **Action items done** — only if not already stated plainly earlier in the response (don't repeat a summary you already gave)
+- **Session to-dos / reminders (open loops)** — the running ledger of what's still outstanding IN THIS SESSION: in-flight background work (name what completes it — e.g. "sweep running → I finish the regen+restart on completion"), changes **staged but not yet deployed**, queued next actions, and **decisions awaiting the user**. This is the "don't drop the thread" list — surface every open loop so nothing started-but-unfinished is silently lost. Tag each: ⏳ in-flight · 🅿️ staged · ⛔ blocked-on-you.
 - **Next-step proposals** — concrete, named next actions; not "let me know if you want me to continue"
 - **Open findings** — anything discovered but not yet acted on or decided
 - **Vocabulary / domain knowledge** — for any non-trivial domain term, tool, or concept used in the response: a short "what it is" + "why it matters here" gloss, so the user builds a working mental model of the area, not just the specific fix
@@ -144,6 +174,22 @@ Stay on the critical path. Work that does **not** directly advance the current g
 - **Same repo, parallel writers** → give each agent its own `isolation: worktree` so they don't collide on shared files.
 - Decoupling by *concern* (e.g. feature A vs feature B) only helps if the concerns don't touch the same files; if they do, either serialize them or isolate via worktrees. Per-repo / per-module splits usually beat per-concern splits because they share less state.
 Test before parallelizing: would the strands touch the same files or depend on each other's output? If no → parallelize. If yes → serialize or worktree-isolate.
+
+## Skill-First Dispatch (Orchestration Default)
+
+**Propose the matching skill / orchestration flow BEFORE reaching for an agent — `general-purpose` is a LAST RESORT.** Before dispatching any non-trivial work, identify and name the specialized primitive that fits, in this priority order:
+
+1. **A named skill** (`/orchestrate`, `/code-review`, `/security-review`, `/qa`, `/brief`, `/evaluate`, `/deploy-web`, project skills, …) — if one matches the task, propose/use it.
+2. **A role flow** via `/orchestrate` (feature / bugfix / arch-decision / security-review / go-to-market / hotfix) — for feature development, so **Implementer(TDD) → Reviewer → QA → Security** is *structural*, not bolted on. Any work that writes code touching money/auth/execution/external side-effects MUST include the Security gate.
+3. **A `Workflow` pipeline** — when the task wants deterministic fan-out + adversarial verification (implement → independent review → refute → QA).
+4. **A specific agent type** (`code-reviewer`, `Explore`, `Plan`, …) over `general-purpose`.
+5. **`general-purpose`** — ONLY as a last resort: read-only research fan-out where self-certification is acceptable, or when genuinely nothing above fits. When you use it, say *why* nothing more specific applied.
+
+**Rule of thumb:** a general-purpose agent authors code AND grades its own homework — never let that self-certify code that ships to a live/money/auth path. Separate author from reviewer from security auditor (fresh contexts, adversarial mandate).
+
+**Gap → propose a skill.** When a particular kind of work recurs (a pattern of the same manual steps, the same ad-hoc briefing, the same missing gate) **≥2–3 times**, propose building a skill around it rather than re-improvising. Surface it immediately when noticed in-session, and it also feeds the **Self-Improvement Loop** (which scans sessions for recurring patterns → proposes skill/CLAUDE.md/memory additions). Skill-worthy signal: repeated multi-step orchestration, a recurring role sequence, or a gate you keep adding by hand.
+
+**Bound every agent; guard the shared state.** A general-purpose agent with an open-ended brief will *self-extend* — keep finding "one more thing," burn budget, and drift off-task (observed: one confluence agent fired 4× / ~190k tokens, ending in autonomous governance edits). So: (1) give every agent an **explicit deliverable + stop condition** ("produce X, then stop — do not extend scope"); a `Workflow`/`/orchestrate` pipeline is preferred precisely because its stages are bounded and it *halts*. (2) **Subagents never autonomously edit governance (`CLAUDE.md`/memory) or land on the main branch** — they work in their `isolation: worktree`, and the **parent reviews and commits** anything touching governance or the shared checkout. If a worktree collapses, the agent must STOP, not write to main. Autonomous agent output touching governance/live/main gets a human-in-the-loop review before it's kept.
 
 ## Agent Personas — Model Tier Allocation
 
