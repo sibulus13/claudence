@@ -1198,7 +1198,7 @@ table.insert(config.hyperlink_rules, {
 })
 
 -- Route opened links: web/mail use the OS default (browser); anything that looks
--- like a local file opens in Cursor at its line via open-in-cursor.ps1 (which
+-- like a local file opens in VS Code at its line via open-in-vscode.ps1 (which
 -- also flips markdown into preview mode).
 wezterm.on('open-uri', function(_window, _pane, uri)
   if not (uri:match('^file:') or uri:match('^/?%a:[/\\]')) then
@@ -1207,7 +1207,7 @@ wezterm.on('open-uri', function(_window, _pane, uri)
   local target = uri:gsub('^file://', ''):gsub('^/([A-Za-z]:)', '%1')  -- file:///D:/x → D:/x
   wezterm.background_child_process({
     'powershell.exe', '-NoProfile', '-WindowStyle', 'Hidden', '-File',
-    wezterm.home_dir .. '/.claude/scripts/open-in-cursor.ps1', '-Target', target,
+    wezterm.home_dir .. '/.claude/scripts/open-in-vscode.ps1', '-Target', target,
   })
   return false  -- handled; don't let WezTerm try to open the raw path
 end)
