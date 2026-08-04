@@ -6,20 +6,21 @@ These instructions apply to every project on this machine. Project-level CLAUDE.
 
 ## Environment
 
-- **OS**: Windows 11 Pro — always use PowerShell syntax, never cmd.exe
-- **Shell**: bash (Claude Code shell), but commands that invoke Windows tools use `powershell.exe -NoProfile -Command "..."`
+- **OS**: macOS (Apple silicon) — use POSIX shell syntax; there is no PowerShell on this machine
+- **Shell**: zsh (login shell) — Claude Code's Bash tool runs POSIX `sh`/`bash` commands
 - **Node**: 20 LTS
 - **Package manager**: pnpm for all JavaScript/TypeScript projects — never use `npm install` or `yarn` inside a pnpm workspace
-- **Python**: available at `python` (not `python3`)
-- **Path separators**: use forward slashes in code; backslashes only when required by Windows APIs
+- **Python**: available at `python3` (`/usr/bin/python3`); there is no bare `python`
+- **Homebrew is NOT installed** — do not assume `brew`, and do not assume any tool it usually provides (`lua`, `fd`, `jq` beyond the system one). Check with `command -v` before relying on a binary
+- **Path separators**: always forward slashes; paths are case-insensitive on the default APFS volume but treat them as case-sensitive in code
 
-## Repository Organization (D:\repo)
+## Repository Organization (~/repo)
 
-- **Every repo lives inside a categorized subfolder** of `D:\repo` — `D:\repo\<Category>\<project>`, never bare at `D:\repo\<project>`.
-- **Existing categories:** `AI\` (AI/ML tools & pipelines), `web\` (web apps/products), `Bot\`, `Data\`, `Experiment\` (spikes/POCs), `_Misc\`. Reuse an existing category before inventing one.
+- **Every repo lives inside a categorized subfolder** of `~/repo` — `~/repo/<Category>/<project>`, never bare at `~/repo/<project>`.
+- **Existing categories:** `AI/` (AI/ML tools & pipelines), `web/` (web apps/products), `Bot/`, `Data/`, `Experiment/` (spikes/POCs), `_Misc/`. Reuse an existing category before inventing one.
 - **New repos:** when creating or cloning a repo, **deem its category** and place it in that subfolder. State the chosen category when you do. If none fit, propose a new category rather than dropping it bare at the root.
 - **Make repos relocatable:** never hardcode absolute repo paths in code — derive in-repo paths from `__file__`/repo-root so a repo can be moved between categories without breakage.
-- **Known placement:** Nüwa (beat-synced short-form video editor) → `D:\repo\AI\nuwa` (AI media pipeline). Its v2 rebuild stays under `AI\`.
+- **Known placement:** Nüwa (beat-synced short-form video editor) → `~/repo/AI/nuwa` (AI media pipeline). Its v2 rebuild stays under `AI/`.
 
 ## Production Application Governance (design → review → gate → build)
 
@@ -74,7 +75,7 @@ Whenever a new rule, convention, or operating contract is established, **explici
 Write every doc / spec / context **visual-first**: lead with **Mermaid diagrams**; use text only for what a diagram can't carry (data/code contracts, exact copy, pricing tables, fine nuance).
 - Maps: architecture → `flowchart` · runtime/data flow → `sequenceDiagram` · branching/decision → `flowchart`/`stateDiagram` · schemas + relationships → `erDiagram`/`classDiagram`.
 - **≤ 5 elements per row** — lay out for portrait/vertical space; prefer top-down (`flowchart TD`); ≤5 participants per sequence diagram; wrap/stack wide chains.
-- A doc opens with a diagram, not a paragraph. (Promoted from a project rule 2026-06-27. Exemplar: `D:\repo\Life\pylon\Catalog\chatbox-assistant\ASK-BOT-SPEC.md`.)
+- A doc opens with a diagram, not a paragraph. (Promoted from a project rule 2026-06-27. Exemplar on the Windows host: `D:\repo\Life\pylon\Catalog\chatbox-assistant\ASK-BOT-SPEC.md`.)
 
 ## End-of-Response Contract
 
@@ -151,13 +152,13 @@ For tasks spanning ≥ 3 files or ≥ 2 independent concerns, default to the `or
 ### Scope & Backlog Discipline
 Stay on the critical path. Work that does **not** directly advance the current goal (e.g. the GTM timeline) **and** wasn't explicitly requested should be **backlogged**, not executed inline — add it to the roadmap/backlog with a priority and surface it, rather than gold-plating. **Propose freely; execute selectively.** Improvements you discover (hardening, tooling, polish, "while I'm here" refactors) get logged, not done, unless they block the critical path or the user asks. Caveat: a bug that breaks the critical path (a failing build, a broken user flow) is not "extra" — fix it. The signal to backlog: "this would be nice / safer / cleaner" with no user ask and no critical-path impact.
 
-## Windows-Specific Conventions
+## macOS-Specific Conventions
 
-- File copies: `Copy-Item` not `cp`
-- Directory listing: `Get-ChildItem` not `ls` (or use the Read/Glob tools directly)
-- Generate random secrets: `-join ((1..32) | ForEach-Object { '{0:x2}' -f (Get-Random -Max 256) })`
-- Firewall rules: `New-NetFirewallRule` not `netsh advfirewall`
-- Never assume `openssl`, `curl` (use `Invoke-RestMethod`), or Unix utilities are in PATH
+- Prefer the Read/Glob/Grep tools over shelling out to `ls`/`cat`/`find`
+- Generate random secrets: `openssl rand -hex 32` (openssl and curl ship with macOS)
+- BSD userland, not GNU: `sed -i ''` needs the empty-string argument, `date` does not accept `-d`, and `find` has no `-printf`. Reach for `python3` rather than fighting a BSD flag difference
+- `python3` is the Xcode command-line-tools build — no third-party packages are installed, so scripts must stay on the standard library
+- Open a file or URL from the shell with `open`
 
 ## Task Execution — Parallelization First
 
@@ -274,15 +275,18 @@ Before writing code for a new feature with a non-trivial data shape, define the 
 
 ## Audio Hooks (Do Not Interfere)
 
-Sound notifications are configured globally:
-- **Stop**: chimes (end of execution — ring-half.wav)
-- **PermissionRequest**: ding (tool call needs approval — ding-half.wav)
+Sound notifications are configured globally, played through `afplay` at 80% volume:
+- **Stop**: end of execution — `ring-half` (Glass) for a long or high-friction run, `notify-half` (Pop) otherwise
+- **PermissionRequest**: a tool call needs approval — `ding-half` (Ping)
+
+The logical names map to macOS system sounds in `telemetry/lib/hooklib.py`; dropping a
+file named `ring-half.aiff` (or .wav) into `~/.claude/sounds/` overrides the mapping.
 
 Do not play sounds manually or adjust system volume unless explicitly asked.
 
 ## Memory System
 
-Auto-memory is active at `~/.claude\projects\[project]\memory\`. When learning something non-obvious about the user, project, or workflow, save it to the appropriate memory file and update `MEMORY.md`. Check existing memories before starting work on a familiar project.
+Auto-memory is active at `~/.claude/projects/[project]/memory/`. When learning something non-obvious about the user, project, or workflow, save it to the appropriate memory file and update `MEMORY.md`. Check existing memories before starting work on a familiar project.
 
 ## Self-Improvement Loop
 
@@ -321,3 +325,11 @@ These user-defined skills are loaded at session start from `~/.claude/skills/`:
 - `/qa` — Validate an implementation against its spec AC. Outputs per-item verdict (MET / PARTIAL / FAILED) + regression risk list. Use after any Implementer agent completes.
 - `/brief` — Generate a role-specific context package for a downstream agent. Takes: role name + project + milestone. Strips irrelevant context and produces a minimum viable briefing.
 - `/self-improve` — Run the self-improvement loop: scan recent sessions for recurring patterns, cluster by category, filter by threshold, propose additions to CLAUDE.md / memory / skill files. View history at Helm `/system`.
+
+## Platform Note
+
+This machine runs the macOS port of the Claudence dotfiles (`~/repo/claudence`, branch
+`macos`). The hooks, status line and repo launcher are python3/zsh ports of the original
+PowerShell ones; `docs/MACOS-PORT.md` records exactly what changed and what is not
+carried over. When editing anything under `~/.claude`, edit it in `~/repo/claudence` —
+most of `~/.claude` is symlinked to that checkout.

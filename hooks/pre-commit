@@ -1,15 +1,25 @@
 #!/usr/bin/env bash
-# pre-commit hook — installed by setup.ps1 to .git/hooks/pre-commit
-# Runs classification tests when any telemetry/ file is staged.
-# Blocks the commit if tests fail.
+# pre-commit hook — installed by setup.sh (macOS) or setup.ps1 (Windows) into
+# .git/hooks/pre-commit. Runs the test suite when any tested file is staged and
+# blocks the commit if it fails.
+#
+# The staged-path filter covers both platforms' implementations plus the shared
+# Lua decision module, so a change to any of them is gated — the Windows version
+# only watched telemetry/, which let an edit to attention.lua through ungated.
 
-staged=$(git diff --cached --name-only 2>/dev/null | grep -E '^telemetry/')
+staged=$(git diff --cached --name-only 2>/dev/null |
+  grep -E '^(telemetry/|tests/|attention\.lua$|terminal\.lua$|statusline\.(ps1|py)$)')
 if [ -z "$staged" ]; then
   exit 0
 fi
 
-echo "telemetry/ files staged — running classification tests..."
+echo "tested files staged — running tests..."
+
+if [ "$(uname -s)" = "Darwin" ]; then
+  # $0 is <repo>/.git/hooks/pre-commit, so the repo root is two levels up.
+  exec "$(dirname "$0")/../../tests/run-tests.sh" --quiet
+fi
+
 powershell.exe -NoProfile -ExecutionPolicy Bypass \
   -File "$USERPROFILE/.claude/tests/run-tests.ps1"
-
 exit $?

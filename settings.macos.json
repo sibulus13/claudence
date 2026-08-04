@@ -1,0 +1,138 @@
+{
+  "_comment": "macOS counterpart of settings.json. Same behaviour, with the PowerShell hooks and status line replaced by their python3 ports and $USERPROFILE replaced by $HOME. setup.sh installs this as ~/.claude/settings.json.",
+  "env": {
+    "BROWSER": "open"
+  },
+  "permissions": {
+    "allow": [
+      "Bash",
+      "WebSearch",
+      "WebFetch",
+      "Skill(remember)",
+      "Skill(schedule)"
+    ],
+    "deny": [],
+    "ask": [],
+    "defaultMode": "auto"
+  },
+  "model": "opus",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$HOME/.claude/startup-reminder.py\"",
+            "shell": "bash"
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$HOME/.claude/scripts/record-pane-session.py\"",
+            "shell": "bash"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$HOME/.claude/telemetry/log-prompt.py\"",
+            "shell": "bash"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$HOME/.claude/telemetry/analyze-session.py\"",
+            "shell": "bash"
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$HOME/.claude/telemetry/notify-attention.py\" --reason stop --silent",
+            "shell": "bash",
+            "async": true
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$HOME/.claude/telemetry/log-tool-done.py\"",
+            "shell": "bash",
+            "async": true
+          }
+        ]
+      }
+    ],
+    "PostCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$HOME/.claude/telemetry/record-compact.py\"",
+            "shell": "bash",
+            "async": true
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$HOME/.claude/telemetry/log-permission.py\"",
+            "shell": "bash",
+            "async": true
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$HOME/.claude/telemetry/notify-attention.py\" --reason permission --sound ding-half",
+            "shell": "bash",
+            "async": true
+          }
+        ]
+      }
+    ]
+  },
+  "worktree": {
+    "baseRef": "fresh"
+  },
+  "enableWorkflows": true,
+  "statusLine": {
+    "type": "command",
+    "command": "python3 \"$HOME/.claude/statusline.py\"",
+    "padding": 1
+  },
+  "enabledPlugins": {
+    "supabase@claude-plugins-official": true,
+    "vercel@claude-plugins-official": true,
+    "frontend-design@claude-plugins-official": true,
+    "typescript-lsp@claude-plugins-official": true,
+    "explanatory-output-style@claude-plugins-official": true,
+    "remember@claude-plugins-official": true,
+    "notion@claude-plugins-official": true,
+    "stripe@claude-plugins-official": true
+  },
+  "effortLevel": "high",
+  "autoUpdatesChannel": "latest",
+  "tui": "fullscreen",
+  "skipDangerousModePermissionPrompt": true,
+  "skipWorkflowUsageWarning": true,
+  "theme": "dark-daltonized",
+  "editorMode": "normal",
+  "preferredNotifChannel": "auto",
+  "remoteControlAtStartup": true,
+  "inputNeededNotifEnabled": true,
+  "agentPushNotifEnabled": true,
+  "voiceEnabled": true
+}

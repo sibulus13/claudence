@@ -2,6 +2,12 @@ local wezterm = require 'wezterm'
 local config  = wezterm.config_builder()
 local act     = wezterm.action
 
+-- Platform switch. This config runs on both the Windows host it was written for
+-- and macOS; everything that spawns a process or depends on path syntax branches
+-- on IS_WIN, and everything else is identical on both.
+local IS_WIN = (wezterm.target_triple:find('windows') ~= nil)
+local SHELL  = os.getenv('SHELL') or '/bin/zsh'
+
 -- Pure notification decision logic (unit-tested in tests/attention.test.lua).
 -- terminal.lua does only the impure I/O; all the rules live in this module, so
 -- the tested logic IS the runtime logic.
@@ -39,7 +45,14 @@ theme.tab_bar = {
   new_tab_hover      = { bg_color = '#181825', fg_color = '#cdd6f4' },
 }
 config.colors = theme
-config.font                      = wezterm.font('JetBrains Mono', { weight = 'Regular' })
+-- A fallback chain rather than a bare font(): JetBrains Mono is not installed on
+-- every machine, and without a fallback WezTerm raises a missing-font error box
+-- on startup. The first installed family wins, so the intended font is still
+-- used wherever it is present.
+config.font = wezterm.font_with_fallback {
+  { family = 'JetBrains Mono', weight = 'Regular' },
+  'SF Mono', 'Menlo', 'Consolas',
+}
 config.font_size                 = 11.0
 config.window_padding            = { left = 6, right = 6, top = 4, bottom = 4 }
 config.window_background_opacity = 1.0   -- fully opaque (was 0.96 — that 4% was the "semi-translucent" look)
@@ -75,10 +88,15 @@ config.audible_bell = 'Disabled'
 -- unaffected. -NoProfile keeps parity with the rest of the file; PSReadLine
 -- auto-loads on the first Set-PSReadLineOption call, then -NoExit drops to the
 -- interactive shell.
-config.default_prog = {
-  'powershell.exe', '-NoProfile', '-NoLogo', '-NoExit', '-Command',
-  'Set-PSReadLineOption -HistorySaveStyle SaveIncrementally -MaximumHistoryCount 10000',
-}
+-- macOS needs no default_prog: WezTerm spawns the login shell, and zsh persists
+-- history on its own — which is the whole point of the PowerShell branch, so
+-- there is nothing to configure here.
+if IS_WIN then
+  config.default_prog = {
+    'powershell.exe', '-NoProfile', '-NoLogo', '-NoExit', '-Command',
+    'Set-PSReadLineOption -HistorySaveStyle SaveIncrementally -MaximumHistoryCount 10000',
+  }
+end
 
 -- ── Tab bar ───────────────────────────────────────────────────────────────────
 config.use_fancy_tab_bar              = false
@@ -553,12 +571,14 @@ local RESUMABLE = {
   cargo = true, go = true, docker = true, ['docker-compose'] = true,
 }
 
--- Quote a single argv token for a PowerShell single-quoted context (only when
--- it contains whitespace, to keep the common case readable). Embedded single
--- quotes are doubled per PowerShell escaping.
+-- Quote a single argv token for the shell that will re-run it (only when it
+-- contains whitespace, to keep the common case readable). PowerShell doubles an
+-- embedded single quote; a POSIX shell has to close the quote, escape it, and
+-- reopen.
 local function quote_arg(a)
-  if a:find('%s') then return "'" .. a:gsub("'", "''") .. "'" end
-  return a
+  if not a:find('%s') then return a end
+  if IS_WIN then return "'" .. a:gsub("'", "''") .. "'" end
+  return "'" .. a:gsub("'", "'\\''") .. "'"
 end
 
 -- The command to relaunch in a pane on restore, or nil if the pane holds an
@@ -597,10 +617,22 @@ end
 -- right-pane path split on whitespace, which broke any quoted argument).
 local function pane_launch_args(cmd, cwd)
   if not cmd or cmd == '' then return nil end
-  local safe = cwd:gsub("'", "''")
+  if IS_WIN then
+    local safe = cwd:gsub("'", "''")
+    return {
+      'powershell.exe', '-NoProfile', '-NoLogo', '-NoExit', '-Command',
+      "Set-Location '" .. safe .. "'; " .. cmd,
+    }
+  end
+  -- The POSIX equivalent of -NoExit: run the saved command, then hand the pane
+  -- to an interactive login shell so a dev server that crashes leaves a usable
+  -- prompt instead of a dead pane. `exec` replaces the wrapper, so no extra
+  -- shell layer lingers in the process tree. Braces keep a compound command
+  -- (`a && b`) from binding only its first clause to the `;`.
+  local safe = cwd:gsub("'", "'\\''")
   return {
-    'powershell.exe', '-NoProfile', '-NoLogo', '-NoExit', '-Command',
-    "Set-Location '" .. safe .. "'; " .. cmd,
+    SHELL, '-lc',
+    "cd '" .. safe .. "' && { " .. cmd .. "; }; exec " .. SHELL .. " -l",
   }
 end
 
@@ -697,8 +729,9 @@ local function write_active(window, pane)
 
   -- Resolve git branch for the current working directory.
   local branch = ""
+  local git_cwd = IS_WIN and cwd:gsub('/', '\\') or cwd
   local ok, stdout = wezterm.run_child_process({
-    'git', '-C', cwd:gsub('/', '\\'), 'branch', '--show-current',
+    'git', '-C', git_cwd, 'branch', '--show-current',
   })
   if ok then branch = stdout:match('^%s*(.-)%s*$') or "" end
 
@@ -899,6 +932,42 @@ local function path_to_ws_name(rel)
     :gsub('%-+$', '')
 end
 
+-- Directory names never worth walking into. Shared by both discovery paths so
+-- the Windows walk and the macOS find return the same repo set.
+local PRUNE_DIRS = {
+  'node_modules', 'dist', '.next', 'build', 'out', '.worktrees', 'archive',
+  '_Misc', 'example', 'examples', '.venv', 'venv', '__pycache__', 'target',
+  'obj', '.turbo', '.cache',
+}
+
+-- `find` argv that prints every .git entry under the repo root, pruning the
+-- noise directories at the door. The POSIX counterpart of the pruned walk in the
+-- PowerShell branch below, and pruned for the same reason: an unpruned walk of a
+-- repo root full of node_modules costs hundreds of milliseconds on every Alt+O.
+--
+-- Matching .git (rather than testing each directory for one) keeps it a single
+-- pass. `-prune` after the match skips only .git's own internals, so the walk
+-- still descends past a repo and nested repos are found — same as the original.
+-- -maxdepth 5 = a .git at depth 5, i.e. repos up to 4 levels below the root,
+-- matching the Windows walk's depth cap of 4.
+local function find_repos_argv()
+  local argv = { '/usr/bin/find', REPO_DIR, '-maxdepth', '5', '(', '-type', 'd', '(' }
+  for i, name in ipairs(PRUNE_DIRS) do
+    if i > 1 then argv[#argv + 1] = '-o' end
+    argv[#argv + 1] = '-name'
+    argv[#argv + 1] = name
+  end
+  argv[#argv + 1] = ')'
+  argv[#argv + 1] = '-prune'
+  argv[#argv + 1] = ')'
+  -- No -type here: a worktree or submodule has .git as a FILE, and those are
+  -- real repos the launcher should list.
+  for _, token in ipairs({ '-o', '(', '-name', '.git', '-print', '-prune', ')' }) do
+    argv[#argv + 1] = token
+  end
+  return argv
+end
+
 local function discover_repos()
   -- Pruned breadth-first walk over a manual stack. Records any directory that
   -- has a .git child (and keeps descending, so nested repos are still found),
@@ -922,13 +991,22 @@ local function discover_repos()
     "$n=[System.IO.Path]::GetFileName($d);" ..
     "if($p.ContainsKey($n)){continue};$s.Push(@{P=$d;D=$c.D+1})}}catch{}};" ..
     "$o|Sort-Object -Unique"
-  local ok, stdout = wezterm.run_child_process({
-    'powershell.exe', '-NoProfile', '-NoLogo', '-NonInteractive', '-Command', ps,
-  })
+  local ok, stdout
+  if IS_WIN then
+    ok, stdout = wezterm.run_child_process({
+      'powershell.exe', '-NoProfile', '-NoLogo', '-NonInteractive', '-Command', ps,
+    })
+  else
+    ok, stdout = wezterm.run_child_process(find_repos_argv())
+  end
   if not ok then return {} end
   local repos = {}
   for line in stdout:gmatch('[^\r\n]+') do
     line = line:match('^%s*(.-)%s*$')
+    -- find prints the .git entry; the repo is its parent. Stripping it also maps
+    -- REPO_DIR/.git back to REPO_DIR, so a repo root that is itself a repo is
+    -- listed exactly like the PowerShell branch lists it.
+    if not IS_WIN then line = line:gsub('/%.git$', '') end
     if line ~= '' then
       local rel = rel_under_repo(line) or line:gsub('\\', '/')
       table.insert(repos, { path = line, rel = rel, ws = path_to_ws_name(rel) })
@@ -1189,26 +1267,50 @@ config.mouse_bindings = {
     mouse_reporting = true, action = act.OpenLinkAtMouseCursor },
 }
 
--- Make bare Windows file paths (e.g. D:\repo\foo.ts:12) clickable too, on top of
--- the built-in URL rules. The matched text is handed verbatim to open-uri below.
+-- Make bare file paths clickable too, on top of the built-in URL rules. The
+-- matched text is handed verbatim to open-uri below.
 config.hyperlink_rules = wezterm.default_hyperlink_rules()
-table.insert(config.hyperlink_rules, {
-  regex  = [[[A-Za-z]:[\\/](?:[^\s"'<>|:*?]+[\\/])*[^\s"'<>|:*?]+\.[A-Za-z0-9]+(?::\d+(?::\d+)?)?]],
-  format = '$0',
-})
+if IS_WIN then
+  -- e.g. D:\repo\foo.ts:12
+  table.insert(config.hyperlink_rules, {
+    regex  = [[[A-Za-z]:[\\/](?:[^\s"'<>|:*?]+[\\/])*[^\s"'<>|:*?]+\.[A-Za-z0-9]+(?::\d+(?::\d+)?)?]],
+    format = '$0',
+  })
+else
+  -- e.g. /Users/me/repo/foo.ts:12 or ~/repo/foo.ts. Anchored on / or ~/ and
+  -- required to carry a file extension, so ordinary prose containing a slash
+  -- ("and/or", "TODO: 3/4 done") is not turned into a dead link.
+  table.insert(config.hyperlink_rules, {
+    regex  = [[(?:~|\.{0,2})/(?:[\w.\-+@]+/)*[\w.\-+@]+\.[A-Za-z0-9]+(?::\d+(?::\d+)?)?]],
+    format = '$0',
+  })
+end
 
 -- Route opened links: web/mail use the OS default (browser); anything that looks
 -- like a local file opens in VS Code at its line via open-in-vscode.ps1 (which
 -- also flips markdown into preview mode).
 wezterm.on('open-uri', function(_window, _pane, uri)
-  if not (uri:match('^file:') or uri:match('^/?%a:[/\\]')) then
+  local is_local = uri:match('^file:') ~= nil
+  if IS_WIN then
+    is_local = is_local or uri:match('^/?%a:[/\\]') ~= nil
+  else
+    is_local = is_local or uri:match('^/') ~= nil or uri:match('^~/') ~= nil
+  end
+  if not is_local then
     return  -- not a local file → let WezTerm open it (browser, etc.)
   end
   local target = uri:gsub('^file://', ''):gsub('^/([A-Za-z]:)', '%1')  -- file:///D:/x → D:/x
-  wezterm.background_child_process({
-    'powershell.exe', '-NoProfile', '-WindowStyle', 'Hidden', '-File',
-    wezterm.home_dir .. '/.claude/scripts/open-in-vscode.ps1', '-Target', target,
-  })
+  if IS_WIN then
+    wezterm.background_child_process({
+      'powershell.exe', '-NoProfile', '-WindowStyle', 'Hidden', '-File',
+      wezterm.home_dir .. '/.claude/scripts/open-in-vscode.ps1', '-Target', target,
+    })
+  else
+    target = target:gsub('^~', wezterm.home_dir)
+    wezterm.background_child_process({
+      wezterm.home_dir .. '/.claude/scripts/open-in-editor.sh', target,
+    })
+  end
   return false  -- handled; don't let WezTerm try to open the raw path
 end)
 

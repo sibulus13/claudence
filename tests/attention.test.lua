@@ -1,10 +1,23 @@
--- Tests for the notification decision logic (~/.claude/attention.lua).
--- Run:  wezterm --config-file ~/.claude/tests/attention.test.lua show-keys
--- Results are written to scratchpad/attention-test-out.txt (read that, not stdout).
+-- Tests for the notification decision logic (attention.lua).
+-- Run:  tests/run-tests.sh   (or directly:
+--       wezterm --config-file <this file> show-keys)
+-- Results are written next to this file as .last-results.txt — read that, not
+-- stdout: WezTerm owns stdout when it loads a config file.
+--
+-- WezTerm has no Lua CLI, so its own bundled interpreter runs the suite: loading
+-- a config file executes its top-level code. That is also why there is no
+-- separate Lua install to manage on macOS (there is no `lua` binary on this
+-- machine at all).
 local wezterm = require 'wezterm'
-local A = dofile(wezterm.home_dir .. '/.claude/attention.lua')
 
-local OUT = wezterm.home_dir .. '/.claude/tests/.last-results.txt'
+-- Resolve attention.lua relative to THIS file rather than ~/.claude, so the suite
+-- tests the checkout you are editing and runs before setup.sh has installed
+-- anything. wezterm.config_file is the path passed to --config-file.
+local HERE = (wezterm.config_file or ''):match('^(.*)[/\\][^/\\]+$')
+             or (wezterm.home_dir .. '/.claude/tests')
+local A = dofile(HERE .. '/../attention.lua')
+
+local OUT = HERE .. '/.last-results.txt'
 
 local log, pass, fail = {}, 0, 0
 local function check(name, cond, detail)
@@ -213,6 +226,63 @@ do
   check('paint flagged+no-claude stays attn', fl_bg.fg == 'attn' and fl_bg.dot == true)
   check('paint flagged+focused stays focus', fl_focus.fg == 'focus' and fl_focus.dot == true)
   check('paint flagged never dimmed', fl_bg.fg ~= 'noclaude' and fl_focus.fg ~= 'noclaude_hi')
+end
+
+-- 18. POSIX / macOS paths. The rules are pure string logic, so the same
+-- decisions must hold for '/Users/...' as for 'D:/...' — this is the section that
+-- would catch a Windows-only assumption leaking into the shared module.
+do
+  check('norm posix trailing slash + case',
+    A.norm_path('/Users/miki/repo/Web/App/') == '/users/miki/repo/web/app',
+    A.norm_path('/Users/miki/repo/Web/App/'))
+  check('norm posix root', A.norm_path('/Users/miki/repo') == '/users/miki/repo')
+  check('norm posix already-normal is idempotent',
+    A.norm_path(A.norm_path('/Users/miki/repo/app')) == '/users/miki/repo/app')
+
+  local ROOT = '/users/miki/repo'
+  check('posix nexus label at the repo root',
+    A.chip_label(ROOT, 'repo', ROOT) == 'Nexus')
+  check('posix repo label below the root',
+    A.chip_label(ROOT .. '/web/app', 'app', ROOT) == 'app')
+
+  -- A live pane on a background tab: flagged, chipped, nothing removed.
+  local r = A.decide({ { path = '/tmp/p18', cwd = ROOT .. '/web/app', repo = 'app',
+                         pane = 12, ts = 1000000 } },
+    { pane_to_tab = { [12] = 4 }, active_tab_id = -1, active_since = 999001,
+      now = 1000000, dwell_secs = 5, max_age = 43200, repo_dir_norm = ROOT })
+  check('posix live non-active -> flagged', r.flagged_tabs[4] == 'app',
+    tostring(r.flagged_tabs[4]))
+  check('posix live non-active -> 1 chip',
+    #r.chips == 1 and r.chips[1].label == 'app' and r.chips[1].count == 1)
+  check('posix live non-active -> no removal', #r.remove == 0)
+
+  -- Dwelling on the flagged tab clears it, exactly as on Windows.
+  local r2 = A.decide({ { path = '/tmp/p18b', cwd = ROOT .. '/web/app', repo = 'app',
+                          pane = 12, ts = 1000000 } },
+    { pane_to_tab = { [12] = 4 }, active_tab_id = 4, active_since = 999990,
+      now = 1000000, dwell_secs = 5, max_age = 43200, repo_dir_norm = ROOT })
+  check('posix active+dwell -> removed', has(r2.remove, '/tmp/p18b'))
+  check('posix active+dwell -> no flag', count(r2.flagged_tabs) == 0)
+
+  check('posix legacy flag name still detected',
+    A.is_legacy_name('users-miki-repo-app__abc.json') == true)
+end
+
+-- 19. Claude-pane detection with macOS process paths. The regression the title
+-- check exists for is the same here: while Claude runs a Bash tool the pane's
+-- foreground process is /bin/zsh, not claude, so process-only detection would
+-- read "no Claude" mid-tool and the tab would flicker to dimmed.
+do
+  check('mac claude by proc',
+    A.is_claude_pane('/Users/miki/.local/bin/claude', '\u{2733} Claude Code') == true)
+  check('mac claude by title (zsh tool)',
+    A.is_claude_pane('/bin/zsh', '\u{2802} Porting the hooks') == true)
+  check('mac claude by title (spinner frame)',
+    A.is_claude_pane('/bin/zsh', '\u{280B} Running tests') == true)
+  check('mac login shell is NOT claude', A.is_claude_pane('/bin/zsh', '-zsh') == false)
+  check('mac plain shell is NOT claude', A.is_claude_pane('/bin/zsh', 'zsh') == false)
+  check('mac node pane is NOT claude',
+    A.is_claude_pane('/opt/homebrew/bin/node', 'node vite') == false)
 end
 
 log[#log + 1] = ('---- %d passed, %d failed ----'):format(pass, fail)
