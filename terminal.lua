@@ -1265,6 +1265,26 @@ config.mouse_bindings = {
     mouse_reporting = true, action = act.Nop },
   { event = { Up = { streak = 1, button = 'Left' } }, mods = 'CTRL',
     mouse_reporting = true, action = act.OpenLinkAtMouseCursor },
+
+  -- ── Wheel scrolling inside a mouse-reporting TUI ──────────────────────────
+  -- Same root cause as the Ctrl+Click rules above: a mouse-reporting app owns the
+  -- wheel, so WezTerm neither synthesizes arrow keys (see
+  -- alternate_buffer_wheel_scroll_speed) nor has scrollback to move — a fullscreen
+  -- Claude Code pane holds ~14 lines of pre-TUI shell output and nothing else.
+  -- Whatever the app does with a wheel event is all you get, and in Claude Code that
+  -- is one line.
+  --
+  -- So intercept the wheel before the app sees it and send the app's own paging keys.
+  -- PageUp/PageDown are used because they were verified to scroll the Claude Code
+  -- transcript; arrow keys are deliberately NOT used, as Up recalls the previous
+  -- prompt and would rewrite your input while you scrolled.
+  --
+  -- Scope: applies to every mouse-reporting TUI, not just Claude Code. A TUI that
+  -- uses the wheel for something other than scrolling loses that here.
+  { event = { Down = { streak = 1, button = { WheelUp = 1 } } }, mods = 'NONE',
+    mouse_reporting = true, action = act.SendKey { key = 'PageUp' } },
+  { event = { Down = { streak = 1, button = { WheelDown = 1 } } }, mods = 'NONE',
+    mouse_reporting = true, action = act.SendKey { key = 'PageDown' } },
 }
 
 -- Make bare file paths clickable too, on top of the built-in URL rules. The
@@ -1315,11 +1335,35 @@ wezterm.on('open-uri', function(_window, _pane, uri)
 end)
 
 config.scrollback_lines  = 10000
+
+-- Wheel scrolling inside a full-screen TUI (Claude Code, less, vim) does NOT move the
+-- scrollback — the app owns the alternate screen, so WezTerm translates each wheel notch
+-- into this many synthetic arrow-key presses and lets the app scroll itself. The default
+-- is 3, which reads as "one or two lines" once the app coalesces them. Raising it is the
+-- only knob for TUI scroll speed; scrollback_lines above is buffer depth, not speed.
+--
+-- Deliberately not overriding the primary-screen wheel bindings: WezTerm's default there
+-- is ScrollByCurrentEventWheelDelta, which honours the trackpad's momentum. Replacing it
+-- with a fixed ScrollByLine would make two-finger scrolling chunky to speed up a mouse
+-- wheel nobody here uses.
+config.alternate_buffer_wheel_scroll_speed = 6
+
 config.default_workspace = 'nexus'
 -- Repaint the status bar 4x/s instead of the 1s default so a workspace
 -- switch/rename converges fast (backstop to the immediate repaint in Alt+N).
 -- update-status only scans the small attention dir + in-memory mux state, so
 -- the extra ticks are cheap.
 config.status_update_interval = 250
+
+-- Config-load fingerprint. The status bar shows a short-lived "✓ reloaded" pill, but that
+-- is easy to miss and proves only that SOMETHING reloaded. This writes the load time and
+-- the values most likely to be in question to the GUI log, so
+-- `tail ~/.local/share/wezterm/wezterm-gui-log-<pid>.txt` answers "did my edit take
+-- effect, and what is actually live?" without guessing.
+wezterm.log_info(string.format(
+  'nexus config loaded %s | alt_buffer_wheel_scroll_speed=%s scrollback_lines=%s',
+  os.date('%Y-%m-%d %H:%M:%S'),
+  tostring(config.alternate_buffer_wheel_scroll_speed),
+  tostring(config.scrollback_lines)))
 
 return config
