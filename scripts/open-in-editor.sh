@@ -32,6 +32,29 @@ elif [[ "$target" =~ ^(.*):([0-9]+)$ ]]; then
   path="${BASH_REMATCH[1]}"; line="${BASH_REMATCH[2]}"
 fi
 
+# Resolve a bare filename (no directory) that agent output and commit messages produce
+# constantly — "OBSERVABILITY.md", "create_corporation.rb:31". WezTerm hands the matched text
+# over verbatim, and this process has no useful cwd, so search known roots.
+#
+# First match in root order wins, so ordering IS the disambiguation: put the repos you click
+# in most first. Depth is bounded and .git/node_modules pruned to keep this interactive.
+if [ ! -e "$path" ] && [[ "$path" != */* ]]; then
+  # Roots are configured per machine, not hardcoded — this repo is public and a
+  # default listing real project paths would publish them. Set CLAUDENCE_LINK_ROOTS
+  # (colon-separated, most-clicked first) in your shell profile; ~/repo is the fallback.
+  IFS=':' read -r -a roots <<< "${CLAUDENCE_LINK_ROOTS:-$HOME/repo}"
+  for root in "${roots[@]}"; do
+    [ -d "$root" ] || continue
+    found=$(find "$root" -maxdepth 5 \
+              \( -name .git -o -name node_modules -o -name vendor -o -name tmp \) -prune -o \
+              -type f -name "$path" -print 2>/dev/null | head -1)
+    if [ -n "$found" ]; then
+      path="$found"
+      break
+    fi
+  done
+fi
+
 [ -e "$path" ] || exit 0
 
 position="$path"
