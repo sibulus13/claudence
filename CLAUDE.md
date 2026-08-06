@@ -20,7 +20,7 @@ These instructions apply to every project on this machine. Project-level CLAUDE.
 - **Existing categories:** `AI/` (AI/ML tools & pipelines), `web/` (web apps/products), `Bot/`, `Data/`, `Experiment/` (spikes/POCs), `_Misc/`. Reuse an existing category before inventing one.
 - **New repos:** when creating or cloning a repo, **deem its category** and place it in that subfolder. State the chosen category when you do. If none fit, propose a new category rather than dropping it bare at the root.
 - **Make repos relocatable:** never hardcode absolute repo paths in code — derive in-repo paths from `__file__`/repo-root so a repo can be moved between categories without breakage.
-- **Known placement:** Nüwa (beat-synced short-form video editor) → `~/repo/AI/nuwa` (AI media pipeline). Its v2 rebuild stays under `AI/`.
+- **Known placements** for specific repos live in `CLAUDE.local.md` — they are machine- and client-specific.
 
 ## Production Application Governance (design → review → gate → build)
 
@@ -47,7 +47,7 @@ The human-approval-before-code blocker (item 3) is **tier-`live` only**. For tie
 
 - When the user describes a concept in lay/informal language, proactively surface the correct technical term **inline, in the same response** — not as a footnote or end-of-response glossary entry. Applies across every domain a task touches: engineering, finance, PM, marketing, sales, business strategy.
 - When phrasing is ambiguous in a way that would change a design or implementation decision (e.g., "rebalancing" could mean calendar-, threshold-, or event-driven), ask for clarification immediately rather than guessing.
-- This behavior was originally scoped to one project (quant finance terminology) — it is now a standing global rule, not project-specific. The End-of-Response Contract's "Vocabulary / domain knowledge" gloss is the fallback for terms not already corrected inline.
+- This behavior was originally scoped to a single project's domain vocabulary — it is now a standing global rule, not project-specific. The End-of-Response Contract's "Vocabulary / domain knowledge" gloss is the fallback for terms not already corrected inline.
 
 ## Rule Scope & Placement (global vs project)
 
@@ -75,7 +75,7 @@ Whenever a new rule, convention, or operating contract is established, **explici
 Write every doc / spec / context **visual-first**: lead with **Mermaid diagrams**; use text only for what a diagram can't carry (data/code contracts, exact copy, pricing tables, fine nuance).
 - Maps: architecture → `flowchart` · runtime/data flow → `sequenceDiagram` · branching/decision → `flowchart`/`stateDiagram` · schemas + relationships → `erDiagram`/`classDiagram`.
 - **≤ 5 elements per row** — lay out for portrait/vertical space; prefer top-down (`flowchart TD`); ≤5 participants per sequence diagram; wrap/stack wide chains.
-- A doc opens with a diagram, not a paragraph. (Promoted from a project rule 2026-06-27. Exemplar on the Windows host: `D:\repo\Life\pylon\Catalog\chatbox-assistant\ASK-BOT-SPEC.md`.)
+- A doc opens with a diagram, not a paragraph. (Promoted from a project rule 2026-06-27. Exemplars are listed in `CLAUDE.local.md`.)
 
 ## End-of-Response Contract
 
@@ -249,7 +249,7 @@ Before touching code in any repo, read the state doc first (`context.md`, `todo.
 **Diagnose against local sources before reaching outside.** Before a web search, an external
 fetch, or a remote API call for *context*, exhaust in this order: (1) the project's own
 knowledge base / docs, including its **archive** — the question may already be answered;
-(2) local mirrors of team documentation (e.g. `~/repo/Envisio/wikis/`); (3) the repos
+(2) local mirrors of team documentation, where a project has them — see `CLAUDE.local.md`; (3) the repos
 themselves, including `CLAUDE.md`, `.claude/rules/`, and in-repo guides; (4) only then external.
 
 **Never call something missing on the strength of a search that did not cover every source.**
@@ -279,7 +279,7 @@ minimised, with history archived and dated:
   line linking the archive.
 - **Enforce it in code**, not convention — a driver validating front matter, checking that
   status and directory agree, verifying `superseded-by` targets exist, and reporting documents
-  overdue for re-verification. Reference: `~/repo/Envisio/knowledge-base/drivers/index_docs.py`.
+  overdue for re-verification. A reference implementation is named in `CLAUDE.local.md`.
 
 ## Source of Truth Files
 
@@ -287,9 +287,9 @@ Repos with multiple living docs (todo, roadmap, knowledge base) must have a tabl
 
 **One canonical per concern — augment, don't proliferate.** Before creating a new spec/doc, check for an existing one covering the same concern and **update/augment the canonical** instead. When two docs overlap, designate **one** as the single source of truth and mark the other **superseded** with a banner pointer (don't maintain parallel specs — they drift). New docs only for a genuinely new concern.
 
-**Subject versus method — never mix them in one deliverable.** A document, artifact, or report about a *subject* (a product, a system, a business) carries only that subject. Anything about **how the work was done** — tooling choices, library comparisons, methodology, "here's how I'd build this next time" — either **stays inline in the console response** or becomes **its own separate deliverable**. A reader opening a subject brief should never have to sort domain knowledge from technique. This holds even when the method content is good: relevance to the reader, not quality, decides where it lives. Where a set of documents covers one subject at several altitudes, add an **index/hub** that names each one's single concern *and what it deliberately does not cover*, and make that hub the one home for the consolidated action list — items that unblock each other are invisible when they sit in separate documents. (Global, adopted 2026-08-06 from the Envisio brief set.)
+**Subject versus method — never mix them in one deliverable.** A document, artifact, or report about a *subject* (a product, a system, a business) carries only that subject. Anything about **how the work was done** — tooling choices, library comparisons, methodology, "here's how I'd build this next time" — either **stays inline in the console response** or becomes **its own separate deliverable**. A reader opening a subject brief should never have to sort domain knowledge from technique. This holds even when the method content is good: relevance to the reader, not quality, decides where it lives. Where a set of documents covers one subject at several altitudes, add an **index/hub** that names each one's single concern *and what it deliberately does not cover*, and make that hub the one home for the consolidated action list — items that unblock each other are invisible when they sit in separate documents. (Global, adopted 2026-08-06 while consolidating a multi-artifact brief set.)
 
-**Register every published artifact, in the same turn you publish it.** Artifacts (rendered HTML pages on claude.ai) live outside git and outside session memory — a URL nobody wrote down is gone, and the next session has no way to find or update it, so it publishes a duplicate instead. So: publishing is not finished until the artifact has a row in an index recording its **URL, its single concern, its local source path, and the date**. Registration is part of the same turn, never a tidy-up for later; later is a different session with no memory of the URL. Where it goes follows the subject-versus-method rule above — an artifact about a project's subject goes in that project's index (e.g. `~/repo/Envisio/knowledge-base/docs/ARTIFACTS.md`), and tooling/method/machine artifacts go in `~/repo/claudence/docs/ARTIFACTS.md`. If a project is accumulating artifacts and has no index, create one. **Keep the source file in the repo** — a stable path is what lets a later session redeploy to the same URL instead of minting a new one; from a different conversation, pass the recorded `url`. Audit with `Artifact action: "list"` and reconcile against the index.
+**Register every published artifact, in the same turn you publish it.** Artifacts (rendered HTML pages on claude.ai) live outside git and outside session memory — a URL nobody wrote down is gone, and the next session has no way to find or update it, so it publishes a duplicate instead. So: publishing is not finished until the artifact has a row in an index recording its **URL, its single concern, its local source path, and the date**. Registration is part of the same turn, never a tidy-up for later; later is a different session with no memory of the URL. Where it goes follows the subject-versus-method rule above — an artifact about a project's subject goes in **that project's own index**, and tooling/method/machine artifacts go in `~/repo/claudence/docs/ARTIFACTS.md`. Per-project index locations are listed in `CLAUDE.local.md`. If a project is accumulating artifacts and has no index, create one. **Keep the source file in the repo** — a stable path is what lets a later session redeploy to the same URL instead of minting a new one; from a different conversation, pass the recorded `url`. Audit with `Artifact action: "list"` and reconcile against the index.
 
 **Decision journal — the uniform convention (every project).** Each project keeps a **`docs/DECISIONS.md`** (an ADR-lite log) as the single home for design choices and assumptions, so the doc experience is uniform across repos and reversible decisions can be *made now, revisited later* instead of blocking. Scattered "DECIDED:" notes in todo/roadmap get consolidated here. Each entry is one row/block:
 
@@ -333,7 +333,7 @@ Auto-memory is active at `~/.claude/projects/[project]/memory/`. When learning s
 
 Automated retrospective: scans session friction + memory files → clusters patterns by category (global / project / stack / user-preference) → filters by threshold (≥2 occurrences) → proposes additions to CLAUDE.md / memory / skill files → logs to `~/.claude/improve/history.jsonl`.
 
-Config at `~/.claude/improve/config.json`: `frequencyDays` (7) · `thresholdOccurrences` (2) · `maxSessionsToAnalyze` (10) · `autoApply` (false). Trigger: `/self-improve`. Dashboard: Helm `/system` page. Scheduled: every Tuesday 9:23am (durable cron).
+Config at `~/.claude/improve/config.json`: `frequencyDays` (7) · `thresholdOccurrences` (2) · `maxSessionsToAnalyze` (10) · `autoApply` (false). Trigger: `/self-improve`. Scheduled weekly via durable cron; the dashboard surface, if any, is named in `CLAUDE.local.md`.
 
 ## Repetition and Redirection Detection
 
@@ -365,7 +365,7 @@ These user-defined skills are loaded at session start from `~/.claude/skills/`:
 - `/retrospect` — Review accumulated session friction reports, propose allow-rule additions and CLAUDE.md updates, apply them, and reset the cumulative counter. Run this when the status bar shows a high override or block rate, or when Claude suggests it automatically.
 - `/qa` — Validate an implementation against its spec AC. Outputs per-item verdict (MET / PARTIAL / FAILED) + regression risk list. Use after any Implementer agent completes.
 - `/brief` — Generate a role-specific context package for a downstream agent. Takes: role name + project + milestone. Strips irrelevant context and produces a minimum viable briefing.
-- `/self-improve` — Run the self-improvement loop: scan recent sessions for recurring patterns, cluster by category, filter by threshold, propose additions to CLAUDE.md / memory / skill files. View history at Helm `/system`.
+- `/self-improve` — Run the self-improvement loop: scan recent sessions for recurring patterns, cluster by category, filter by threshold, propose additions to CLAUDE.md / memory / skill files.
 - `/depth-tree` — Build a click-to-expand hierarchy artifact: a system, product, org or roadmap rendered as collapsible depth levels where every row advertises whether it opens. Carries `template.html` (zero dependencies, hue-driven theming, two colour channels). Use when a Mermaid diagram is about to outgrow legibility, or when the same content must read at both executive and engineer altitude.
 
 ## Platform Note
@@ -375,3 +375,12 @@ This machine runs the macOS port of the Claudence dotfiles (`~/repo/claudence`, 
 PowerShell ones; `docs/MACOS-PORT.md` records exactly what changed and what is not
 carried over. When editing anything under `~/.claude`, edit it in `~/repo/claudence` —
 most of `~/.claude` is symlinked to that checkout.
+
+## Machine and client specifics
+
+Everything above is generic and safe to publish. Anything naming a **client, a tenant, a private
+project, or an absolute path on one machine** belongs in `~/.claude/CLAUDE.local.md`, which is
+never committed. `setup.sh` creates it from `CLAUDE.local.example.md` on a new machine, so a fresh
+checkout is immediately usable and you fill in specifics as they arise.
+
+@~/.claude/CLAUDE.local.md

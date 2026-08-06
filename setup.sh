@@ -122,6 +122,14 @@ else
   run cp "$REPO/settings.macos.json" "$CLAUDE_DIR/settings.json"
 fi
 
+step "CLAUDE.local.md (machine + client specifics, never committed)"
+if [ -f "$CLAUDE_DIR/CLAUDE.local.md" ]; then
+  say "already present: $CLAUDE_DIR/CLAUDE.local.md"
+else
+  run cp "$REPO/CLAUDE.local.example.md" "$CLAUDE_DIR/CLAUDE.local.md"
+  say "created from template — fill in client paths as they arise"
+fi
+
 step "terminal.local.lua (machine-specific, gitignored)"
 if [ -f "$REPO/terminal.local.lua" ]; then
   say "already present: $(sed -n 's/.*repo_root *= *//p' "$REPO/terminal.local.lua" | tr -d "',")"
