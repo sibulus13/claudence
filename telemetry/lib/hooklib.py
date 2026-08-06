@@ -34,10 +34,22 @@ WORKSPACES_DIR = os.path.join(CLAUDE_DIR, 'workspaces')
 # A file dropped in ~/.claude/sounds/ with the same stem overrides the mapping,
 # which is how you customize without editing code.
 SYSTEM_SOUNDS = {
-    'ring-half': '/System/Library/Sounds/Glass.aiff',    # was chimes.wav — Claude finished
-    'notify-half': '/System/Library/Sounds/Pop.aiff',    # was Windows Notify.wav — short, low-friction stop
+    'ring-half': '/System/Library/Sounds/Glass.aiff',    # was chimes.wav — Claude finished, long or high-friction
+    'notify-half': '/System/Library/Sounds/Bottle.aiff', # the ordinary session-complete chime — soft rounded
+                                                         # bloop. Was Pop.aiff, which is sharper than a chime
+                                                         # you hear dozens of times a day wants to be.
     'ding-half': '/System/Library/Sounds/Ping.aiff',     # was Windows Ding.wav — a tool wants approval
 }
+def _sound_override(name):
+    """Per-machine override, so changing a chime never needs a code edit.
+
+    CLAUDENCE_SOUND_NOTIFY_HALF=/System/Library/Sounds/Purr.aiff swaps one sound;
+    dropping <name>.aiff into ~/.claude/sounds/ still wins over both, and that
+    is the route for a custom file rather than a system one.
+    """
+    return os.environ.get('CLAUDENCE_SOUND_' + name.upper().replace('-', '_'))
+
+
 SOUND_VOLUME = '0.8'   # matches the 80% PCM scaling setup.ps1 baked into the .wav files
 
 
@@ -210,7 +222,7 @@ def resolve_sound(name):
         candidate = os.path.join(local_dir, stem + ext)
         if os.path.exists(candidate):
             return candidate
-    system = SYSTEM_SOUNDS.get(stem)
+    system = _sound_override(stem) or SYSTEM_SOUNDS.get(stem)
     if system and os.path.exists(system):
         return system
     return None

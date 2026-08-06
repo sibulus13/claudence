@@ -1,0 +1,4 @@
+#!/bin/sh
+# claudence is a public repo. Block client-identifying content before it lands.
+# Denylist lives at ~/.claude/claudence-denylist.txt, outside this repo on purpose.
+exec python3 "$(git rev-parse --show-toplevel)/scripts/check-public-safe.py"

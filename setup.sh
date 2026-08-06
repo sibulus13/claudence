@@ -122,6 +122,16 @@ else
   run cp "$REPO/settings.macos.json" "$CLAUDE_DIR/settings.json"
 fi
 
+step "public-safe pre-commit guard"
+run git -C "$REPO" config core.hooksPath .githooks
+if [ -f "$HOME/.claude/claudence-denylist.txt" ]; then
+  say "denylist present: $HOME/.claude/claudence-denylist.txt"
+else
+  printf '# One client / tenant / private-product name per line, or /a-regex/.\n' \
+    > "$HOME/.claude/claudence-denylist.txt"
+  say "created empty denylist — add client names to it"
+fi
+
 step "CLAUDE.local.md (machine + client specifics, never committed)"
 if [ -f "$CLAUDE_DIR/CLAUDE.local.md" ]; then
   say "already present: $CLAUDE_DIR/CLAUDE.local.md"

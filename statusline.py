@@ -36,6 +36,7 @@ RED = E + '[31m'
 DIM = E + '[2m'
 GREY = E + '[38;5;240m'      # extra-recessed tone for a stale task row
 MAGENTA = E + '[35m'
+THEME_WIDTH = 34   # statusline real estate; labels are capped at 60 upstream
 BLUE = E + '[34m'
 
 TREND_THRESHOLD = 0.10       # 10 percentage points before a rate is called worse/better
@@ -149,6 +150,28 @@ def friction_row(state, averages):
         else:
             out += '  %s%d %s%s' % (colour, count, label, RESET)
     return out
+
+
+def theme_row(state):
+    """The topic the session is currently on.
+
+    log-prompt.py has tracked these since it was written — a new theme is pushed
+    on an override or a Jaccard shift below THEME_SHIFT_JACCARD — but nothing
+    ever rendered them. Show the newest, with a turn count once it has run for
+    more than one prompt, so a long-running topic is visibly long-running.
+    """
+    themes = [t for t in (state.get('themes') or []) if isinstance(t, dict)]
+    if not themes:
+        return ''
+    label = str(themes[0].get('label') or '').strip()
+    if not label:
+        return ''
+    label = ' '.join(label.split())
+    if len(label) > THEME_WIDTH:
+        label = label[:THEME_WIDTH - 1].rstrip() + '\u2026'
+    turns = int(themes[0].get('turns') or 0)
+    suffix = ('%s\u00d7%d%s' % (DIM, turns, RESET)) if turns > 1 else ''
+    return '  %s\u25b8 %s%s%s' % (MAGENTA, label, RESET, suffix)
 
 
 def meta_row(payload):
@@ -271,6 +294,7 @@ def main():
         retro_prefix,
         prompt_str,
         friction_row(state, averages),
+        theme_row(state),
         meta_row(payload),
         runtime_row(state),
         spinner(session_id),
