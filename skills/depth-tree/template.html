@@ -1,0 +1,634 @@
+<title>REPLACE — Depth Tree</title>
+
+<!-- ============================================================
+     DEPTH TREE TEMPLATE  ·  v1.0
+     A dependency-free, click-to-expand hierarchy for artifacts.
+
+     To reuse: edit CONFIG and DATA at the bottom of this file.
+     Nothing above the <script> needs to change unless you are
+     deliberately re-designing.  Colour is hue-driven: every type
+     and status is a single number, and both themes derive from it.
+     ============================================================ -->
+
+<style>
+  /* ---------- TOKENS ----------
+     Pick ONE accent hue for the chrome and bias the neutrals toward it.
+     A pure grey reads as unconsidered; a grey pulled a few degrees
+     toward the accent reads as chosen. --accent-h drives both. */
+  :root {
+    --accent-h: 194;                       /* <-- the one hue to change */
+
+    --ground:  hsl(var(--accent-h) 18% 96%);
+    --surface: hsl(var(--accent-h) 30% 100%);
+    --surface-2: hsl(var(--accent-h) 22% 94%);
+    --ink:   hsl(var(--accent-h) 32% 12%);
+    --ink-2: hsl(var(--accent-h) 20% 30%);
+    --ink-3: hsl(var(--accent-h) 13% 48%);
+    --rule:  hsl(var(--accent-h) 18% 85%);
+    --rule-2:hsl(var(--accent-h) 16% 74%);
+    --accent:      hsl(var(--accent-h) 100% 32%);
+    --accent-soft: hsl(var(--accent-h) 60% 91%);
+    --shadow: 0 1px 2px hsl(var(--accent-h) 30% 15% / .05),
+              0 8px 24px hsl(var(--accent-h) 30% 15% / .06);
+
+    /* per-theme lightness for the hue-driven dots and pills */
+    --dot-l: 42%;  --dot-s: 58%;
+    --pill-fg: 28%; --pill-bg: 94%; --pill-bd: 70%;
+    --row-hi: 96%;
+
+    --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground:  hsl(var(--accent-h) 30% 6%);
+      --surface: hsl(var(--accent-h) 26% 10%);
+      --surface-2: hsl(var(--accent-h) 24% 14%);
+      --ink:   hsl(var(--accent-h) 22% 91%);
+      --ink-2: hsl(var(--accent-h) 15% 70%);
+      --ink-3: hsl(var(--accent-h) 13% 53%);
+      --rule:  hsl(var(--accent-h) 22% 19%);
+      --rule-2:hsl(var(--accent-h) 20% 28%);
+      --accent:      hsl(var(--accent-h) 62% 56%);
+      --accent-soft: hsl(var(--accent-h) 45% 17%);
+      --shadow: 0 1px 2px #0006, 0 10px 28px #0005;
+      --dot-l: 62%; --dot-s: 55%;
+      --pill-fg: 76%; --pill-bg: 13%; --pill-bd: 32%;
+      --row-hi: 16%;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:hsl(var(--accent-h) 30% 6%); --surface:hsl(var(--accent-h) 26% 10%);
+    --surface-2:hsl(var(--accent-h) 24% 14%);
+    --ink:hsl(var(--accent-h) 22% 91%); --ink-2:hsl(var(--accent-h) 15% 70%);
+    --ink-3:hsl(var(--accent-h) 13% 53%);
+    --rule:hsl(var(--accent-h) 22% 19%); --rule-2:hsl(var(--accent-h) 20% 28%);
+    --accent:hsl(var(--accent-h) 62% 56%); --accent-soft:hsl(var(--accent-h) 45% 17%);
+    --shadow:0 1px 2px #0006, 0 10px 28px #0005;
+    --dot-l:62%; --dot-s:55%; --pill-fg:76%; --pill-bg:13%; --pill-bd:32%; --row-hi:16%;
+  }
+  :root[data-theme="light"] {
+    --ground:hsl(var(--accent-h) 18% 96%); --surface:hsl(var(--accent-h) 30% 100%);
+    --surface-2:hsl(var(--accent-h) 22% 94%);
+    --ink:hsl(var(--accent-h) 32% 12%); --ink-2:hsl(var(--accent-h) 20% 30%);
+    --ink-3:hsl(var(--accent-h) 13% 48%);
+    --rule:hsl(var(--accent-h) 18% 85%); --rule-2:hsl(var(--accent-h) 16% 74%);
+    --accent:hsl(var(--accent-h) 100% 32%); --accent-soft:hsl(var(--accent-h) 60% 91%);
+    --dot-l:42%; --dot-s:58%; --pill-fg:28%; --pill-bg:94%; --pill-bd:70%; --row-hi:96%;
+  }
+
+  * { box-sizing:border-box; }
+  body {
+    margin:0; background:var(--ground); color:var(--ink);
+    font-family:var(--font-sans); font-size:16px; line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap { max-width:1100px; margin:0 auto; padding:0 26px 110px; }
+  @media (max-width:640px){ .wrap{ padding:0 14px 80px; } }
+
+  /* ---------- masthead ---------- */
+  header.masthead { padding:46px 0 26px; }
+  .eyebrow {
+    font-family:var(--font-mono); font-size:11px; letter-spacing:.16em;
+    text-transform:uppercase; color:var(--ink-3); margin:0 0 12px;
+  }
+  h1 {
+    font-family:var(--font-mono); font-size:clamp(26px,3.6vw,38px); font-weight:700;
+    line-height:1.14; letter-spacing:-.015em; margin:0 0 16px; text-wrap:balance;
+  }
+  .standfirst { font-size:17px; color:var(--ink-2); max-width:70ch; margin:0 0 20px; }
+  .standfirst strong { color:var(--ink); font-weight:600; }
+  .provenance { display:flex; flex-wrap:wrap; gap:6px; }
+  .src {
+    font-family:var(--font-mono); font-size:11px; padding:3px 8px;
+    border:1px solid var(--rule-2); border-radius:3px; color:var(--ink-2); background:var(--surface);
+  }
+
+  /* ---------- legend cards ---------- */
+  .howto { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:14px; margin:30px 0 8px; }
+  .card { background:var(--surface); border:1px solid var(--rule); border-radius:8px; padding:15px 17px; }
+  .card h3 {
+    font-family:var(--font-mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase;
+    color:var(--ink-3); margin:0 0 11px; font-weight:700;
+  }
+  .card ul { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:9px; }
+  .card li { display:grid; grid-template-columns:26px minmax(0,1fr); gap:9px; align-items:start; font-size:13.5px; line-height:1.4; }
+  .card li b { font-weight:600; display:block; }
+  /* Heading-to-body gap. Never let these collide. */
+  .card li em { font-style:normal; color:var(--ink-3); display:block; font-size:12.5px; margin-top:3px; line-height:1.45; }
+  .glyphdemo { font-family:var(--font-mono); font-size:13px; color:var(--ink-2); text-align:center; padding-top:1px; }
+
+  /* ---------- toolbar ---------- */
+  .toolbar {
+    position:sticky; top:0; z-index:20;
+    display:flex; flex-wrap:wrap; align-items:center; gap:8px;
+    padding:11px 13px; margin:26px 0 0;
+    background:var(--surface); border:1px solid var(--rule);
+    border-radius:8px 8px 0 0; box-shadow:var(--shadow);
+  }
+  .toolbar .grp { display:flex; align-items:center; gap:5px; }
+  .grp-label {
+    font-family:var(--font-mono); font-size:10px; letter-spacing:.11em;
+    text-transform:uppercase; color:var(--ink-3); margin-right:5px; font-weight:700;
+  }
+  .btn {
+    font-family:var(--font-mono); font-size:12px; line-height:1.6;
+    padding:3px 10px; background:var(--surface-2); color:var(--ink-2);
+    border:1px solid var(--rule-2); border-radius:4px; cursor:pointer;
+  }
+  .btn:hover { color:var(--ink); border-color:var(--accent); }
+  .btn[aria-pressed="true"] { background:var(--accent); color:var(--surface); border-color:var(--accent); }
+  .btn:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  #q {
+    flex:1 1 170px; min-width:130px;
+    font-family:var(--font-sans); font-size:13.5px; padding:5px 10px;
+    background:var(--surface-2); color:var(--ink);
+    border:1px solid var(--rule-2); border-radius:4px;
+  }
+  #q:focus { outline:2px solid var(--accent); outline-offset:1px; }
+  #count { font-family:var(--font-mono); font-size:11px; color:var(--ink-3); white-space:nowrap; }
+
+  /* ---------- tree ---------- */
+  .treebox {
+    background:var(--surface); border:1px solid var(--rule); border-top:0;
+    border-radius:0 0 8px 8px; padding:10px 6px 16px; box-shadow:var(--shadow);
+  }
+  ul.tree, ul.kids { list-style:none; margin:0; padding:0; }
+  ul.kids { margin-left:15px; padding-left:13px; border-left:1px solid var(--rule); }
+  li.node { margin:0; }
+  li.node.hide { display:none; }
+
+  .row {
+    display:grid; grid-template-columns:22px 12px minmax(0,1fr) auto;
+    align-items:start; gap:7px;
+    width:100%; text-align:left;
+    padding:5px 8px 5px 2px; border-radius:5px;
+    background:none; border:0; color:inherit; font:inherit;
+  }
+  button.row { cursor:pointer; }
+  button.row:hover { background:var(--surface-2); }
+  button.row:focus-visible { outline:2px solid var(--accent); outline-offset:-1px; }
+  div.row { cursor:default; }
+
+  /* THE AFFORDANCE RULE — a row must say, before it is clicked,
+     whether it opens. Caret + count = opens. Terminal dash = leaf. */
+  .caret {
+    font-family:var(--font-mono); font-size:11px; color:var(--ink-3);
+    justify-self:center; padding-top:4px; transition:transform .13s ease;
+    display:inline-block; line-height:1;
+  }
+  li.node.open > .row .caret { transform:rotate(90deg); color:var(--accent); }
+  .leafmark {
+    justify-self:center; padding-top:9px; color:var(--rule-2);
+    font-family:var(--font-mono); font-size:11px; line-height:1;
+  }
+  @media (prefers-reduced-motion:reduce){ .caret{ transition:none; } }
+
+  .dot {
+    width:9px; height:9px; border-radius:50%; margin-top:7px;
+    justify-self:center; flex:none;
+    background:hsl(var(--th) var(--dot-s) var(--dot-l));
+  }
+  .dot.hollow { background:transparent; border:2px solid hsl(var(--th) var(--dot-s) var(--dot-l)); }
+
+  /* Heading-to-body gap lives on the flex container, so it never
+     collapses and stays uniform when a pill wraps. */
+  .body { min-width:0; display:flex; flex-direction:column; gap:4px; }
+  .lbl { font-size:14.5px; line-height:1.42; display:block; }
+  .note { font-size:12.8px; color:var(--ink-3); line-height:1.5; display:block; }
+  li.node[data-kind="theme"] > .row .lbl {
+    font-family:var(--font-mono); font-size:15px; font-weight:700; letter-spacing:.01em;
+  }
+  li.node[data-kind="theme"] > .row .body { gap:6px; }
+  li.node[data-kind="flow"]  > .row .lbl  { font-weight:620; }
+  li.node[data-kind="flow"]  > .row .body { gap:5px; }
+  li.node[data-accent="1"] > .row .lbl { color:hsl(var(--th) var(--dot-s) var(--dot-l)); font-weight:600; }
+  li.node[data-accent="1"] > .row { background:hsl(var(--th) 55% var(--row-hi)); }
+
+  .note code, .lbl code {
+    font-family:var(--font-mono); font-size:11.8px; background:var(--surface-2);
+    padding:1px 4px; border-radius:3px; color:var(--ink-2);
+  }
+  mark { background:var(--accent-soft); color:var(--ink); border-radius:2px; padding:0 1px; }
+
+  .meta { display:flex; align-items:center; gap:5px; padding-top:3px; flex:none; }
+  .kidcount {
+    font-family:var(--font-mono); font-size:10.5px; color:var(--ink-3);
+    background:var(--surface-2); border:1px solid var(--rule);
+    border-radius:9px; padding:1px 7px; white-space:nowrap; font-variant-numeric:tabular-nums;
+  }
+  li.node.open > .row .kidcount { visibility:hidden; }
+
+  .pill {
+    font-family:var(--font-mono); font-size:9.5px; font-weight:700; letter-spacing:.07em;
+    text-transform:uppercase; padding:2px 6px; border-radius:3px; white-space:nowrap;
+    color:hsl(var(--ph) 55% var(--pill-fg));
+    background:hsl(var(--ph) 50% var(--pill-bg));
+    border:1px solid hsl(var(--ph) 40% var(--pill-bd));
+  }
+
+  li.node[data-kind="theme"] { margin-top:6px; padding-top:6px; border-top:1px solid var(--rule); }
+  li.node[data-kind="theme"]:first-child { border-top:0; margin-top:0; }
+  .empty { padding:26px 14px; color:var(--ink-3); font-size:14px; }
+
+  /* ---------- optional prose below the tree ---------- */
+  section.prose { padding:48px 0 0; }
+  h2 {
+    font-family:var(--font-mono); font-size:clamp(19px,2.3vw,25px); font-weight:700;
+    margin:0 0 14px; letter-spacing:-.01em; text-wrap:balance;
+  }
+  section.prose > p { font-size:15.5px; color:var(--ink-2); max-width:76ch; margin:0 0 18px; }
+  section.prose > p strong { color:var(--ink); font-weight:600; }
+  p code, li code { font-family:var(--font-mono); font-size:12.5px; background:var(--surface-2); padding:1px 5px; border-radius:3px; color:var(--ink-2); }
+  a { color:var(--accent); }
+</style>
+
+<div class="wrap">
+  <header class="masthead">
+    <p class="eyebrow" id="c-eyebrow"></p>
+    <h1 id="c-title"></h1>
+    <p class="standfirst" id="c-standfirst"></p>
+    <div class="provenance" id="c-sources"></div>
+  </header>
+
+  <div class="howto" id="c-legend"></div>
+
+  <div class="toolbar" role="toolbar" aria-label="Map controls">
+    <span class="grp-label">Depth</span>
+    <div class="grp" id="depths"></div>
+    <span class="grp-label" style="margin-left:6px" id="filters-label">Only</span>
+    <div class="grp" id="filters"></div>
+    <input id="q" type="search" placeholder="Search…" aria-label="Search the map">
+    <span id="count"></span>
+  </div>
+
+  <div class="treebox">
+    <ul class="tree" id="tree" role="tree"></ul>
+    <p class="empty" id="empty" hidden>Nothing matches. Clear the search or the filters.</p>
+  </div>
+
+  <!-- Optional: add <section class="prose"> blocks here for anything
+       the tree cannot carry — comparisons, sequences, verdicts. -->
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ==============================================================
+     ①  CONFIG — page chrome, and the two colour channels.
+         Every type and status is ONE hue number; both light and
+         dark themes derive from it, so adding a category is a
+         one-line change and never needs a second palette.
+     ============================================================== */
+  var CONFIG = {
+    eyebrow: "REPLACE · subtitle line",
+    title: "REPLACE — the claim this map makes",
+    standfirst: "REPLACE. One paragraph: what the reader is looking at, and the rule that makes it readable — <strong>every row says before you click whether it opens</strong>.",
+    sources: ["source one", "source two", "verified YYYY-MM-DD"],
+
+    /* Channel 1 — dot colour = KIND of thing. Keep to 5–7. */
+    types: {
+      actor:    { label: "Human action",     note: "Someone clicks, types, decides", h: 194 },
+      system:   { label: "System reaction",  note: "Synchronous, invisible to the user", h: 200, sat: "low" },
+      async:    { label: "Scheduled / async",note: "Runs on a clock, not on a click", h: 240 },
+      external: { label: "External boundary",note: "Leaves the system", h: 35 },
+      store:    { label: "Data store",       note: "Where it lands", h: 150 },
+      focus:    { label: "Opportunity",      note: "Proposed, not built", h: 272, hollow: true, accent: true },
+      risk:     { label: "Gap or risk",      note: "Absent thing that constrains the rest", h: 352, accent: true }
+    },
+
+    /* Channel 2 — pill = STATUS. Source these from something real
+       (a feature-flag file, a roadmap) rather than inventing them. */
+    statuses: {
+      live:     { label: "Live",     h: 145 },
+      beta:     { label: "Beta",     h: 42  },
+      proposed: { label: "Proposed", h: 272 },
+      blocked:  { label: "Blocked",  h: 352 }
+    },
+
+    /* Toolbar quick-filters. type: or status: */
+    filters: [
+      { label: "Opportunities", type: "focus" },
+      { label: "Gaps",          type: "risk" },
+      { label: "Beta",          status: "beta" }
+    ],
+
+    startDepth: 1          // 1 = only the top level, all closed
+  };
+
+  /* ==============================================================
+     ②  DATA — the entire diagram. Change this and nothing else.
+
+         n(label, type, note, children, opts)
+           label  : short. HTML allowed (<code>, <strong>).
+           type   : a key from CONFIG.types
+           note   : WHY it matters, not what it is. Optional.
+           opts   : { status:'live'|…, kind:'theme'|'flow' }
+
+         kind is typographic weight, not semantics:
+           theme → top-level, mono bold, separated by a rule
+           flow  → second level, semibold
+           (omit) → everything below
+     ============================================================== */
+  var DATA = [
+
+    n("FIRST THEME — a verb the reader came here to do", "actor",
+      "One line on when this happens and who does it.",
+      [
+        n("A flow inside that theme", "actor", "", [
+          n("A concrete step", "actor"),
+          n("Another step", "system", "A note explains the consequence, not the label."),
+          n("A leaf with no children shows a terminal dash", "store")
+        ], { kind: "flow", status: "live" }),
+
+        n("A second flow", "async", "", [
+          n("Something on a clock", "async", "Say the actual cadence — vagueness here is where diagrams rot."),
+          n("An opportunity, placed where it would attach", "focus",
+            "Put proposals AT their injection point, never in a separate list. That is the whole value of a tree over a slide.",
+            [], { status: "proposed" }),
+          n("A structural gap", "risk", "Name the absent thing and what it blocks.", [], { status: "blocked" })
+        ], { kind: "flow", status: "beta" })
+      ],
+      { kind: "theme", status: "live" }),
+
+    n("SECOND THEME", "actor", "Aim for 5–8 themes and 3–4 levels total.", [
+      n("Keep leaves factual", "system", "A leaf that needs a paragraph is really a flow with hidden children.", [], { kind: "flow" })
+    ], { kind: "theme", status: "live" })
+  ];
+
+  /* ==============================================================
+     ③  ENGINE — no edits needed below this line.
+     ============================================================== */
+  function n(label, type, note, kids, opts) {
+    var o = opts || {};
+    return { label: label, type: type, note: note || "", kids: kids || [],
+             status: o.status || "", kind: o.kind || "" };
+  }
+
+  function el(tag, cls, txt) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (txt != null) e.innerHTML = txt;
+    return e;
+  }
+
+  /* ---- chrome ---- */
+  document.getElementById("c-eyebrow").innerHTML = CONFIG.eyebrow;
+  document.getElementById("c-title").innerHTML = CONFIG.title;
+  document.getElementById("c-standfirst").innerHTML = CONFIG.standfirst;
+  var srcBox = document.getElementById("c-sources");
+  CONFIG.sources.forEach(function (s) { srcBox.appendChild(el("span", "src", s)); });
+
+  function dotFor(key) {
+    var t = CONFIG.types[key] || { h: 200 };
+    var d = el("span", "dot" + (t.hollow ? " hollow" : ""));
+    d.style.setProperty("--th", String(t.h));
+    if (t.sat === "low") d.style.setProperty("--dot-s", "12%");
+    d.setAttribute("aria-hidden", "true");
+    return d;
+  }
+  function pillFor(key) {
+    var s = CONFIG.statuses[key];
+    if (!s) return null;
+    var p = el("span", "pill", s.label);
+    p.style.setProperty("--ph", String(s.h));
+    return p;
+  }
+
+  /* ---- legend, rendered from CONFIG so it can never drift ---- */
+  var legend = document.getElementById("c-legend");
+
+  var c1 = el("div", "card"); c1.appendChild(el("h3", null, "Does this row open?"));
+  var u1 = el("ul");
+  [["▸", "Collapsed, has children", "Caret plus a count of what is inside", ""],
+   ["▾", "Open", "Caret turns, count hides", "color:var(--accent)"],
+   ["─", "Leaf — nothing inside", "Not clickable, no hover state", "color:var(--rule-2)"]
+  ].forEach(function (r) {
+    var li = el("li");
+    var g = el("span", "glyphdemo", r[0]); g.setAttribute("style", r[3]);
+    li.appendChild(g);
+    li.appendChild(el("span", null, "<b>" + r[1] + "</b><em>" + r[2] + "</em>"));
+    u1.appendChild(li);
+  });
+  c1.appendChild(u1); legend.appendChild(c1);
+
+  var c2 = el("div", "card"); c2.appendChild(el("h3", null, "Dot colour — kind"));
+  var u2 = el("ul");
+  Object.keys(CONFIG.types).forEach(function (k) {
+    var t = CONFIG.types[k], li = el("li");
+    var holder = el("span"); holder.style.cssText = "display:flex;justify-content:center;padding-top:5px";
+    holder.appendChild(dotFor(k));
+    li.appendChild(holder);
+    li.appendChild(el("span", null, "<b>" + t.label + "</b>" + (t.note ? "<em>" + t.note + "</em>" : "")));
+    u2.appendChild(li);
+  });
+  c2.appendChild(u2); legend.appendChild(c2);
+
+  if (Object.keys(CONFIG.statuses).length) {
+    var c3 = el("div", "card"); c3.appendChild(el("h3", null, "Pill — status"));
+    var u3 = el("ul");
+    Object.keys(CONFIG.statuses).forEach(function (k) {
+      var s = CONFIG.statuses[k], li = el("li");
+      var g = el("span", "glyphdemo"); g.appendChild(pillFor(k));
+      li.appendChild(g);
+      li.appendChild(el("span", null, "<b>" + s.label + "</b>" + (s.note ? "<em>" + s.note + "</em>" : "")));
+      u3.appendChild(li);
+    });
+    c3.appendChild(u3); legend.appendChild(c3);
+  }
+
+  /* ---- tree ---- */
+  var root = document.getElementById("tree");
+  var allNodes = [];
+
+  function descendants(d) {
+    var t = 0;
+    d.kids.forEach(function (k) { t += 1 + descendants(k); });
+    return t;
+  }
+
+  function build(list, level) {
+    var ul = el("ul", level === 1 ? "tree" : "kids");
+    if (level > 1) ul.setAttribute("role", "group");
+
+    list.forEach(function (d) {
+      var t = CONFIG.types[d.type] || {};
+      var li = el("li", "node");
+      li.setAttribute("role", "treeitem");
+      li.setAttribute("aria-level", String(level));
+      li.dataset.t = d.type;
+      if (d.kind) li.dataset.kind = d.kind;
+      if (d.status) li.dataset.status = d.status;
+      if (t.accent) { li.dataset.accent = "1"; li.style.setProperty("--th", String(t.h)); }
+
+      var hasKids = d.kids.length > 0;
+      var row = document.createElement(hasKids ? "button" : "div");
+      row.className = "row";
+      if (hasKids) row.type = "button";
+
+      var mark = el("span", hasKids ? "caret" : "leafmark", hasKids ? "▸" : "─");
+      mark.setAttribute("aria-hidden", "true");
+      row.appendChild(mark);
+      row.appendChild(dotFor(d.type));
+
+      var body = el("span", "body");
+      body.appendChild(el("span", "lbl", d.label));
+      if (d.note) body.appendChild(el("span", "note", d.note));
+      row.appendChild(body);
+
+      var meta = el("span", "meta");
+      var p = pillFor(d.status);
+      if (p) meta.appendChild(p);
+      if (hasKids) meta.appendChild(el("span", "kidcount", descendants(d) + " inside"));
+      row.appendChild(meta);
+
+      li.appendChild(row);
+
+      if (hasKids) {
+        li.setAttribute("aria-expanded", "false");
+        var sub = build(d.kids, level + 1);
+        sub.hidden = true;
+        li.appendChild(sub);
+        row.addEventListener("click", function () { toggle(li); });
+      }
+
+      allNodes.push(li);
+      ul.appendChild(li);
+    });
+    return ul;
+  }
+
+  function toggle(li, force) {
+    var sub = li.querySelector(":scope > ul");
+    if (!sub) return;
+    var open = typeof force === "boolean" ? force : !li.classList.contains("open");
+    li.classList.toggle("open", open);
+    li.setAttribute("aria-expanded", open ? "true" : "false");
+    sub.hidden = !open;
+  }
+
+  var built = build(DATA, 1);
+  built.id = "tree";
+  built.setAttribute("role", "tree");
+  built.setAttribute("aria-label", CONFIG.title);
+  root.replaceWith(built);
+  root = built;
+
+  /* ---- depth control ---- */
+  var maxLevel = allNodes.reduce(function (m, li) {
+    return Math.max(m, parseInt(li.getAttribute("aria-level"), 10));
+  }, 1);
+  var depthBox = document.getElementById("depths");
+  var depthBtns = [];
+  for (var i = 1; i < maxLevel; i++) {
+    (function (d) {
+      var b = el("button", "btn", String(d));
+      b.addEventListener("click", function () { setDepth(d); });
+      depthBox.appendChild(b); depthBtns.push([b, d]);
+    })(i);
+  }
+  var allBtn = el("button", "btn", "All");
+  allBtn.addEventListener("click", function () { setDepth(maxLevel); });
+  depthBox.appendChild(allBtn); depthBtns.push([allBtn, maxLevel]);
+
+  function setDepth(dep) {
+    allNodes.forEach(function (li) {
+      var lvl = parseInt(li.getAttribute("aria-level"), 10);
+      if (li.querySelector(":scope > ul")) toggle(li, lvl < dep);
+    });
+    depthBtns.forEach(function (pair) {
+      pair[0].setAttribute("aria-pressed", String(pair[1] === dep));
+    });
+  }
+
+  /* ---- filters ---- */
+  var filterBox = document.getElementById("filters");
+  var activeFilter = null;
+  if (!CONFIG.filters.length) {
+    filterBox.hidden = true;
+    document.getElementById("filters-label").hidden = true;
+  }
+  CONFIG.filters.forEach(function (f) {
+    var b = el("button", "btn", f.label);
+    b.setAttribute("aria-pressed", "false");
+    b.addEventListener("click", function () {
+      var was = activeFilter === f;
+      activeFilter = was ? null : f;
+      Array.prototype.forEach.call(filterBox.children, function (o) {
+        o.setAttribute("aria-pressed", String(!was && o === b));
+      });
+      apply();
+    });
+    filterBox.appendChild(b);
+  });
+
+  /* ---- search ---- */
+  var q = document.getElementById("q");
+  var countEl = document.getElementById("count");
+  var emptyEl = document.getElementById("empty");
+
+  function matches(li, term) {
+    if (activeFilter) {
+      if (activeFilter.type && li.dataset.t !== activeFilter.type) return false;
+      if (activeFilter.status && li.dataset.status !== activeFilter.status) return false;
+    }
+    if (!term) return true;
+    return li.querySelector(":scope > .row").textContent.toLowerCase().indexOf(term) !== -1;
+  }
+
+  function apply() {
+    var term = q.value.trim().toLowerCase();
+    allNodes.forEach(function (li) { li.classList.remove("hide"); li.dataset.hit = ""; });
+
+    if (!term && !activeFilter) {
+      countEl.textContent = allNodes.length + " nodes";
+      emptyEl.hidden = true;
+      return;
+    }
+    var hits = 0;
+    allNodes.forEach(function (li) {
+      if (matches(li, term)) { li.dataset.hit = "1"; hits++; }
+    });
+    allNodes.forEach(function (li) {
+      var keep = li.dataset.hit === "1" || li.querySelector('[data-hit="1"]') !== null;
+      li.classList.toggle("hide", !keep);
+      if (keep && li.querySelector(":scope > ul")) toggle(li, true);
+    });
+    countEl.textContent = hits + (hits === 1 ? " match" : " matches");
+    emptyEl.hidden = hits > 0;
+  }
+  q.addEventListener("input", apply);
+
+  /* ---- keyboard ---- */
+  root.addEventListener("keydown", function (e) {
+    var row = e.target.closest(".row");
+    if (!row) return;
+    var li = row.parentElement;
+    var rows = Array.prototype.filter.call(
+      root.querySelectorAll("button.row, div.row"),
+      function (r) { return r.offsetParent !== null; }
+    );
+    var i = rows.indexOf(row);
+    if (e.key === "ArrowDown" && rows[i + 1]) { e.preventDefault(); focusRow(rows[i + 1]); }
+    else if (e.key === "ArrowUp" && i > 0) { e.preventDefault(); focusRow(rows[i - 1]); }
+    else if (e.key === "ArrowRight") {
+      if (li.querySelector(":scope > ul") && !li.classList.contains("open")) { e.preventDefault(); toggle(li, true); }
+    } else if (e.key === "ArrowLeft") {
+      if (li.classList.contains("open")) { e.preventDefault(); toggle(li, false); }
+      else {
+        var up = li.parentElement.closest("li.node");
+        if (up) { e.preventDefault(); focusRow(up.querySelector(":scope > .row")); }
+      }
+    }
+  });
+  function focusRow(r) {
+    if (r.tagName !== "BUTTON") r.setAttribute("tabindex", "-1");
+    r.focus();
+  }
+
+  setDepth(CONFIG.startDepth);
+  apply();
+})();
+</script>

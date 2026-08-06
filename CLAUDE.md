@@ -244,6 +244,43 @@ Choose the mode based on how stable and correctness-critical the target is:
 
 Before touching code in any repo, read the state doc first (`context.md`, `todo.md`, `workflow_state.md`, `KNOWLEDGE.md`, or `ROADMAP.md`). Spot-check it against actual repo state (git log, file existence) for staleness, then summarize: current phase / last completed step / immediate next action. If no state doc exists, surface that explicitly — it is itself a finding.
 
+## Local Knowledge First (Global)
+
+**Diagnose against local sources before reaching outside.** Before a web search, an external
+fetch, or a remote API call for *context*, exhaust in this order: (1) the project's own
+knowledge base / docs, including its **archive** — the question may already be answered;
+(2) local mirrors of team documentation (e.g. `~/repo/Envisio/wikis/`); (3) the repos
+themselves, including `CLAUDE.md`, `.claude/rules/`, and in-repo guides; (4) only then external.
+
+**Never call something missing on the strength of a search that did not cover every source.**
+Absence of evidence in the paths you happened to search is not evidence of absence. Wikis are
+the classic blind spot: a GitHub wiki is a *separate git repo* (`<repo>.wiki.git`), invisible to
+code search and the contents API, so a repo can carry a hundred pages of documentation no
+`grep` will ever surface. Clone and grep the wiki before concluding a gap exists.
+
+Promoted to global 2026-08-05 after asserting a tooling gap that two documentation sources —
+one in-repo, one in a wiki — already answered.
+
+## Knowledge Lifecycle — Update, Archive, Backdate (Global)
+
+Any repo maintaining its own knowledge base keeps the **live tree to current truth only**,
+minimised, with history archived and dated:
+
+- **Update in place, don't append.** Revise the document that already owns the concern; never
+  stack a correction beneath a stale claim. Carry a `last-verified` date (when the content was
+  confirmed against reality, not when it was edited) and bump it.
+- **Archive when settled** — a question answered, a decision superseded, a claim retracted.
+  Retractions are the highest-value archive records: keep the root cause of the error, not just
+  the correction. Merely-stale content gets revised, not archived.
+- **Backdate everything** to the day the work happened, in both filename (`YYYY-MM-DD-slug.md`)
+  and an `as-of` field. Dating *is* the conflict-resolution mechanism: when two records
+  disagree, compare `as-of` and the newer wins.
+- **Leave a pointer.** Archived content names what superseded it; the live entry shrinks to one
+  line linking the archive.
+- **Enforce it in code**, not convention — a driver validating front matter, checking that
+  status and directory agree, verifying `superseded-by` targets exist, and reporting documents
+  overdue for re-verification. Reference: `~/repo/Envisio/knowledge-base/drivers/index_docs.py`.
+
 ## Source of Truth Files
 
 Repos with multiple living docs (todo, roadmap, knowledge base) must have a table mapping each doc to its purpose and update trigger. Without it, docs accumulate as undifferentiated sprawl. When working in a repo with multiple docs but no table, propose adding one.
@@ -325,6 +362,7 @@ These user-defined skills are loaded at session start from `~/.claude/skills/`:
 - `/qa` — Validate an implementation against its spec AC. Outputs per-item verdict (MET / PARTIAL / FAILED) + regression risk list. Use after any Implementer agent completes.
 - `/brief` — Generate a role-specific context package for a downstream agent. Takes: role name + project + milestone. Strips irrelevant context and produces a minimum viable briefing.
 - `/self-improve` — Run the self-improvement loop: scan recent sessions for recurring patterns, cluster by category, filter by threshold, propose additions to CLAUDE.md / memory / skill files. View history at Helm `/system`.
+- `/depth-tree` — Build a click-to-expand hierarchy artifact: a system, product, org or roadmap rendered as collapsible depth levels where every row advertises whether it opens. Carries `template.html` (zero dependencies, hue-driven theming, two colour channels). Use when a Mermaid diagram is about to outgrow legibility, or when the same content must read at both executive and engineer altitude.
 
 ## Platform Note
 
