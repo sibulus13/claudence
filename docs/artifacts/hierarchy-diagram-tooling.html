@@ -1,0 +1,242 @@
+<title>Tooling — hierarchical and drill-down diagrams</title>
+
+<style>
+  /* Deliberately not the Envisio suite palette. This is a tooling note,
+     not a product brief, and it should not read as one: warm graphite
+     ground, amber accent, no teal anywhere. */
+  :root {
+    --ground:#f6f5f2; --surface:#fffffe; --surface-2:#edece7;
+    --ink:#1e1c18; --ink-2:#4f4b43; --ink-3:#807a6f;
+    --rule:#dcd9d1; --rule-2:#bdb8ac;
+    --accent:#95601a; --accent-soft:#f3e9d8;
+    --shadow:0 1px 2px rgba(30,28,24,.05), 0 8px 22px rgba(30,28,24,.06);
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground:#151310; --surface:#1e1b17; --surface-2:#26221c;
+      --ink:#efece5; --ink-2:#bdb6a9; --ink-3:#8b8478;
+      --rule:#332e26; --rule-2:#4a4338;
+      --accent:#dda653; --accent-soft:#2b2113;
+      --shadow:0 1px 2px rgba(0,0,0,.45), 0 10px 26px rgba(0,0,0,.32);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:#151310; --surface:#1e1b17; --surface-2:#26221c;
+    --ink:#efece5; --ink-2:#bdb6a9; --ink-3:#8b8478;
+    --rule:#332e26; --rule-2:#4a4338;
+    --accent:#dda653; --accent-soft:#2b2113;
+    --shadow:0 1px 2px rgba(0,0,0,.45), 0 10px 26px rgba(0,0,0,.32);
+  }
+  :root[data-theme="light"] {
+    --ground:#f6f5f2; --surface:#fffffe; --surface-2:#edece7;
+    --ink:#1e1c18; --ink-2:#4f4b43; --ink-3:#807a6f;
+    --rule:#dcd9d1; --rule-2:#bdb8ac;
+    --accent:#95601a; --accent-soft:#f3e9d8;
+  }
+
+  * { box-sizing:border-box; }
+  body {
+    margin:0; background:var(--ground); color:var(--ink);
+    font-family:var(--sans); font-size:16px; line-height:1.62;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap { max-width:980px; margin:0 auto; padding:0 26px 100px; }
+  @media (max-width:640px){ .wrap{ padding:0 14px 70px; } }
+
+  header { padding:48px 0 26px; }
+  .eyebrow {
+    font-family:var(--mono); font-size:11px; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--accent); margin:0 0 12px;
+  }
+  h1 {
+    font-size:clamp(26px,3.6vw,38px); font-weight:750; line-height:1.14;
+    letter-spacing:-.02em; margin:0 0 16px; text-wrap:balance;
+  }
+  .standfirst { font-size:17px; color:var(--ink-2); max-width:70ch; margin:0; }
+  .standfirst strong { color:var(--ink); font-weight:620; }
+
+  .scope {
+    margin:22px 0 0; padding:12px 16px;
+    background:var(--surface); border:1px solid var(--rule); border-left:3px solid var(--rule-2);
+    border-radius:0 7px 7px 0; font-size:13.8px; color:var(--ink-3);
+  }
+  .scope b {
+    font-family:var(--mono); font-size:10px; letter-spacing:.12em; text-transform:uppercase;
+    color:var(--ink-2); display:block; margin-bottom:4px;
+  }
+
+  section { padding:44px 0 0; }
+  h2 {
+    font-size:clamp(19px,2.3vw,24px); font-weight:730; margin:0 0 14px;
+    letter-spacing:-.015em; text-wrap:balance;
+  }
+  section > p { font-size:15.5px; color:var(--ink-2); max-width:76ch; margin:0 0 20px; }
+  section > p strong { color:var(--ink); font-weight:620; }
+
+  .tablewrap { overflow-x:auto; border:1px solid var(--rule); border-radius:8px; background:var(--surface); margin:0 0 22px; box-shadow:var(--shadow); }
+  table { border-collapse:collapse; width:100%; font-size:14px; min-width:720px; }
+  th,td { text-align:left; padding:12px 15px; border-bottom:1px solid var(--rule); vertical-align:top; }
+  thead th {
+    font-family:var(--mono); font-size:10px; letter-spacing:.12em; text-transform:uppercase;
+    color:var(--ink-3); font-weight:700; background:var(--surface-2);
+  }
+  tbody tr:last-child td { border-bottom:0; }
+  td:first-child { white-space:nowrap; }
+  td strong { color:var(--ink); font-weight:650; }
+  td em { font-style:normal; color:var(--ink-3); display:block; font-family:var(--mono); font-size:11.5px; margin-top:3px; }
+  td { color:var(--ink-2); }
+
+  code {
+    font-family:var(--mono); font-size:12.5px; background:var(--surface-2);
+    padding:1px 5px; border-radius:3px; color:var(--ink-2);
+  }
+  .verdict {
+    border-left:3px solid var(--accent); background:var(--surface);
+    border-radius:0 8px 8px 0; padding:17px 20px; margin:0 0 22px;
+    font-size:14.8px; color:var(--ink-2);
+  }
+  .verdict h3 {
+    font-family:var(--mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase;
+    color:var(--ink-3); margin:0 0 9px; font-weight:700;
+  }
+  .verdict p { margin:0 0 10px; } .verdict p:last-child { margin-bottom:0; }
+  .verdict strong { color:var(--ink); font-weight:620; }
+  ul.plain { padding-left:20px; margin:0 0 20px; font-size:14.8px; color:var(--ink-2); }
+  ul.plain li { margin-bottom:8px; }
+  ul.plain strong { color:var(--ink); font-weight:620; }
+  a { color:var(--accent); }
+</style>
+
+<div class="wrap">
+
+  <header>
+    <p class="eyebrow">Tooling note · not an Envisio product document</p>
+    <h1>Drawing hierarchies you can click into</h1>
+    <p class="standfirst">
+      Split out of the Envisio system map, where it did not belong. The question was whether a
+      component system exists for drill-down diagrams — a high-level view that expands into its own
+      detail, nested several layers deep. Several do, and
+      <strong>they split cleanly by whether the hierarchy is the point, or the graph is</strong>.
+    </p>
+    <p class="scope">
+      <b>Scope</b>
+      This page is method, not company knowledge. Envisio product briefs live in their own set and
+      stay free of technique, so a reader opening one never has to sort the two apart.
+    </p>
+  </header>
+
+  <section>
+    <h2>The options, and what each actually buys you</h2>
+
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr><th>Option</th><th>What it gives you</th><th>Reach for it when</th><th>Cost</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>LikeC4</strong><em>likec4</em></td>
+            <td>Architecture defined as text in a DSL, compiled into a <em style="display:inline;font-family:inherit;font-size:inherit;margin:0">navigable</em> site where clicking an element drills from context into container into component. Drill-down is the native interaction, not an add-on.</td>
+            <td>You want the map to be the durable, diffable source of truth that survives the next re-org. Closest thing to a finished product for this exact need.</td>
+            <td>A DSL to learn; opinionated about C4 levels</td>
+          </tr>
+          <tr>
+            <td><strong>Structurizr</strong><em>DSL + C4 model</em></td>
+            <td>The original model-once-render-many approach. One model, many views at different altitudes. Mature, well documented, hosted and self-hosted paths.</td>
+            <td>You want the C4 methodology with the widest ecosystem and don't mind heavier tooling.</td>
+            <td>Heavier; the free renderer is plainer</td>
+          </tr>
+          <tr>
+            <td><strong>React Flow</strong><em>@xyflow/react</em></td>
+            <td>A controlled node-and-edge canvas with working pan and zoom, custom node components, and sub-flows for nesting. You own the expand logic; every primitive is there.</td>
+            <td>The diagram must live inside a React app. Sub-flows map naturally onto any nested domain model.</td>
+            <td>You implement collapse yourself; pair with <code>elkjs</code> or <code>dagre</code> for layout</td>
+          </tr>
+          <tr>
+            <td><strong>d3-hierarchy</strong><em>D3</em></td>
+            <td>The canonical layouts — collapsible tree, treemap, sunburst, partition, icicle. The collapsible tree is the reference implementation of drill-down.</td>
+            <td>The data is genuinely a tree and you want a real layout algorithm rather than indentation.</td>
+            <td>Most code to own; no React bindings</td>
+          </tr>
+          <tr>
+            <td><strong>visx</strong><em>@visx/hierarchy</em></td>
+            <td>D3's layout maths exposed as React components. You keep React's rendering and state model.</td>
+            <td>Middle ground — D3 layouts without hand-writing enter/update/exit.</td>
+            <td>Lower level than a charting library; you compose it</td>
+          </tr>
+          <tr>
+            <td><strong>Cytoscape.js</strong><em>+ expand-collapse</em></td>
+            <td>Compound nodes with native collapse, built for large graphs. Handles thousands of nodes where the others degrade.</td>
+            <td>Scale is the problem — a full dependency graph rather than a curated map.</td>
+            <td>Plainer defaults; imperative API</td>
+          </tr>
+          <tr>
+            <td><strong>Mermaid</strong><em>text to SVG</em></td>
+            <td>Excellent in docs and pull requests. Its <code>click</code> directive fires a callback, but there is <em style="display:inline;font-family:inherit;font-size:inherit;margin:0">no</em> expand/collapse model.</td>
+            <td>Docs-as-code, where a static picture in a Markdown file is the goal.</td>
+            <td>Wrong tool for interaction — this was the original mistake</td>
+          </tr>
+          <tr>
+            <td><strong>tldraw / Excalidraw</strong><em>freeform canvas</em></td>
+            <td>Embeddable, pleasant, good for thinking out loud with a group.</td>
+            <td>Whiteboarding, not documenting.</td>
+            <td>Not model-driven, so it drifts the moment the system changes</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>What I would actually reach for</h2>
+
+    <div class="verdict">
+      <h3>Three calls</h3>
+      <p>
+        <strong>For an architecture record that must stay true: LikeC4.</strong> It is text, it lives
+        in the repo next to the code, it diffs in a pull request, and drill-down navigation is built
+        in rather than assembled. That directly fixes the failure mode every hand-maintained diagram
+        has — quietly going stale while still looking authoritative.
+      </p>
+      <p>
+        <strong>For anything shipped inside a product: React Flow.</strong> MIT licensed, real pan and
+        zoom, and the sub-flow primitive handles nesting without you writing a layout engine.
+      </p>
+      <p>
+        <strong>For a one-off page where the shape is genuinely a hierarchy: hand-roll it.</strong>
+        The Envisio system map is about 120 lines of vanilla JS over a nested JSON array. A disclosure
+        tree is the one case where a library buys almost nothing and costs you a build step — and
+        because the diagram <em>is</em> the JSON, editing it is editing data, not markup.
+      </p>
+    </div>
+
+    <h2>Two constraints worth knowing before you choose</h2>
+    <ul class="plain">
+      <li>
+        <strong>Published artifacts run under a strict CSP with no external hosts.</strong> No CDN
+        scripts, fonts or images — anything from the table above has to be bundled and inlined. That
+        is a real reason to hand-roll inside an artifact, and no reason at all to avoid these
+        libraries inside an app that has a build step.
+      </li>
+      <li>
+        <strong>A tree is the wrong shape for two common cases.</strong> A system context is a graph
+        with cycles, and a sequence has a time axis. Both want a static diagram, and neither should
+        get fake zoom controls bolted on — a CSS transform over an SVG is not zoom, it is a scaling
+        bug waiting to be reported.
+      </li>
+    </ul>
+
+    <div class="verdict">
+      <h3>Already built</h3>
+      <p>
+        The hand-rolled option is packaged as the <code>/depth-tree</code> skill —
+        <code>SKILL.md</code> plus a dependency-free <code>template.html</code> with hue-driven
+        theming, two separate colour channels, and the affordance rule that every row states whether
+        it opens before it is clicked. Copy the template, edit <code>CONFIG</code> and
+        <code>DATA</code>, publish.
+      </p>
+    </div>
+  </section>
+</div>
