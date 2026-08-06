@@ -1260,10 +1260,18 @@ config.keys = {
 -- / OSC-8 file link under the cursor, and the Ctrl press-down is swallowed so it
 -- doesn't begin a text selection. (With no TUI running, the built-in Ctrl+Click
 -- rule already handles it.)
+-- Both CTRL and SUPER (Cmd) are bound. Cmd+Click is the macOS convention and is what
+-- WezTerm's own built-in rule uses — but that built-in has no mouse_reporting = true, so
+-- inside a TUI the app swallows it and the link looks dead. Binding CTRL alone left the
+-- muscle-memory gesture broken; both are bound so either works, in or out of a TUI.
 config.mouse_bindings = {
   { event = { Down = { streak = 1, button = 'Left' } }, mods = 'CTRL',
     mouse_reporting = true, action = act.Nop },
   { event = { Up = { streak = 1, button = 'Left' } }, mods = 'CTRL',
+    mouse_reporting = true, action = act.OpenLinkAtMouseCursor },
+  { event = { Down = { streak = 1, button = 'Left' } }, mods = 'SUPER',
+    mouse_reporting = true, action = act.Nop },
+  { event = { Up = { streak = 1, button = 'Left' } }, mods = 'SUPER',
     mouse_reporting = true, action = act.OpenLinkAtMouseCursor },
 
   -- ── Wheel scrolling inside a mouse-reporting TUI ──────────────────────────
@@ -1306,6 +1314,20 @@ else
   })
 end
 
+-- Bare filenames, e.g. OBSERVABILITY.md or create_corporation.rb:31. Agent output and
+-- commit messages name files without a directory constantly, so anchoring only on / and ~/
+-- left most file references dead. open-in-editor.sh resolves a bare name against
+-- CLAUDENCE_LINK_ROOTS.
+--
+-- The extension list is an allowlist rather than \w+ on purpose: it keeps ordinary prose from
+-- becoming clickable. "e.g." and version strings like "14.13.2" do not match, because "g" and
+-- "2" are not in the list. Inserted LAST so the absolute-path rules above win on paths that
+-- carry a directory.
+table.insert(config.hyperlink_rules, {
+  regex  = [[\b[\w\-+@]+\.(?:md|rb|lua|py|sh|zsh|ts|tsx|js|jsx|json|ya?ml|sql|css|scss|html|toml|rake|gemspec)(?::\d+(?::\d+)?)?\b]],
+  format = '$0',
+})
+
 -- Route opened links: web/mail use the OS default (browser); anything that looks
 -- like a local file opens in VS Code at its line via open-in-vscode.ps1 (which
 -- also flips markdown into preview mode).
@@ -1315,6 +1337,11 @@ wezterm.on('open-uri', function(_window, _pane, uri)
     is_local = is_local or uri:match('^/?%a:[/\\]') ~= nil
   else
     is_local = is_local or uri:match('^/') ~= nil or uri:match('^~/') ~= nil
+    -- A bare filename (no directory) is local too — the bare-name hyperlink rule below
+    -- matches these, and open-in-editor.sh resolves them against CLAUDENCE_LINK_ROOTS.
+    -- Without this they fall through and WezTerm hands "OBSERVABILITY.md" to the browser.
+    is_local = is_local or uri:match('^[%w%-%+@_.]+%.%a[%w]*$') ~= nil
+                        or uri:match('^[%w%-%+@_.]+%.%a[%w]*:%d+') ~= nil
   end
   if not is_local then
     return  -- not a local file → let WezTerm open it (browser, etc.)
