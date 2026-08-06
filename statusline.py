@@ -36,7 +36,7 @@ RED = E + '[31m'
 DIM = E + '[2m'
 GREY = E + '[38;5;240m'      # extra-recessed tone for a stale task row
 MAGENTA = E + '[35m'
-THEME_WIDTH = 34   # statusline real estate; labels are capped at 60 upstream
+THEME_WIDTH = 62   # the theme owns its own row, so it only has to fit one line
 BLUE = E + '[34m'
 
 TREND_THRESHOLD = 0.10       # 10 percentage points before a rate is called worse/better
@@ -170,8 +170,8 @@ def theme_row(state):
     if len(label) > THEME_WIDTH:
         label = label[:THEME_WIDTH - 1].rstrip() + '\u2026'
     turns = int(themes[0].get('turns') or 0)
-    suffix = ('%s\u00d7%d%s' % (DIM, turns, RESET)) if turns > 1 else ''
-    return '  %s\u25b8 %s%s%s' % (MAGENTA, label, RESET, suffix)
+    suffix = ('%s \u00d7%d%s' % (DIM, turns, RESET)) if turns > 1 else ''
+    return '%s\u25b8%s %s%s' % (DIM, RESET, label, suffix)
 
 
 def meta_row(payload):
@@ -294,11 +294,17 @@ def main():
         retro_prefix,
         prompt_str,
         friction_row(state, averages),
-        theme_row(state),
         meta_row(payload),
         runtime_row(state),
         spinner(session_id),
     ]) + '\n')
+
+    # The theme is prose of variable length; the row above is fixed-width metrics.
+    # Mixing them pushed the line past 80 columns and truncated both. Own row.
+    theme = theme_row(state)
+    if theme:
+        sys.stdout.write(theme + '\n')
+
     for row in helm_rows(payload):
         sys.stdout.write(row + '\n')
 
