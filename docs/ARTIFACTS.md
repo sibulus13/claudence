@@ -29,3 +29,9 @@ Browse all of them at <https://claude.ai/code/artifacts>. Enumerate from a sessi
   other conversation, pass the artifact's `url`. Publishing without it mints a *new* URL and
   silently orphans the old — the main way these get duplicated.
 - **Keep the favicon stable** across redeploys; people find the tab by its icon.
+- **Moving a source file does not move the artifact.** The URL belongs to the artifact, not the
+  path. If you relocate the source, the next publish must pass the recorded `url` or it mints a
+  fresh URL and orphans the old one. This happened on 2026-08-06 when the tooling note's source
+  moved here from the Envisio knowledge base — `0ae4616e-2a77-4497-91ae-68b92ed2af33` is that
+  orphan, superseded immediately and left unreferenced. The tool has no delete action, so a
+  mistaken publish is permanent; check the returned URL against this table every time.
