@@ -358,8 +358,10 @@ try:
     check_true('statusline: context percentage shown', 'ctx 78%' in out, out)
     check_true('statusline: 60-79% is a warning, not COMPACT', 'COMPACT' not in out, out)
     check_true('statusline: cost rounded to cents', '$4.57' in out, out)
+    # The spinner terminates the metrics row, not the whole output — the theme row
+    # and any helm rows follow it. Assert against the row that actually owns it.
     check_true('statusline: spinner shown while running',
-               out.rstrip().endswith(('|', '/', '-', '\\', '\x1b[0m')), out)
+               out.split('\n')[0].rstrip().endswith(('|', '/', '-', '\\', '\x1b[0m')), out)
 
     _code, out = box.run('statusline.py', {'session_id': SID,
                                            'context_window': {'used_percentage': 91}})

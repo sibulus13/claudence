@@ -20,11 +20,20 @@ import sys
 
 DENYLIST = os.path.expanduser('~/.claude/claudence-denylist.txt')
 
+# Usernames that are obviously stand-ins, not a real account. Test fixtures and
+# docs are full of these, and flagging them trains you to --no-verify past the
+# guard — which is worse than not having one.
+PLACEHOLDER_USERS = r'(?:x|y|me|you|user|username|someone|somebody|example|test|dev|foo|bar|name)'
+
 # Always-on patterns — these are unsafe in a public repo regardless of client.
 BUILTIN = [
-    (r'/Users/[a-z0-9._-]+/', 'absolute home path (leaks the account name)'),
+    (r'/Users/(?!%s/)[a-z0-9._-]+/' % PLACEHOLDER_USERS,
+     'absolute home path (leaks the account name)'),
+    (r'/home/(?!%s/)[a-z0-9._-]+/' % PLACEHOLDER_USERS,
+     'absolute home path (leaks the account name)'),
     (r'[A-Z]:\\\\(?:repo|Users)', 'absolute Windows path'),
-    (r'[\w.+-]+@[\w-]+\.[\w.]+', 'email address'),
+    # Same reasoning: example.com and friends are reserved for documentation.
+    (r'[\w.+-]+@(?!example\.(?:com|org|net)\b)[\w-]+\.[\w.]+', 'email address'),
     (r'(?i)\b(?:sk|pk|ghp|gho|github_pat)_[A-Za-z0-9_]{16,}', 'API token'),
     (r'(?i)\b(?:BEGIN (?:RSA|OPENSSH|EC) PRIVATE KEY)\b', 'private key'),
 ]
