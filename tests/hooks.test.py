@@ -108,8 +108,10 @@ try:
     state = box.json_at('telemetry', 'state-%s.json' % SID)
     check('log-prompt: state prompts=1', state.get('prompts'), 1)
     check('log-prompt: state overrides=0', state.get('overrides'), 0)
-    check('log-prompt: theme anchored to the first line',
-          state['themes'][0]['label'], 'Build the goals screen')
+    # The label is a condensed topic, not the prompt verbatim: filler is dropped and a
+    # leading verb becomes a category, so the status bar reads as a subject not a quote.
+    check('log-prompt: theme condensed to a categorised topic',
+          state['themes'][0]['label'], 'build: goals screen')
     check_true('log-prompt: running flag written',
                os.path.exists(box.path('telemetry', 'running-%s.flag' % SID)))
     check_true('log-prompt: turn-start stamp written (per-session, not shared)',
