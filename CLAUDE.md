@@ -8,10 +8,11 @@ These instructions apply to every project on this machine. Project-level CLAUDE.
 
 - **OS**: macOS (Apple silicon) — use POSIX shell syntax; there is no PowerShell on this machine
 - **Shell**: zsh (login shell) — Claude Code's Bash tool runs POSIX `sh`/`bash` commands
-- **Node**: 20 LTS
+- **Node**: managed by `fnm` — default v22.23.2, plus a Homebrew node at `/opt/homebrew/bin/node`. Repos pin their own version per-directory (one work repo pins 18.15.0). **`fnm`'s PATH entry is an ephemeral per-shell directory** (`~/.local/state/fnm_multishells/<pid>_<ts>/bin`), so it is never available to a process that did not source the profile — see the hook-PATH note below
 - **Package manager**: pnpm for all JavaScript/TypeScript projects — never use `npm install` or `yarn` inside a pnpm workspace
-- **Python**: available at `python3` (`/usr/bin/python3`); there is no bare `python`
-- **Homebrew is NOT installed** — do not assume `brew`, and do not assume any tool it usually provides (`lua`, `fd`, `jq` beyond the system one). Check with `command -v` before relying on a binary
+- **Python**: `python3` resolves to the Homebrew build (3.14.x) ahead of the system one (`/usr/bin/python3`, 3.9.6); there is no bare `python`. Scripts that must run under either — hooks especially — stay on the standard library
+- **Homebrew IS installed** at `/opt/homebrew` (Apple-silicon prefix). Still `command -v` before relying on a binary: `gh` in particular is **not** present, so GitHub work goes through the GitHub MCP server, not the CLI
+- **Hook and status-line PATH**: hooks do not source the profile, so they see only `env.PATH` from `~/.claude/settings.json`. That is pinned to an explicit absolute PATH (Homebrew → rbenv shims → `~/.local/bin` → system) precisely because `node` is reachable *only* via Homebrew or an ephemeral fnm dir. **A hook that shells out to anything outside `/usr/bin` needs its interpreter present in that pinned PATH** — this is what broke the ponytail plugin's hooks on install (`node: command not found`)
 - **Path separators**: always forward slashes; paths are case-insensitive on the default APFS volume but treat them as case-sensitive in code
 
 ## Repository Organization (~/repo)
@@ -157,7 +158,7 @@ Stay on the critical path. Work that does **not** directly advance the current g
 - Prefer the Read/Glob/Grep tools over shelling out to `ls`/`cat`/`find`
 - Generate random secrets: `openssl rand -hex 32` (openssl and curl ship with macOS)
 - BSD userland, not GNU: `sed -i ''` needs the empty-string argument, `date` does not accept `-d`, and `find` has no `-printf`. Reach for `python3` rather than fighting a BSD flag difference
-- `python3` is the Xcode command-line-tools build — no third-party packages are installed, so scripts must stay on the standard library
+- Two `python3` builds exist (Homebrew 3.14.x first, Xcode CLT 3.9.6 at `/usr/bin/python3`). Driver and hook scripts stay on the **standard library** so they run identically under either
 - Open a file or URL from the shell with `open`
 
 ## Task Execution — Parallelization First
