@@ -295,7 +295,7 @@ local function tab_label_src(tab)
 end
 
 wezterm.on('format-tab-title', function(tab, _tabs, _panes, _conf, _hover, _max_width)
-  -- A user-set custom label (Alt+R) wins over the derived repo name. Keyed by the
+  -- A user-set custom label (Alt+L) wins over the derived repo name. Keyed by the
   -- tab's identity (repo-rel path, or 'Nexus' for home) so it survives restore.
   local src   = tab_label_src(tab)
   local title = tab_names[src] or display_name(src)
@@ -992,10 +992,21 @@ end
 --  Nominal usage: 1–3 horizontal panes per tab, 1–3 tabs per workspace.
 --
 --  PANE NAV   A=left  D=right
---  TAB NAV    W=prev  S=next   ⇧W/⇧S=move tab   R=rename tab
---  PANE OPS   Z=zoom  X=close  C=split-H  V=split-V  T=new-tab
+--  TAB NAV    W=prev  S=next   ⇧W/⇧S=move tab   L=rename(label) tab
+--  PANE OPS   M=maximize(zoom)  X=close  C=split-H  T=new-tab
 --  WORKSPACES F=fuzzy  N=rename-ws  [/]=cycle  G=jump-to-alert  (O=repo launcher)
 --  HELP       /=keymap pane
+--
+--  RESERVED KEYS — do not bind these. Other software registers them as GLOBAL
+--  low-level keyboard hooks, so the keystroke is consumed by the OS and WezTerm
+--  receives NO key event at all: the binding silently does nothing, with no
+--  error and no log line to grep. Alt+R (rename tab) and Alt+Z (zoom) were both
+--  dead this way for an unknown length of time before anyone noticed.
+--    Alt+R Alt+Z Alt+F1 Alt+F9 Alt+F10  -> NVIDIA overlay ("NVIDIA Share")
+--    Alt+Tab Alt+Esc Alt+Space Alt+F4   -> Windows shell (never reclaimable)
+--  The full table and the check that enforces it live in
+--  ~/.claude/scripts/check-keymap-conflicts.ps1, gated by tests/run-tests.ps1.
+--  ADD A NEW BINDING -> run that script; it fails on a stolen or duplicate key.
 --
 -- Alt+B activates this table; press one of WASD to split in that direction.
 -- one_shot = true means it auto-pops after one keypress (or after timeout).
@@ -1032,7 +1043,9 @@ config.keys = {
   { key = '5', mods = 'ALT', action = act.ActivateTab(4) },
 
   -- ── Pane / tab operations ─────────────────────────────────────────────
-  { key = 'z', mods = 'ALT', action = act.TogglePaneZoomState                    },
+  -- Alt+M (maximize), not Alt+Z: NVIDIA's overlay owns Alt+Z as a global hook,
+  -- so the keystroke never reached WezTerm. See the reserved-key note above.
+  { key = 'm', mods = 'ALT', action = act.TogglePaneZoomState                    },
   { key = 'x', mods = 'ALT', action = act.CloseCurrentPane { confirm = true }    },
   { key = 'q', mods = 'ALT', action = act.CloseCurrentTab  { confirm = true }    },
   { key = 'c', mods = 'ALT', action = act.SplitPane { direction = 'Right' } },
@@ -1109,12 +1122,13 @@ config.keys = {
         end
       end),
     }},
-  -- Alt+R: rename the CURRENT TAB (persistent; blank input resets to default).
+  -- Alt+L (label): rename the CURRENT TAB (persistent; blank input resets to
+  -- default). Was Alt+R until NVIDIA's overlay claimed it globally.
   -- Stores a display override keyed by the tab's identity (its repo-rel path, or
   -- 'Nexus' for home) — the title itself is left intact so session-restore and
   -- attention keep working. Re-setting the title to itself forces an in-place
   -- repaint so the new label shows immediately.
-  { key = 'r', mods = 'ALT',
+  { key = 'l', mods = 'ALT',
     action = act.PromptInputLine {
       description = 'Rename tab (blank = reset):',
       action = wezterm.action_callback(function(win, _pane, line)

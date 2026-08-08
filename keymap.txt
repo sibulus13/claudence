@@ -12,13 +12,13 @@
   [97mC[0m       split right
   [97mB[0m       split [2m+W↑ A← S↓ D→[0m
   [97mE[0m       swap pane
-  [97mZ[0m       zoom pane
+  [97mM[0m       zoom pane
   [97mX[0m       close pane
 
  [1;38;2;200;70;155mTABS[0m
  [90m─────────────────────────[0m
   [97mT[0m       new tab
-  [97mR[0m       rename tab
+  [97mL[0m       rename tab
   [97mQ[0m       close tab
   [97m⇧W ⇧S[0m  move tab
 
