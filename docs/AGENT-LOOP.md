@@ -148,18 +148,53 @@ flowchart TD
   H --> A["Human review<br/>then CLAUDE.md · skill · brief template"]
 ```
 
-**Deliberately not a learned controller.** Three reasons, and they are not squeamishness:
+### It runs unattended — autonomy bounded by blast radius, not by a prompt
 
-1. **Sample size.** A few hundred sessions across dozens of task classes will not support a
-   policy that is distinguishable from noise.
-2. **Goodhart.** Optimising an envelope against gate pass rate teaches the system to prefer
-   briefs that pass gates, which is only the goal if the gates are perfect. They are not.
-3. **Non-stationarity.** Model, harness, and repo all move underneath. A policy fitted to
-   last month's conditions decays silently, and nothing here would notice.
+**Decided: no human in the inner loop.** The loop fires from cron and from the end of an
+orchestration run, applies what it has learned, and the human reads the ledger afterwards
+rather than gating each change. Approval-per-change is what has kept this at zero runs since
+it was written.
 
-The honest version is a **proposal engine with a human approval step** — which is exactly
-what `/self-improve` already specifies. It has simply never run: `~/.claude/improve/` holds
-`config.json` and no `history.jsonl`, and its inputs were null until §7.
+The safety property is **reversibility, not permission** — every change is attributable,
+reverse-chronological, and revertible by id. Autonomy is then scoped by what a wrong change
+can cost:
+
+| Target | Blast radius | Mode |
+|---|---|---|
+| Allow-rules, brief templates, skill hints, per-class defaults | A worse next run | **Auto-apply.** Logged, revertible |
+| Gate thresholds, model/effort routing | A missed defect | **Auto-apply, shadow first** — run one cycle recording what *would* have changed |
+| `CLAUDE.md`, memory, anything governance | Compounds silently across every future session | **Propose only.** This keeps the standing rule that agents never autonomously edit governance |
+
+**The three risks do not go away, so each gets a mechanism rather than a caveat:**
+
+| Risk | Mechanism |
+|---|---|
+| **Sample size** — a few hundred sessions across dozens of classes is noise | A change needs ≥2 occurrences *and* ≥1 class with ≥5 runs. Below that it is recorded as an observation, not applied |
+| **Goodhart** — optimising for gate pass-rate teaches gate-pleasing | Score on **rework** (was the node revisited?) alongside pass-rate. A change that raises pass-rate while raising rework auto-reverts |
+| **Non-stationarity** — model, harness and repo move underneath | Every entry carries the model and harness version it was fitted under. A version change marks prior entries `stale`, and stale entries decay out rather than persisting silently |
+
+### The surface: what changed, and what is in force
+
+Two views, one store — an append-only `history.jsonl` plus a derived current state.
+
+```mermaid
+flowchart TD
+  H["history.jsonl<br/>append-only · one row per change"]
+  H --> C["Changelog view<br/>reverse chronological<br/>what changed · why · evidence · revert id"]
+  H --> S["State view<br/>what is in force NOW<br/>per task class · with age"]
+```
+
+| View | Answers | Fields |
+|---|---|---|
+| **Changelog** | *what has this thing done to itself lately?* | `ts · target · change · why · occurrences · evidence · applied\|shadow\|reverted · revert_id` |
+| **State** | *what is in force right now, and how stale is it?* | per task class: active defaults · fitted-under version · age · runs since fitted · rework rate |
+
+**The state view is the one that gets skipped and matters more.** A changelog alone tells you
+what moved; it does not tell you what the system currently believes, which is what you need
+before trusting a run or debugging a bad one.
+
+Published as an artifact from `history.jsonl`, regenerated on each loop run, registered in
+`docs/ARTIFACTS.md` per the standing rule.
 
 ---
 
@@ -208,9 +243,10 @@ Each step is independently useful, and each has a criterion that kills it.
 |---|---|---|
 | **1** | Ledger accumulates — 2 weeks, no code | If cost and context stay null, everything downstream is unfalsifiable. Re-open §7 |
 | **2** | Join task class → outcome. One script over themes + reports + ledger | If classes do not recur ≥2× in a fortnight, per-use-case learning has no sample. Stop at reporting |
-| **3** | Node record: envelope digest, parent SHA, gate verdict, drift rows | If `Workflow`'s journal plus git can already answer "what did it know", drop the envelope digest |
-| **4** | Gate ladder as executable predicates, one repo first | If gates never fail, they are not gates. Validate with a deliberately broken node |
-| **5** | Run `/self-improve` against real data; measure proposal acceptance | If humans reject most proposals, the threshold or the evidence is wrong — fix that before automating anything |
+| **3** | `history.jsonl` + the two views (§5), **shadow mode only** — record what would change | If the shadow entries read as noise, the evidence threshold is wrong. Fix before applying anything |
+| **4** | Flip low-blast targets to auto-apply; cron the loop | If rework rate rises after a change and auto-revert does not catch it, the scoring is wrong |
+| **5** | Node record: envelope digest, parent SHA, gate verdict, drift rows | If `Workflow`'s journal plus git already answer "what did it know", drop the envelope digest |
+| **6** | Gate ladder as executable predicates, one repo first | If gates never fail, they are not gates. Validate with a deliberately broken node |
 
 **Steps 1 and 2 are the whole bet.** If task classes do not recur, the per-use-case premise
 is refuted cheaply and steps 3–5 are never built.
