@@ -105,12 +105,40 @@ scrolls to the full entry · the list is filterable, with expand-all and collaps
 **Write "bearing here" for every term or drop the term.** A definition anyone could copy from
 Wikipedia adds length without adding orientation.
 
+## Make the controls visibly consequential — the failure mode to avoid
+
+**A depth control that changes 15% of the page teaches the reader that the control does nothing**,
+and they stop using it. This is the most likely way to get this architecture wrong, and it happened
+on the first build: the dial was wired only to the disclosure blocks, while every dense
+element — mechanism paragraphs, table columns, recommendation bodies — was hardcoded visible.
+
+Three requirements that make the difference legible:
+
+| Requirement | Why |
+|---|---|
+| **Tag most of the content, not just the obvious blocks** | Every paragraph that justifies rather than states belongs at L2 or L3. Section intros, table columns, mechanism lines, value statements, falsifiers. If the L1 view is not dramatically shorter, the tagging is incomplete |
+| **Ship an explicit "how to read this" section** | A matrix per control: the setting, the question it answers, **what appears**, and **what is hidden**. Highlight the active row live so the control's current effect is visible without experimentation |
+| **Show one finding at all three depths simultaneously** | Side by side, with word counts. This answers "what is the difference" without asking the reader to toggle and remember. It is also where you prove the split is real rather than cosmetic |
+
+**Add a live density meter** — visible sections, word count, read time. Measure it from `innerText`
+rather than counting tagged elements, because `innerText` respects CSS visibility and therefore
+reports what is genuinely on the page. It makes the control's effect immediate and it catches
+incomplete tagging during development: if L1 and L3 report similar word counts, you are not done.
+
+**Rough target:** L1 should be an order of magnitude shorter than L3. If it is within 2×, the
+levels are not carrying different kinds of content.
+
 ## Implementation notes
 
 - **Use `<details>`/`<summary>`** for disclosure. Native, keyboard-accessible, no state to manage —
   a platform feature beats a JS accordion.
 - **A depth dial** opens and closes all blocks of a level at once, so the reader sets depth globally
-  rather than clicking through a page.
+  rather than clicking through a page. Drive it with **one attribute on `<body>` and CSS rules**
+  (`body[data-depth="1"] .d2 {display:none}`) rather than per-element JS — one source of truth, and
+  tagging a new element is a class rather than a code change.
+- **Mode reorders via flexbox `order`**, so sections move without DOM manipulation and in-page
+  anchors keep working. Reorder and re-scope; never rewrite. Both views drawing on the same markup
+  is what stops them drifting.
 - **Mode is a body attribute** plus `data-only` on sections. Both modes stay in the DOM so nothing
   drifts and in-page links keep working.
 - **Frozen lane headers.** In a horizontally-scrolling graph, put lane labels in a **separate
