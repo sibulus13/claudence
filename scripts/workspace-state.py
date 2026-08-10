@@ -13,10 +13,19 @@ root. Legacy names are accepted so this works in repos that predate it:
   JOURNAL.md   dated why-the-direction-changed         (CHANGELOG.md is NOT this)
   DECISIONS.md ADR-lite journal                        (ADR.md)
 
-Beyond listing them, it inlines the `## Now` section of TODO.md — the immediate
-work is the one thing worth injecting rather than pointing at, because an agent
-that has to open a file to learn there is nothing urgent has already paid the
-cost of opening it.
+Beyond listing them, it inlines the parts a fresh session would otherwise have
+to reconstruct by hand:
+
+  TODO.md `## Now`     what is in flight or blocked on a person
+  TODO.md `## Next`    the immediate next steps, agreed and unblocked
+  JOURNAL.md head      the newest dated entry's headings — latest decisions
+  git log              the last commits — latest implementations
+
+The last two exist because neither file answers "what happened last session" on
+its own: the journal records *why the direction changed*, git records *what
+changed*, and joining them is exactly the derivation this contract exists to
+spare a fresh session. The commit log is also the only record that is a
+byproduct of the work rather than a chore alongside it, so it cannot go stale.
 
 Silent when a workspace has none of these: no nagging, and no noise in repos
 this convention does not apply to. Standard library only, so it runs identically
@@ -25,6 +34,7 @@ under the Homebrew and Xcode python3 builds.
 
 import json
 import os
+import subprocess
 import sys
 
 # canonical name -> (what it is, accepted aliases)
@@ -38,6 +48,10 @@ CONTRACT = (
 SEARCH_DIRS = ('docs', '.')
 NOW_HEADINGS = ('## now', '## 1 · now', '## in flight')
 MAX_NOW_LINES = 14
+NEXT_HEADINGS = ('## next', '## next up', '## 2 · next')
+MAX_NEXT_LINES = 8
+MAX_COMMITS = 6
+MAX_JOURNAL_LINES = 6
 
 
 def repo_root(start):
@@ -69,15 +83,20 @@ def read_text(path):
         return None
 
 
-def now_block(path):
-    """The `## Now` section, trimmed. Returns [] when absent or empty."""
+def section(path, headings, limit):
+    """One `## `-delimited section of a markdown file, trimmed.
+
+    Returns [] when the file or the heading is absent, so a caller can treat
+    "no such section" and "section is empty" the same way — both mean there is
+    nothing worth injecting.
+    """
     raw = read_text(path)
     if not raw:
         return []
     lines = raw.splitlines()
     start = None
     for i, ln in enumerate(lines):
-        if ln.strip().lower() in NOW_HEADINGS:
+        if ln.strip().lower() in headings:
             start = i + 1
             break
     if start is None:
@@ -88,10 +107,47 @@ def now_block(path):
             break
         if ln.strip():
             out.append(ln.rstrip())
-        if len(out) >= MAX_NOW_LINES:
+        if len(out) >= limit:
             out.append('    … truncated, read the file for the rest')
             break
     return out
+
+
+def journal_head(path):
+    """The newest dated entry's date plus its `### ` subheadings.
+
+    The journal is newest-first by convention, so the first `## ` heading past
+    the front matter is the latest day. Only the subheadings are taken: they are
+    written as `### HH:MM · TYPE · summary`, which is already the one-line form
+    of what changed and why.
+    """
+    raw = read_text(path)
+    if not raw:
+        return []
+    out = []
+    for ln in raw.splitlines():
+        if ln.startswith('## ') and not out:
+            out.append(ln[3:].strip())
+        elif ln.startswith('## ') and out:
+            break
+        elif ln.startswith('### ') and out:
+            out.append('  ' + ln[4:].strip())
+            if len(out) > MAX_JOURNAL_LINES:
+                break
+    return out if len(out) > 1 else []
+
+
+def recent_commits(root, limit):
+    """The last commits, one line each. [] outside a repo or on any git failure."""
+    try:
+        done = subprocess.run(
+            ['git', '-C', root, 'log', '--format=%h %ad %s', '--date=short', '-n', str(limit)],
+            capture_output=True, text=True, timeout=5)
+    except Exception:
+        return []
+    if done.returncode != 0:
+        return []
+    return ['  ' + ln for ln in done.stdout.splitlines() if ln.strip()]
 
 
 def improve_state():
@@ -161,7 +217,8 @@ def main():
 
     todo = next((rel for rel, _ in found if os.path.basename(rel).lower() in ('todo.md', 'roadmap.md', 'backlog.md')), None)
     if todo:
-        block = now_block(os.path.join(root, todo))
+        p = os.path.join(root, todo)
+        block = section(p, NOW_HEADINGS, MAX_NOW_LINES)
         if block:
             parts.append('')
             parts.append('Open now, from %s:' % todo)
@@ -169,6 +226,25 @@ def main():
         else:
             parts.append('')
             parts.append('%s has no populated "## Now" section — nothing is flagged as in flight.' % todo)
+        nxt = section(p, NEXT_HEADINGS, MAX_NEXT_LINES)
+        if nxt:
+            parts.append('')
+            parts.append('Next, agreed and unblocked, from %s:' % todo)
+            parts.extend(nxt)
+
+    journal = next((rel for rel, _ in found if os.path.basename(rel).lower() == 'journal.md'), None)
+    if journal:
+        head = journal_head(os.path.join(root, journal))
+        if head:
+            parts.append('')
+            parts.append('Latest decisions and changes of direction, from %s — %s:' % (journal, head[0]))
+            parts.extend(head[1:])
+
+    commits = recent_commits(root, MAX_COMMITS)
+    if commits:
+        parts.append('')
+        parts.append('Latest implementations, from git log:')
+        parts.extend(commits)
 
     parts.append('')
     parts.append('State these to the user in your first reply, then work from them rather than '

@@ -431,6 +431,40 @@ try:
 finally:
     box.close()
 
+# ── workspace-state: the four injected blocks, and silence without a contract ──
+box = Sandbox()
+try:
+    project = os.path.join(box.home, 'ws')
+    docs = os.path.join(project, 'docs')
+    os.makedirs(docs, exist_ok=True)
+
+    _code, out = box.run('scripts/workspace-state.py', {'cwd': project})
+    check('workspace-state: silent with no contract files', out, '')
+
+    with open(os.path.join(docs, 'TODO.md'), 'w', encoding='utf-8') as fh:
+        fh.write('# TODO\n\n## Now\n\n- blocked on a person\n\n## Next\n\n- the agreed step\n\n'
+                 '## Backlog\n\n- deliberately deferred\n')
+    with open(os.path.join(docs, 'JOURNAL.md'), 'w', encoding='utf-8') as fh:
+        fh.write('# Journal\n\n## 2026-08-10\n\n### 12:00 · `PIVOT` · the newest entry\n\n'
+                 '## 2026-08-09\n\n### 09:00 · `OLD` · the previous day\n')
+
+    subprocess.run(['git', 'init', '-q', project], check=True, timeout=30)
+    subprocess.run(['git', '-C', project, 'add', '.'], check=True, timeout=30)
+    subprocess.run(['git', '-C', project, '-c', 'user.email=t@t', '-c', 'user.name=t',
+                    'commit', '-qm', 'docs: the committed change'], check=True, timeout=30)
+
+    _code, out = box.run('scripts/workspace-state.py', {'cwd': project})
+    ctx = json.loads(out)['hookSpecificOutput']['additionalContext']
+    check_true('workspace-state: injects Now', 'blocked on a person' in ctx, ctx)
+    check_true('workspace-state: injects Next', 'the agreed step' in ctx, ctx)
+    check_true('workspace-state: omits Backlog', 'deliberately deferred' not in ctx, ctx)
+    check_true('workspace-state: injects the newest journal entry only',
+               'the newest entry' in ctx and 'the previous day' not in ctx, ctx)
+    check_true('workspace-state: injects the commit log',
+               'docs: the committed change' in ctx, ctx)
+finally:
+    box.close()
+
 # ── loop-health: the canary must fire on nulls, and stay quiet before baseline ─
 # The whole point of this check is that it caught a null ledger. A version that
 # cannot fail is decoration, so assert it fails on the bad input.
