@@ -18,9 +18,10 @@ Three modes, cheapest first, mirroring telemetry/loop-health.py:
   --sanity   is it wired up? File-level checks, no side effects, <1s.
   --smoke    does it work end to end? Drives the real hook + launcher in a
              throwaway repo and asserts a fresh session could catch up.
-  --drift    has the code moved without the doc? The behaviour-2 check.
+  --drift    has the project moved on without the doc? The behaviour-2 check.
+  --ids      does every identifier a doc cites actually have a register?
 
-  ./state-health.py                 all three, for the repo containing cwd
+  ./state-health.py                 all four, for the repo containing cwd
   ./state-health.py --all           every git repo two levels under ~/repo
   ./state-health.py --sanity        exit 0 = healthy, 1 = a check failed
 
@@ -305,56 +306,130 @@ def smoke():
 # ── drift ────────────────────────────────────────────────────────────────────
 
 def drift(roots):
-    """Has the code moved without the doc?
+    """Has the project moved on without the state doc?
 
-    The mechanical signal is commits landing after `last-verified` that touch
-    something other than the docs themselves. Calendar staleness ("90 days old")
-    answers a different and weaker question: a doc verified yesterday can already
-    be fiction if eight commits landed this morning, and a doc untouched for a
-    year is fine if the code was too.
+    Anchored on the commit that last touched the state doc, not on its
+    `last-verified` date. Two reasons, both learned by running the date version
+    against a docs-only project and watching it pass vacuously:
 
-    Doc-only commits are excluded deliberately — editing STATE.md is not evidence
-    that STATE.md is wrong.
+      A date is too coarse. `last-verified: today` versus `commit_date > today`
+      is never true, so every commit made on the day of verification is
+      invisible — precisely the day it matters.
+
+      "Non-code commits don't count" assumes the deliverable is code. For a
+      research or specification project every commit is markdown, so the filter
+      excluded everything and printed "matches the code", which reads as
+      verified when it means unmeasurable. Worse than no check.
+
+    So: anchor = the state doc's own last commit. Drift = commits after it that
+    touch anything except the churn files, which move constantly by design and
+    do not invalidate a summary — the state doc itself, TODO and JOURNAL. Code,
+    specs, research notes and schemas all count, whatever the project is made of.
     """
     for root in roots:
         label = os.path.basename(root)
         state = find(root, STATE_NAMES)
         if not state:
             continue
+
+        anchor = git(root, 'log', '-1', '--format=%H', '--', state).strip()
+        if not anchor:
+            warn('%s: %s is not committed' % (label, state), 'drift cannot be anchored')
+            continue
+
+        churn = {state}
+        for names in (TODO_NAMES, ('JOURNAL.md', 'journal.md')):
+            rel = find(root, names)
+            if rel:
+                churn.add(rel)
+
+        moved = []
+        for sha in git(root, 'log', '%s..HEAD' % anchor, '--format=%H').split():
+            files = git(root, 'show', '--name-only', '--format=', sha).split()
+            if any(f not in churn for f in files):
+                subject = git(root, 'log', '-1', '--format=%s', sha).strip()
+                moved.append(subject)
+
+        anchored = git(root, 'log', '-1', '--format=%ad', '--date=short', anchor).strip()
+        if not moved:
+            ok('%s: %s is current' % (label, state), 'last updated ' + anchored)
+        elif len(moved) <= DRIFT_COMMITS:
+            ok('%s: %s lags by %d commit(s)' % (label, state, len(moved)),
+               'newest: ' + moved[0][:60])
+        else:
+            warn('%s: %s is DRIFTING' % (label, state),
+                 '%d substantive commits since it was last updated (%s) — newest: %s'
+                 % (len(moved), anchored, moved[0][:60]))
+
+        # `last-verified` is the human assertion, so it is cross-checked rather
+        # than trusted: older than the doc's own last commit means someone edited
+        # the page without re-asserting that they had checked it.
         fm = front_matter(read(os.path.join(root, state)))
         lv = fm.get('last-verified', '')
         if not re.match(r'^\d{4}-\d{2}-\d{2}$', lv):
-            warn('%s: no usable last-verified' % label, repr(lv) + ' — drift cannot be measured')
+            warn('%s: no usable last-verified' % label, repr(lv))
             continue
-
-        # Commits strictly after the verification date, excluding doc-only ones.
-        raw = git(root, 'log', '--since=%s' % lv, '--format=%H %ad %s', '--date=short')
-        moved = []
-        for line in raw.splitlines():
-            parts = line.split(' ', 2)
-            if len(parts) < 3 or parts[1] <= lv:
-                continue
-            files = git(root, 'show', '--name-only', '--format=', parts[0]).split()
-            if any(not f.startswith('docs/') and not f.endswith('.md') for f in files):
-                moved.append((parts[1], parts[2]))
-
-        if not moved:
-            ok('%s: %s matches the code' % (label, state), 'verified ' + lv)
-        elif len(moved) <= DRIFT_COMMITS:
-            ok('%s: %s lags by %d commit(s)' % (label, state, len(moved)),
-               'newest: ' + moved[0][1][:60])
-        else:
-            warn('%s: %s is DRIFTING' % (label, state),
-                 '%d non-doc commits since %s — newest: %s'
-                 % (len(moved), lv, moved[0][1][:60]))
-
-        # An overdue re-verification is a weaker signal, but free to compute.
+        if anchored and lv < anchored:
+            warn('%s: %s edited without re-verifying' % (label, state),
+                 'last-verified %s but last edited %s' % (lv, anchored))
         try:
             age = (date.today() - datetime.strptime(lv, '%Y-%m-%d').date()).days
             if age > 90:
                 warn('%s: %s unverified for %d days' % (label, state, age))
         except Exception:
             pass
+
+
+def identifiers(roots):
+    """Every identifier family cited must have a register that defines it.
+
+    The failure this exists for: `ariadne` cited `OQ-1` in STATE.md and in the
+    `## Now` block injected into every session, while its question register used
+    A-/B-/C- tiers and no `OQ-` scheme existed anywhere. A dangling id is the
+    docs-only equivalent of a dangling file link, and it is invisible to a link
+    checker because there is no link.
+
+    An id counts as DEFINED where it opens a table cell or titles a heading —
+    that is what a register row looks like. Real registers in the wild wrap the
+    id in emphasis or a link, so all of these count and the pattern must allow
+    the leading markup:
+
+        | **A-1** | ...        | [DL-013](#dl-013) | ...
+        | PB-1 | ...           ### DL-013
+
+    Anywhere else it is a citation. A family with citations and no definition
+    anywhere is dangling. Distinguishing definition from citation is what makes
+    this usable: counting members instead flagged `PB-1`, a legitimately
+    single-member family with a proper register row, and a stricter pattern
+    flagged six families that were correctly registered in bold.
+    """
+    defined_pat = re.compile(r'^(?:\|\s*|#{1,6}\s+)[*_`\[]*([A-Z]{1,3})-([0-9]{1,3})\b',
+                             re.MULTILINE)
+    cited_pat = re.compile(r'\b([A-Z]{1,3})-([0-9]{1,3})\b')
+
+    for root in roots:
+        label = os.path.basename(root)
+        docs_dir = os.path.join(root, 'docs')
+        if not os.path.isdir(docs_dir):
+            continue
+
+        defined, cited = set(), {}
+        for name in sorted(os.listdir(docs_dir)):
+            if not name.endswith('.md'):
+                continue
+            text = read(os.path.join(docs_dir, name))
+            for pre, _num in defined_pat.findall(text):
+                defined.add(pre)
+            for pre, _num in cited_pat.findall(text):
+                cited.setdefault(pre, set()).add(name)
+
+        dangling = sorted(p for p in cited if p not in defined)
+        for pre in dangling:
+            warn('%s: identifier family %s- is cited but defined nowhere here' % (label, pre),
+                 'in %s — a reader cannot resolve it' % ', '.join(sorted(cited[pre])))
+        if cited and not dangling:
+            ok('%s: %d identifier families all have registers' % (label, len(defined & set(cited))),
+               ' '.join(sorted(defined & set(cited))[:8]))
 
 
 # ── main ─────────────────────────────────────────────────────────────────────
@@ -377,13 +452,15 @@ def main():
             return 1
         roots = [root]
 
-    run_all = not (args & {'--sanity', '--smoke', '--drift'})
+    run_all = not (args & {'--sanity', '--smoke', '--drift', '--ids'})
     if run_all or '--sanity' in args:
         sanity(roots)
     if run_all or '--smoke' in args:
         smoke()
     if run_all or '--drift' in args:
         drift(roots)
+    if run_all or '--ids' in args:
+        identifiers(roots)
 
     for line in PASS:
         sys.stdout.write('  ok   %s\n' % line)

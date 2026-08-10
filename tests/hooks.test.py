@@ -606,18 +606,84 @@ try:
 
     out = drift_out()
     check_true('state-health: warns when code outran the doc', 'DRIFTING' in out, out)
-    check_true('state-health: names the commit count', '4 non-doc commits' in out, out)
+    check_true('state-health: names the commit count', '4 substantive commits' in out, out)
 
-    # Editing the doc must NOT clear drift — only re-verifying it does. Otherwise
-    # touching a file would launder the signal the check exists to raise.
-    commit('docs: tweak without re-verifying', '2026-08-09')
+    # Churn in TODO must NOT clear drift — TODO moves constantly by design, and a
+    # tweak there is not evidence the summary was reconciled.
+    with open(os.path.join(proj, 'docs', 'TODO.md'), 'a', encoding='utf-8') as fh:
+        fh.write('\n- a note\n')
+    commit('docs: todo churn', '2026-08-09')
     out = drift_out()
-    check_true('state-health: a doc edit does not launder drift', 'DRIFTING' in out, out)
+    check_true('state-health: TODO churn does not launder drift', 'DRIFTING' in out, out)
 
+    # Updating the state doc itself is what clears it, because that is the anchor.
     write_state('2026-08-09')
-    commit('docs: re-verified', '2026-08-09')
+    commit('docs: reconciled the state page', '2026-08-09')
     out = drift_out()
-    check_true('state-health: bumping last-verified clears it', 'DRIFTING' not in out, out)
+    check_true('state-health: updating the state doc clears it', 'DRIFTING' not in out, out)
+finally:
+    box.close()
+
+# A DOCS-ONLY project must still be able to drift. The first version of this check
+# counted "commits touching something other than markdown", which for a research
+# or specification repo excluded every commit — it printed "matches the code" and
+# could never fail. Found by running it against a real docs-only project.
+box = Sandbox()
+try:
+    proj = os.path.join(box.home, 'research')
+    os.makedirs(os.path.join(proj, 'docs'), exist_ok=True)
+
+    def spec_commit(msg):
+        subprocess.run(['git', '-C', proj, 'add', '.'], capture_output=True, timeout=30)
+        subprocess.run(['git', '-C', proj, '-c', 'user.email=t@t', '-c', 'user.name=t',
+                        'commit', '-qm', msg], capture_output=True, timeout=30)
+
+    with open(os.path.join(proj, 'docs', 'STATE.md'), 'w', encoding='utf-8') as fh:
+        fh.write('---\npurpose: p\nupdate-trigger: t\nlast-verified: 2026-08-10\nstatus: current\n'
+                 '---\n\n# S\n\n```mermaid\nflowchart TD\n  A --> B\n```\n')
+    with open(os.path.join(proj, 'docs', 'TODO.md'), 'w', encoding='utf-8') as fh:
+        fh.write('# TODO\n\n## Now\n\n## Next\n\n## Backlog\n')
+    subprocess.run(['git', '-C', proj, 'init', '-q', '.'], capture_output=True, timeout=30)
+    spec_commit('docs: baseline')
+
+    # Every commit is markdown, and every one is dated the same day as the
+    # verification — the two conditions that made the old check blind.
+    for name in ('SPEC.md', 'DESIGN.md', 'RESEARCH.md'):
+        with open(os.path.join(proj, 'docs', name), 'w', encoding='utf-8') as fh:
+            fh.write('# %s\n\nrewritten\n' % name)
+        spec_commit('docs: rewrote %s' % name)
+
+    proc = subprocess.run([PY, os.path.join(REPO, 'scripts', 'state-health.py'), '--drift'],
+                          cwd=proj, capture_output=True, text=True, timeout=60)
+    check_true('state-health: a docs-only project can drift', 'DRIFTING' in proc.stdout, proc.stdout)
+    check_true('state-health: same-day commits are not invisible',
+               '3 substantive commits' in proc.stdout, proc.stdout)
+finally:
+    box.close()
+
+# ── state-health --ids: a cited identifier with no register is dangling ─────────
+box = Sandbox()
+try:
+    proj = os.path.join(box.home, 'ids')
+    docs = os.path.join(proj, 'docs')
+    os.makedirs(docs, exist_ok=True)
+    with open(os.path.join(docs, 'STATE.md'), 'w', encoding='utf-8') as fh:
+        # A-1 is registered in bold below; OQ-1 is cited only, in prose.
+        fh.write('# S\n\nBlocked on the owner (OQ-1) and on A-1.\n')
+    with open(os.path.join(docs, 'QUESTIONS.md'), 'w', encoding='utf-8') as fh:
+        fh.write('# Q\n\n| id | q |\n|---|---|\n| **A-1** | who owns it |\n| **A-2** | when |\n')
+    # Every mode resolves its target through the repo root, so the fixture is one.
+    subprocess.run(['git', '-C', proj, 'init', '-q', '.'], capture_output=True, timeout=30)
+
+    proc = subprocess.run([PY, os.path.join(REPO, 'scripts', 'state-health.py'), '--ids'],
+                          cwd=proj, capture_output=True, text=True, timeout=60)
+    out = proc.stdout
+    check_true('state-health: flags an identifier family with no register',
+               'OQ- is cited but defined nowhere' in out, out)
+    # The regression that made this usable: a register row wraps its id in bold,
+    # and a pattern that only accepted a bare id flagged six correct families.
+    check_true('state-health: a bold table-cell id counts as defined',
+               'A- is cited' not in out, out)
 finally:
     box.close()
 
