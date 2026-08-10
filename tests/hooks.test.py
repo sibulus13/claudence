@@ -139,6 +139,27 @@ try:
 finally:
     box.close()
 
+# A new subject phrased as a followup must still split the theme. These two prompts
+# shared only "taking" and "look" — conversational scaffolding — which scored exactly
+# at THEME_SHIFT_JACCARD and fused two unrelated topics into one row reading "×2".
+box = Sandbox()
+try:
+    box.run('telemetry/log-prompt.py',
+            {'session_id': SID, 'cwd': '/Users/x/repo/app',
+             'prompt': 'Taking a look at our open policy, the imported version does not '
+                       'open in a new tab but a new terminal'})
+    box.run('telemetry/analyze-session.py', {'session_id': SID})   # a turn completed
+    box.run('telemetry/log-prompt.py',
+            {'session_id': SID, 'cwd': '/Users/x/repo/app',
+             'prompt': 'Also taking a look at the status bar summary section, it is not '
+                       'reflective of what we have been working on'})
+    state = box.json_at('telemetry', 'state-%s.json' % SID)
+    check('log-prompt: scaffolding is not subject — a new topic splits', len(state['themes']), 2)
+    check('log-prompt: label carries the subject, not the scaffolding',
+          state['themes'][0]['label'], 'status bar summary section reflective working')
+finally:
+    box.close()
+
 # ── log-permission: first vs repeat, and the state file the status bar reads ──
 box = Sandbox()
 try:
@@ -541,6 +562,62 @@ try:
     for src, found in sources.items():
         check_true('state-doc aliases agree: %s' % src, found == expected,
                    'missing %s' % sorted(expected - found))
+finally:
+    box.close()
+
+# ── state-health: the drift check must actually fire, and be clearable ─────────
+# Same lesson as loop-health below: a check that cannot fail is decoration, so
+# assert it warns on real drift AND goes quiet the one way it should.
+box = Sandbox()
+try:
+    proj = os.path.join(box.home, 'drifting')
+    os.makedirs(os.path.join(proj, 'docs'), exist_ok=True)
+    os.makedirs(os.path.join(proj, 'src'), exist_ok=True)
+
+    def write_state(last_verified):
+        with open(os.path.join(proj, 'docs', 'STATE.md'), 'w', encoding='utf-8') as fh:
+            fh.write('---\npurpose: p\nupdate-trigger: t\nlast-verified: %s\nstatus: current\n'
+                     '---\n\n# S\n\n```mermaid\nflowchart TD\n  A --> B\n```\n' % last_verified)
+
+    def commit(msg, day):
+        subprocess.run(['git', '-C', proj, 'add', '.'], capture_output=True, timeout=30)
+        subprocess.run(['git', '-C', proj, '-c', 'user.email=t@t', '-c', 'user.name=t',
+                        'commit', '-qm', msg, '--date=%s' % day], capture_output=True, timeout=30)
+
+    def drift_out():
+        proc = subprocess.run([PY, os.path.join(REPO, 'scripts', 'state-health.py'), '--drift'],
+                              cwd=proj, capture_output=True, text=True, timeout=60)
+        return proc.stdout
+
+    write_state('2026-08-01')
+    with open(os.path.join(proj, 'docs', 'TODO.md'), 'w', encoding='utf-8') as fh:
+        fh.write('# TODO\n\n## Now\n\n## Next\n\n## Backlog\n')
+    subprocess.run(['git', '-C', proj, 'init', '-q', '.'], capture_output=True, timeout=30)
+    commit('docs: baseline', '2026-08-01')
+
+    out = drift_out()
+    check_true('state-health: quiet when no code landed after last-verified',
+               'DRIFTING' not in out, out)
+
+    for i in range(1, 5):
+        with open(os.path.join(proj, 'src', 'f%d.py' % i), 'w') as fh:
+            fh.write('v%d\n' % i)
+        commit('feat: shipped thing %d' % i, '2026-08-0%d' % (4 + i))
+
+    out = drift_out()
+    check_true('state-health: warns when code outran the doc', 'DRIFTING' in out, out)
+    check_true('state-health: names the commit count', '4 non-doc commits' in out, out)
+
+    # Editing the doc must NOT clear drift — only re-verifying it does. Otherwise
+    # touching a file would launder the signal the check exists to raise.
+    commit('docs: tweak without re-verifying', '2026-08-09')
+    out = drift_out()
+    check_true('state-health: a doc edit does not launder drift', 'DRIFTING' in out, out)
+
+    write_state('2026-08-09')
+    commit('docs: re-verified', '2026-08-09')
+    out = drift_out()
+    check_true('state-health: bumping last-verified clears it', 'DRIFTING' not in out, out)
 finally:
     box.close()
 

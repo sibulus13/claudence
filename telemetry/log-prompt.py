@@ -54,6 +54,8 @@ while who why will with within would yes yet you your yours
 also actually anything else given premise regard regarding rather really something
 come each more right because seem seems back here there thing things way ways
 ensure likewise moving forward currently current default one two both either
+look looks looking taking took keep keeps seeing bit lets
+whats theres heres weve youve wasnt arent couldnt wouldnt didnt havent hasnt wont
 """.split())
 
 # Leading verb → a coarse category, so the row says what kind of work it is before
