@@ -17,7 +17,7 @@ and here is the structural reason"* before committing a design to it. A feature 
 a technology claims; a lineage tells you which of those claims were contested, which alternatives
 were tried and abandoned, and which failure modes are inherent rather than incidental.
 
-**The load-bearing output is section 5, the capability envelope.** Everything before it exists to
+**The load-bearing output is the capability envelope (spine section 5).** Everything before it exists to
 make that section trustworthy.
 
 ## When this is the right shape
@@ -32,15 +32,21 @@ Use it when:
 **Don't** use it for: how-to instructions (that is documentation), API reference, or a build-vs-buy
 comparison of named products at the same layer (that is a vendor evaluation — a different shape).
 
+Assets in this skill directory:
+
+| File | What it is |
+|---|---|
+| `references/layered-disclosure.md` | The information architecture for a dossier that outgrew one linear read — two reading modes, three disclosure depths, decision provenance, and the reference-list contract. Read it before designing the page. |
+
 ## The workflow
 
 ```mermaid
 flowchart TD
   A["1 · Scope<br/>subject · why now · the decision it serves"]
   B["2 · Verify<br/>search, don't recall<br/>anchor dates and negative results"]
-  C["3 · Draft the six sections"]
+  C["3 · Draft the seven sections"]
   D["4 · Map onto the caller's data<br/>the section only you can write"]
-  E["5 · Two outputs<br/>detailed doc + at-a-glance artifact"]
+  E["5 · Layer and publish<br/>modes · depths · two outputs"]
 
   A --> B --> C --> D --> E
 ```
@@ -76,7 +82,7 @@ benchmark that showed the new approach generalises worse, the ablation that remo
 without hurting anything. Those papers are the ones that shaped practice, and they rarely appear in
 overviews.
 
-### 3 · The six sections
+### 3 · The seven sections
 
 Every dossier has the same spine. Skip a section only if the subject genuinely has nothing there,
 and say so rather than padding it.
@@ -108,7 +114,35 @@ Conflating them produces either false pessimism (dismissing something for a fixa
 false optimism (planning around a limit that is permanent). **When you name a weakness, say which
 kind it is.**
 
-### 5 · Two outputs, deliberately different
+### 5 · Layer the output, don't flatten it
+
+Once a dossier's content outgrows a single linear read — roughly past 1,500 words — it needs an
+information architecture, not just good prose. **Read
+[`references/layered-disclosure.md`](references/layered-disclosure.md) before designing the page.**
+
+The short version, because it changes how you write every section:
+
+| Axis | Values | Why it is separate |
+|---|---|---|
+| **Mode** | **Decide** (claims, verdicts, recommendations, provenance) · **Learn** (a prerequisite-ordered lesson path) | Different readers, same facts, different order |
+| **Depth** | **L1** the claim · **L2** the mechanism · **L3** the evidence and counter-argument | Independent of mode — someone can want decide-at-L3 or learn-at-L1 |
+
+**The defect this fixes: most technical writing fuses L1 and L3** — a claim wrapped in its own
+justification — which is exactly why it reads as dense. The claim and the defence of the claim are
+different documents. If your three layers read as one idea getting longer, the split is cosmetic.
+
+Two artifacts the decide mode owes the reader, both specified in the reference:
+
+- **A decision-provenance table** — per recommendation: the evidence, its *kind* (`measured` /
+  `published` / `stated` / `inference`), the confidence and *why it is not higher*, and the concrete
+  falsifier. **A recommendation with no falsifier is an opinion.**
+- **A reference list** built from one data source and rendered twice — inline markers with
+  hover-and-focus tooltips, and an expandable section. Each entry says what it does, why it is
+  useful, **how it bears on this subject specifically**, and where to read more. Write that third
+  field for every term or drop the term; a definition anyone could copy from Wikipedia adds length
+  without adding orientation.
+
+### 6 · Two outputs, deliberately different
 
 | Output | Where | Contains |
 |---|---|---|
