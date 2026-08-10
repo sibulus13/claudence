@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  com.claudence.self-improve — the durable schedule for the judgement half of
+  the loop. launchd rather than cron because a laptop sleeps through cron
+  windows and launchd runs the job it missed.
+
+  Install:
+    sed "s|__HOME__|$HOME|g" scripts/com.claudence.self-improve.plist.template \
+      > ~/Library/LaunchAgents/com.claudence.self-improve.plist
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.claudence.self-improve.plist
+    launchctl list | grep claudence
+
+  Uninstall:
+    launchctl bootout gui/$(id -u)/com.claudence.self-improve
+
+  CADENCE — 09:12 and 16:12, twice a day, and the reason is not cost.
+
+  The script itself is gated on evidence: it exits without spending anything
+  unless new session reports have accumulated since the last run. So checking
+  twice a day gives a fast response to new material without re-processing the
+  same telemetry — running the judgement half four times over identical rows
+  does not reduce staleness, it just raises the chance of acting on noise.
+
+  The measurement half already runs far more often than this: improve/audit.py
+  fires on the Stop hook of every session, so context density and duplication
+  are never more than one session stale. Frequency belongs on the half that
+  consumes fresh input, not the half that consumes accumulated evidence.
+
+  Off-minute on purpose: :12 rather than :00, so this does not land with every
+  other scheduled job on the machine.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.claudence.self-improve</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>__HOME__/repo/claudence/improve/scheduled-run.sh</string>
+  </array>
+
+  <key>StartCalendarInterval</key>
+  <array>
+    <dict><key>Hour</key><integer>9</integer><key>Minute</key><integer>12</integer></dict>
+    <dict><key>Hour</key><integer>16</integer><key>Minute</key><integer>12</integer></dict>
+  </array>
+
+  <!-- launchd does not source a profile; the script uses absolute paths, and
+       this PATH covers the few things it shells out to. -->
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>HOME</key>
+    <string>__HOME__</string>
+  </dict>
+
+  <key>StandardOutPath</key>
+  <string>__HOME__/repo/claudence/improve/scheduled-run.log</string>
+  <key>StandardErrorPath</key>
+  <string>__HOME__/repo/claudence/improve/scheduled-run.log</string>
+
+  <key>RunAtLoad</key>
+  <false/>
+  <key>ProcessType</key>
+  <string>Background</string>
+</dict>
+</plist>

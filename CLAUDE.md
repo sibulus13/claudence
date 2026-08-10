@@ -243,17 +243,33 @@ Choose the mode based on how stable and correctness-critical the target is:
 
 ## Session Start Protocol — the workspace state contract
 
-**Four files per workspace, in `docs/`, and a SessionStart hook points at them automatically**
+**Five files per workspace, in `docs/`, and a SessionStart hook points at them automatically**
 (`scripts/workspace-state.py`, which also inlines `TODO.md`'s `## Now` section into a fresh
 agent's context). The contract exists because six overlapping records had accumulated with no
 entry point, so a new session re-derived what was already written down.
 
 | File | Its single concern | Update trigger |
 |---|---|---|
+| **`OVERVIEW.md`** | What it is, who it serves, the user and data workflows as diagrams, and **the baseline or placebo it must beat, with the metric that decides** | The premise changes — a use case added or dropped, or the baseline revised |
 | **`STATE.md`** | Where the project is — one page, every section a glance, detail behind backlinks | A phase changes, a spike returns a verdict, a dependency clears |
 | **`TODO.md`** | **Now** (in flight or blocked-on-a-person) · **Next** (agreed, unblocked) · **Backlog** (deferred, with the reason) | Work starts, finishes, or is deferred; a session ends |
 | **`JOURNAL.md`** | Why the direction changed — newest first, including `TRIBAL` entries for load-bearing things written down nowhere else | Any material change of direction, or tribal context surfacing |
 | **`DECISIONS.md`** | ADR-lite: decision, status, rationale, revisit-when | A choice is made or an assumption taken |
+
+**`OVERVIEW.md` and `STATE.md` stay separate, deliberately.** They answer different questions for
+different readers on different clocks: the premise changes rarely, the status changes weekly, and
+merging them means the status churn hides a change to the premise — while a reader orienting has to
+wade through blockers to find out what the thing is *for*. `OVERVIEW.md` is also the shareable one.
+
+**`OVERVIEW.md` owes a baseline.** "Better than nothing" is not a claim. Name the honest
+comparisons — the status quo done by hand, an **ungrounded model given the same input** (the
+placebo, which will read *better* while being unfalsifiable), and the trivial version of the
+approach — then state the metric on which the real thing must win. **A project with no stated
+baseline cannot be evaluated, only admired.**
+
+`STATE.md` owes a **time horizon as a chart** — a Mermaid `gantt` or dependency graph against real
+review dates, not estimates — plus a dated high-level progress table. The chart's job is to show
+which bars are blocked on a person and which can proceed today.
 
 **Read them before acting, then work from them rather than re-deriving.** Spot-check against git
 log and file existence for staleness. If a repo has none, surface that — it is itself a finding.

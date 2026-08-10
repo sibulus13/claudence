@@ -2,5 +2,8 @@
   "frequencyDays": 7,
   "thresholdOccurrences": 2,
   "maxSessionsToAnalyze": 10,
-  "autoApply": false
+  "autoApply": false,
+  "minNewSessionsSinceLastRun": 3,
+  "scheduleChecksPerDay": 2,
+  "_note": "frequencyDays is the floor; minNewSessionsSinceLastRun is the real gate. The measurement half (audit.py) runs every session and is always fresh; the judgement half needs accumulated evidence, not a faster clock."
 }

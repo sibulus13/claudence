@@ -83,3 +83,12 @@ __pycache__/
 improve/last-health-check.json
 improve/ledger-baseline.json
 telemetry/health.log
+
+# improve/ runtime state — machine-specific, and reminders.json carries account
+# names the public-repo guard correctly rejects. The scripts and config are
+# source; everything they produce is not.
+improve/reminders.json
+improve/state.json
+improve/history.jsonl
+improve/LEDGER.md
+improve/scheduled-run.log

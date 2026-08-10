@@ -4,9 +4,10 @@
 Points a fresh agent at the workspace's state contract, so it does not have to
 guess which of several overlapping records to read first.
 
-The contract is four files, by convention, looked for in `docs/` then the repo
+The contract is five files, by convention, looked for in `docs/` then the repo
 root. Legacy names are accepted so this works in repos that predate it:
 
+  OVERVIEW.md  what it is, who it serves, the baseline  (README.md)
   STATE.md     where the project is, one page          (context.md, workflow_state.md)
   TODO.md      Now / Next / Backlog                    (todo.md, ROADMAP.md, BACKLOG.md)
   JOURNAL.md   dated why-the-direction-changed         (CHANGELOG.md is NOT this)
@@ -28,6 +29,7 @@ import sys
 
 # canonical name -> (what it is, accepted aliases)
 CONTRACT = (
+    ('OVERVIEW.md', 'what it is, and the baseline it must beat', ('README.md',)),
     ('STATE.md', 'where the project is', ('context.md', 'workflow_state.md', 'KNOWLEDGE.md')),
     ('TODO.md', 'Now / Next / Backlog', ('todo.md', 'ROADMAP.md', 'BACKLOG.md')),
     ('JOURNAL.md', 'why the direction changed', ('journal.md',)),
