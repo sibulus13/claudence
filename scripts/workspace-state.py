@@ -34,6 +34,7 @@ under the Homebrew and Xcode python3 builds.
 
 import json
 import os
+import re
 import subprocess
 import sys
 
@@ -52,6 +53,9 @@ NEXT_HEADINGS = ('## next', '## next up', '## 2 · next')
 MAX_NEXT_LINES = 8
 MAX_COMMITS = 6
 MAX_JOURNAL_LINES = 6
+# Non-doc commits a state doc may lag by before it is called stale. Two is about
+# one session's work; warning on one would cry wolf and get tuned out.
+DRIFT_COMMITS = 2
 
 
 def repo_root(start):
@@ -150,6 +154,54 @@ def recent_commits(root, limit):
     return ['  ' + ln for ln in done.stdout.splitlines() if ln.strip()]
 
 
+def drift_note(root, state_rel):
+    """Has the code moved since the state doc was last verified?
+
+    Surfaced here rather than left to a driver nobody runs, for the same reason
+    the improve auditor is: the moment a session opens is the moment a stale doc
+    does its damage, because everything after that is reasoned from it.
+
+    Counts commits after `last-verified` that touch something other than markdown.
+    A doc-only commit is not evidence the doc is right, so it does not count — and
+    the only way to clear this is to re-verify and bump the date. Cheap by design:
+    two git calls plus one per candidate commit, all with timeouts, silent on any
+    failure. Full detail: scripts/state-health.py --drift.
+    """
+    raw = read_text(os.path.join(root, state_rel)) or ''
+    m = re.search(r'^last-verified:\s*(\d{4}-\d{2}-\d{2})\s*$', raw, re.MULTILINE)
+    if not m:
+        return []
+    since = m.group(1)
+
+    def git(*args):
+        try:
+            done = subprocess.run(['git', '-C', root] + list(args),
+                                  capture_output=True, text=True, timeout=5)
+        except Exception:
+            return ''
+        return done.stdout if done.returncode == 0 else ''
+
+    moved = []
+    for line in git('log', '--since=%s' % since, '--format=%H %ad %s',
+                    '--date=short').splitlines():
+        parts = line.split(' ', 2)
+        if len(parts) < 3 or parts[1] <= since:
+            continue
+        files = git('show', '--name-only', '--format=', parts[0]).split()
+        if any(not f.endswith('.md') for f in files):
+            moved.append(parts[2])
+        if len(moved) > DRIFT_COMMITS:
+            break
+
+    if len(moved) <= DRIFT_COMMITS:
+        return []
+    return ['%s may be STALE — %d+ non-doc commits since it was verified (%s).'
+            % (state_rel, len(moved), since),
+            '  newest: %s' % moved[0][:70],
+            '  Reconcile it against what actually shipped, then bump last-verified.',
+            '  Detail: scripts/state-health.py --drift']
+
+
 def improve_state():
     """What the Stop-hook auditor last measured about the governance files.
 
@@ -245,6 +297,18 @@ def main():
         parts.append('')
         parts.append('Latest implementations, from git log:')
         parts.extend(commits)
+
+    # Whether what you just read is still true. Deliberately last: it qualifies
+    # everything above it, and a caveat printed first is a caveat skipped.
+    state = next((rel for rel, _ in found
+                  if os.path.basename(rel).lower() in ('state.md', 'context.md',
+                                                       'workflow_state.md', 'knowledge.md')), None)
+    if state:
+        note = drift_note(root, state)
+        if note:
+            parts.append('')
+            parts.append('⚠ DRIFT — reconcile before trusting the above:')
+            parts.extend('  ' + ln for ln in note)
 
     parts.append('')
     parts.append('State these to the user in your first reply, then work from them rather than '
