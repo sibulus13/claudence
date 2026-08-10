@@ -42,10 +42,10 @@ end
 
 -- 1. live pane, non-active tab -> flagged + one chip, nothing removed
 do
-  local r = A.decide({ { path = 'p1', cwd = 'd:/repo/web/cashcow', repo = 'cashcow', pane = 32, ts = NOW } },
+  local r = A.decide({ { path = 'p1', cwd = 'd:/repo/web/myapp', repo = 'myapp', pane = 32, ts = NOW } },
     ctx({ pane_to_tab = { [32] = 5 } }))
-  check('live non-active -> flagged', r.flagged_tabs[5] == 'cashcow', 'flagged_tabs=' .. tostring(r.flagged_tabs[5]))
-  check('live non-active -> 1 chip', #r.chips == 1 and r.chips[1].label == 'cashcow' and r.chips[1].count == 1)
+  check('live non-active -> flagged', r.flagged_tabs[5] == 'myapp', 'flagged_tabs=' .. tostring(r.flagged_tabs[5]))
+  check('live non-active -> 1 chip', #r.chips == 1 and r.chips[1].label == 'myapp' and r.chips[1].count == 1)
   check('live non-active -> no removal', #r.remove == 0)
 end
 
@@ -68,16 +68,16 @@ end
 
 -- 4. active tab, dwell NOT yet met -> flagged (focus+dot), no chip, not removed
 do
-  local r = A.decide({ { path = 'p4', cwd = 'd:/repo/web/cashcow', repo = 'cashcow', pane = 32, ts = NOW } },
+  local r = A.decide({ { path = 'p4', cwd = 'd:/repo/web/myapp', repo = 'myapp', pane = 32, ts = NOW } },
     ctx({ pane_to_tab = { [32] = 1 }, active_tab_id = 1, active_since = NOW - 2 }))
-  check('active+short-dwell -> flagged', r.flagged_tabs[1] == 'cashcow')
+  check('active+short-dwell -> flagged', r.flagged_tabs[1] == 'myapp')
   check('active+short-dwell -> no chip', #r.chips == 0)
   check('active+short-dwell -> not removed', #r.remove == 0)
 end
 
 -- 5. active tab, dwell met -> removed (attended)
 do
-  local r = A.decide({ { path = 'p5', cwd = 'd:/repo/web/cashcow', repo = 'cashcow', pane = 32, ts = NOW } },
+  local r = A.decide({ { path = 'p5', cwd = 'd:/repo/web/myapp', repo = 'myapp', pane = 32, ts = NOW } },
     ctx({ pane_to_tab = { [32] = 1 }, active_tab_id = 1, active_since = NOW - 10 }))
   check('active+dwell -> removed', has(r.remove, 'p5'))
   check('active+dwell -> no flag', count(r.flagged_tabs) == 0)
@@ -102,12 +102,12 @@ end
 -- 8. same repo across two non-active tabs -> single chip, count 2
 do
   local r = A.decide({
-    { path = 'a', cwd = 'd:/repo/web/cashcow', repo = 'cashcow', pane = 10, ts = NOW },
-    { path = 'b', cwd = 'd:/repo/web/cashcow', repo = 'cashcow', pane = 11, ts = NOW },
+    { path = 'a', cwd = 'd:/repo/web/myapp', repo = 'myapp', pane = 10, ts = NOW },
+    { path = 'b', cwd = 'd:/repo/web/myapp', repo = 'myapp', pane = 11, ts = NOW },
   }, ctx({ pane_to_tab = { [10] = 7, [11] = 8 } }))
   check('dedup -> 1 chip', #r.chips == 1, '#chips=' .. #r.chips)
   check('dedup -> count 2', r.chips[1] and r.chips[1].count == 2)
-  check('dedup -> both tabs flagged', r.flagged_tabs[7] == 'cashcow' and r.flagged_tabs[8] == 'cashcow')
+  check('dedup -> both tabs flagged', r.flagged_tabs[7] == 'myapp' and r.flagged_tabs[8] == 'myapp')
 end
 
 -- 9. distinct repos -> ordered chips
@@ -233,13 +233,13 @@ end
 -- would catch a Windows-only assumption leaking into the shared module.
 do
   check('norm posix trailing slash + case',
-    A.norm_path('/Users/miki/repo/Web/App/') == '/users/miki/repo/web/app',
-    A.norm_path('/Users/miki/repo/Web/App/'))
-  check('norm posix root', A.norm_path('/Users/miki/repo') == '/users/miki/repo')
+    A.norm_path('/Users/x/repo/Web/App/') == '/users/x/repo/web/app',
+    A.norm_path('/Users/x/repo/Web/App/'))
+  check('norm posix root', A.norm_path('/Users/x/repo') == '/users/x/repo')
   check('norm posix already-normal is idempotent',
-    A.norm_path(A.norm_path('/Users/miki/repo/app')) == '/users/miki/repo/app')
+    A.norm_path(A.norm_path('/Users/x/repo/app')) == '/users/x/repo/app')
 
-  local ROOT = '/users/miki/repo'
+  local ROOT = '/users/x/repo'
   check('posix nexus label at the repo root',
     A.chip_label(ROOT, 'repo', ROOT) == 'Nexus')
   check('posix repo label below the root',
@@ -265,7 +265,7 @@ do
   check('posix active+dwell -> no flag', count(r2.flagged_tabs) == 0)
 
   check('posix legacy flag name still detected',
-    A.is_legacy_name('users-miki-repo-app__abc.json') == true)
+    A.is_legacy_name('users-x-repo-app__abc.json') == true)
 end
 
 -- 19. Claude-pane detection with macOS process paths. The regression the title
@@ -274,7 +274,7 @@ end
 -- read "no Claude" mid-tool and the tab would flicker to dimmed.
 do
   check('mac claude by proc',
-    A.is_claude_pane('/Users/miki/.local/bin/claude', '\u{2733} Claude Code') == true)
+    A.is_claude_pane('/Users/x/.local/bin/claude', '\u{2733} Claude Code') == true)
   check('mac claude by title (zsh tool)',
     A.is_claude_pane('/bin/zsh', '\u{2802} Porting the hooks') == true)
   check('mac claude by title (spinner frame)',

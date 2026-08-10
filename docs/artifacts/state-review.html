@@ -1,0 +1,529 @@
+<title>Claudence — state review</title>
+<style>
+  /* ── tokens: complete light palette on bare :root ──────────────────────── */
+  :root {
+    --ink:        #0f1419;
+    --ink-2:      #38434f;
+    --ink-3:      #6b7885;
+    --paper:      #f5f7f9;
+    --panel:      #ffffff;
+    --line:       #dbe2e8;
+    --line-2:     #eef2f5;
+    --accent:     #3d5a8a;
+    --accent-dim: #e7ecf4;
+    --ok:         #2f7d5d;
+    --warn:       #9a6b16;
+    --fail:       #a33a35;
+    --ok-bg:      #e8f2ed;
+    --warn-bg:    #f7efdd;
+    --fail-bg:    #f7e7e6;
+    --plate:      #ffffff;   /* diagrams always render on white, both themes */
+    --plate-line: #d5dde4;
+    --shadow:     0 1px 2px rgba(15,20,25,.06), 0 8px 24px -12px rgba(15,20,25,.12);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ink:        #e6ecf2;
+      --ink-2:      #a8b4c0;
+      --ink-3:      #74818e;
+      --paper:      #0f1419;
+      --panel:      #161d25;
+      --line:       #2a343e;
+      --line-2:     #1e262f;
+      --accent:     #8fa9d4;
+      --accent-dim: #1c2634;
+      --ok:         #6cbf97;
+      --warn:       #d7a63f;
+      --fail:       #e2827c;
+      --ok-bg:      #16251f;
+      --warn-bg:    #2a2115;
+      --fail-bg:    #2a1917;
+      --shadow:     0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ink:        #e6ecf2;
+    --ink-2:      #a8b4c0;
+    --ink-3:      #74818e;
+    --paper:      #0f1419;
+    --panel:      #161d25;
+    --line:       #2a343e;
+    --line-2:     #1e262f;
+    --accent:     #8fa9d4;
+    --accent-dim: #1c2634;
+    --ok:         #6cbf97;
+    --warn:       #d7a63f;
+    --fail:       #e2827c;
+    --ok-bg:      #16251f;
+    --warn-bg:    #2a2115;
+    --fail-bg:    #2a1917;
+    --shadow:     0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 60rem;
+    margin: 0 auto;
+    padding: 3rem 1.5rem 6rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2.5rem;
+  }
+
+  /* ── masthead ──────────────────────────────────────────────────────────── */
+  header { display: flex; flex-direction: column; gap: .75rem; }
+
+  .eyebrow {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: .7rem;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem 1rem;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: clamp(1.75rem, 4vw, 2.5rem);
+    line-height: 1.15;
+    letter-spacing: -.02em;
+    font-weight: 640;
+    text-wrap: balance;
+  }
+
+  .standfirst {
+    margin: 0;
+    max-width: 62ch;
+    color: var(--ink-2);
+    font-size: 1.0625rem;
+  }
+
+  .source-note {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: .75rem;
+    line-height: 1.5;
+    color: var(--ink-3);
+    border-left: 2px solid var(--line);
+    padding-left: .75rem;
+  }
+  .source-note b { color: var(--ink-2); font-weight: 600; }
+
+  /* ── health band: the numbers that decide whether to trust the page ─────── */
+  .band {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .stat { background: var(--panel); padding: .9rem 1rem; display: flex; flex-direction: column; gap: .2rem; }
+  .stat-n {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 1.5rem;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+    font-weight: 600;
+  }
+  .stat-n.is-ok   { color: var(--ok); }
+  .stat-n.is-warn { color: var(--warn); }
+  .stat-n.is-fail { color: var(--ink-3); }
+  .stat-k {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: .68rem;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+
+  /* ── sections ──────────────────────────────────────────────────────────── */
+  section {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    box-shadow: var(--shadow);
+  }
+  /* The rail is information: it appears only where state is at risk. */
+  section.at-risk  { border-left: 3px solid var(--warn); }
+  section.blocked  { border-left: 3px solid var(--fail); }
+
+  .sec-head { display: flex; flex-direction: column; gap: .25rem; }
+  .sec-num {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: .68rem;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  h2 {
+    margin: 0;
+    font-size: 1.25rem;
+    line-height: 1.25;
+    letter-spacing: -.01em;
+    font-weight: 620;
+    text-wrap: balance;
+  }
+  .sec-lede { margin: 0; color: var(--ink-2); max-width: 66ch; }
+  .sec-lede strong { color: var(--ink); font-weight: 620; }
+
+  /* ── diagram plates: white in both themes so mermaid always reads ──────── */
+  .plate {
+    background: var(--plate);
+    border: 1px solid var(--plate-line);
+    border-radius: 2px;
+    padding: 1.25rem .5rem;
+    overflow-x: auto;
+  }
+  .plate pre.mermaid { margin: 0; display: flex; justify-content: center; min-width: 0; }
+
+  /* ── tables ────────────────────────────────────────────────────────────── */
+  .scroll { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: .875rem; }
+  caption {
+    text-align: left;
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: .68rem;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    padding-bottom: .5rem;
+  }
+  th, td {
+    text-align: left;
+    padding: .55rem .75rem;
+    border-bottom: 1px solid var(--line-2);
+    vertical-align: top;
+  }
+  th {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: .7rem;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    font-weight: 600;
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+  }
+  td.id, td.num {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    color: var(--ink-2);
+  }
+  tbody tr:last-child td { border-bottom: none; }
+
+  code {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: .8125em;
+    background: var(--accent-dim);
+    padding: .1em .35em;
+    border-radius: 2px;
+  }
+
+  /* ── pills: state encoded in form, not only in words ───────────────────── */
+  .pill {
+    display: inline-block;
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: .68rem;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    padding: .12em .45em;
+    border-radius: 2px;
+    white-space: nowrap;
+    font-weight: 600;
+  }
+  .pill.ok   { background: var(--ok-bg);   color: var(--ok); }
+  .pill.warn { background: var(--warn-bg); color: var(--warn); }
+  .pill.fail { background: var(--fail-bg); color: var(--fail); }
+  .pill.flat { background: var(--line-2);  color: var(--ink-3); }
+
+  ul.tight { margin: 0; padding-left: 1.1rem; display: flex; flex-direction: column; gap: .4rem; }
+  ul.tight li { color: var(--ink-2); }
+  ul.tight strong { color: var(--ink); font-weight: 620; }
+
+  .readout {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: .78rem;
+    line-height: 1.75;
+    background: var(--accent-dim);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    padding: .9rem 1rem;
+    overflow-x: auto;
+    white-space: pre;
+    color: var(--ink-2);
+  }
+  .readout .g { color: var(--ok); }
+  .readout .y { color: var(--warn); }
+  .readout .d { color: var(--ink-3); }
+
+  footer {
+    border-top: 1px solid var(--line);
+    padding-top: 1.25rem;
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: .72rem;
+    color: var(--ink-3);
+    line-height: 1.7;
+  }
+
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:focus-visible, section:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    section, .band { animation: rise .4s cubic-bezier(.2,.7,.3,1) backwards; }
+    .band { animation-delay: .04s; }
+    section:nth-of-type(1) { animation-delay: .08s; }
+    section:nth-of-type(2) { animation-delay: .12s; }
+    section:nth-of-type(3) { animation-delay: .16s; }
+    @keyframes rise { from { opacity: 0; transform: translateY(6px); } }
+  }
+</style>
+
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">
+      <span>claudence</span>
+      <span>state review</span>
+      <span>2026-08-10</span>
+      <span>tier · pre-traffic</span>
+    </div>
+    <h1>Where the harness actually is</h1>
+    <p class="standfirst">
+      A rendered view of <code>docs/STATE.md</code> — the phase diagram, the one thing blocking
+      everything durable, and the requirement set the work is checked against. Six hook events and
+      two scheduled jobs are real and measured. None of it leaves this machine.
+    </p>
+    <p class="source-note"><b>This page is a view, not a source.</b> Every claim below is rendered from
+      <code>~/repo/claudence/docs/STATE.md</code>, which stays the single source of truth. If the two
+      disagree, the markdown wins and this page is stale — <code>scripts/state-health.py --drift</code>
+      is what says so.</p>
+  </header>
+
+  <div class="band" role="group" aria-label="State contract health, measured 2026-08-10">
+    <div class="stat"><span class="stat-n is-ok">18</span><span class="stat-k">checks pass</span></div>
+    <div class="stat"><span class="stat-n is-fail">0</span><span class="stat-k">failing</span></div>
+    <div class="stat"><span class="stat-n is-warn">2</span><span class="stat-k">repos w/o state doc</span></div>
+    <div class="stat"><span class="stat-n">116</span><span class="stat-k">hook tests green</span></div>
+    <div class="stat"><span class="stat-n">15</span><span class="stat-k">commits unpushed</span></div>
+  </div>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">01 · phase</span><h2>Where the project is</h2></div>
+    <p class="sec-lede">The harness works and measures itself. <strong>What does not work is leaving
+      this machine</strong> — every capability is real and none is reproducible elsewhere. Read
+      &ldquo;done&rdquo; as &ldquo;done here&rdquo;.</p>
+    <div class="plate">
+<pre class="mermaid">
+flowchart TD
+  T["Telemetry + friction<br/>DONE · 6 hook events wired"]
+  P["macOS port<br/>DONE · python3 + zsh"]
+  L["Self-improvement loop<br/>RUNNING unattended · 2 launchd jobs"]
+  S["Workspace state contract<br/>IN PROGRESS · reader + writer done"]
+  X["Second machine<br/>BLOCKED · cannot publish"]
+
+  T --> P --> L
+  P --> S
+  L --> X
+  S --> X
+</pre>
+    </div>
+  </section>
+
+  <section class="blocked">
+    <div class="sec-head"><span class="sec-num">02 · blocker</span><h2>The one dependency that gates durability</h2></div>
+    <p class="sec-lede">Everything else in this review can proceed today. <strong>This cannot, and it
+      is the only thing that makes the work survive the disk.</strong> The credential-helper account
+      does not match the remote's owner, so pushes 403, and the working branch has no upstream.</p>
+    <div class="plate">
+<pre class="mermaid">
+flowchart TD
+  I["Credential-helper account<br/>does not match remote owner"]
+  U["No upstream for the working branch"]
+  PUSH["Pushes 403<br/>15 commits unpublished"]
+  M["Second machine · collaboration · backup"]
+
+  I --> PUSH
+  U --> PUSH
+  PUSH --> M
+</pre>
+    </div>
+    <p class="sec-lede"><code>scripts/doctor.py</code> reports both, names the accounts, and gives the
+      two fixes. Which accounts is machine-specific and deliberately not in this public repo.</p>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">03 · horizon</span><h2>What shipped, and what waits on a person</h2></div>
+    <p class="sec-lede">Read the chart for one thing: <strong>the two critical bars are one decision
+      each</strong>, and they are the only ones nobody can start without you. The active bars need no
+      permission.</p>
+    <div class="plate">
+<pre class="mermaid">
+gantt
+  title Claudence — shipped versus blocked
+  dateFormat YYYY-MM-DD
+  axisFormat %b %d
+
+  section Done
+  Windows harness + telemetry  :done, win, 2026-03-28, 2026-06-21
+  macOS port                   :done, port, 2026-06-21, 14d
+  Improvement loop + health    :done, loop, 2026-08-03, 2026-08-10
+
+  section Unblocked now
+  State contract writer        :active, wr, 2026-08-10, 3d
+  Adopt the contract per repo  :active, ad, 2026-08-11, 7d
+
+  section Blocked on a person
+  Fix credential mismatch      :crit, id, 2026-08-11, 1d
+  Publish + second machine     :crit, pub, after id, 3d
+</pre>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">04 · contract</span><h2>What it must do, and what must be true of how it does it</h2></div>
+    <p class="sec-lede">Every row carries a source. <strong>A requirement with no source is a
+      preference</strong>, and preferences do not survive contact with a stakeholder who disagrees.</p>
+    <div class="scroll">
+      <table>
+        <caption>Functional — must</caption>
+        <thead><tr><th>#</th><th>Requirement</th><th>Source</th></tr></thead>
+        <tbody>
+          <tr><td class="id">F-a</td><td>Measure friction per session without being asked — classify prompts, score overrides</td><td>Original purpose; <code>telemetry/log-prompt.py</code></td></tr>
+          <tr><td class="id">F-b</td><td>Surface findings where they are seen, not in a JSON nobody opens</td><td>Added after the auditor ran unread</td></tr>
+          <tr><td class="id">F-c</td><td>Point a fresh session at the workspace's state instead of letting it re-derive</td><td>Session Start Protocol</td></tr>
+          <tr><td class="id">F-d</td><td>Propose governance changes; <strong>never apply them autonomously</strong></td><td><code>AGENT-LOOP.md</code> §5</td></tr>
+          <tr><td class="id">F-e</td><td>Verify its own install rather than assume it</td><td><code>doctor.py</code>, after a drifted install failed silently</td></tr>
+          <tr><td class="id">F-f</td><td>Open a project's live state document with its terminal workspace</td><td><code>open-workspace.sh</code> · <code>terminal.lua</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="scroll">
+      <table>
+        <caption>Non-functional — must · the rows that get skipped and then sink it</caption>
+        <thead><tr><th>#</th><th>Constraint</th><th>Anchor</th></tr></thead>
+        <tbody>
+          <tr><td class="id">N-a</td><td><strong>Standard library only</strong> in every hook and driver</td><td>Two <code>python3</code> builds exist; a hook must run identically under both</td></tr>
+          <tr><td class="id">N-b</td><td>Hooks see only the explicit <code>env.PATH</code> — no profile</td><td>An ephemeral per-shell PATH entry broke a plugin's hooks on install</td></tr>
+          <tr><td class="id">N-c</td><td>Silent when a convention does not apply</td><td>A harness that nags in unrelated repos gets uninstalled</td></tr>
+          <tr><td class="id">N-d</td><td>The loop must be able to <strong>fail loudly</strong></td><td>Unattended, &ldquo;silently broken&rdquo; and &ldquo;nothing to improve&rdquo; look identical</td></tr>
+          <tr><td class="id">N-e</td><td>Governance files bounded — 500 lines/file, 60/section</td><td>A loop that only adds rules degrades monotonically</td></tr>
+          <tr><td class="id">N-f</td><td>Never a hardcoded username or absolute machine path</td><td>Publication requires it; <code>doctor.py</code> checks it</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">05 · decisions</span><h2>The choices that shaped this shape</h2></div>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Decision</th><th>Status</th><th>What it ruled out</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Measure and judge are separate halves</strong> — an auditor on Stop measures; <code>/self-improve</code> judges</td><td><span class="pill ok">confirmed</span></td><td>Judgement running unattended</td></tr>
+          <tr><td><strong>Propose-only for <code>CLAUDE.md</code> and memory</strong></td><td><span class="pill ok">confirmed</span></td><td>A loop editing its own governance with no bound on blast radius</td></tr>
+          <tr><td><strong>No durable cron</strong> — launchd and hooks only</td><td><span class="pill ok">confirmed</span></td><td>Session-scoped jobs that expire in 7 days and stop silently</td></tr>
+          <tr><td><strong><code>settings.json</code> is copied, not symlinked</strong></td><td><span class="pill ok">confirmed</span></td><td>The app editing the checkout, since it rewrites that file</td></tr>
+          <tr><td><strong><code>OVERVIEW.md</code> and <code>STATE.md</code> stay separate</strong></td><td><span class="pill ok">confirmed</span></td><td>Weekly status churn burying a change to the premise</td></tr>
+          <tr><td><strong>Drift is measured against commits, not the calendar</strong></td><td><span class="pill warn">assumed</span></td><td>A 90-day threshold calling a doc fresh the morning after 8 commits landed</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="sec-lede"><code>docs/DECISIONS.md</code> does not exist yet — these currently live
+      scattered across <code>AGENT-LOOP.md</code>, <code>MACOS-PORT.md</code> and commit messages.
+      Consolidating them is tracked in <code>TODO.md</code>.</p>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">06 · progress</span><h2>What became true, and when</h2></div>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Date</th><th>Milestone reached</th></tr></thead>
+        <tbody>
+          <tr><td class="num">2026-08-10</td><td>State-contract <strong>health check</strong> — <code>state-health.py</code> with sanity, smoke and drift; drift surfaced at session start</td></tr>
+          <tr><td class="num">2026-08-10</td><td>State-contract <strong>writer</strong> — <code>templates/STATE.md</code>; the launcher opens the state doc</td></tr>
+          <tr><td class="num">2026-08-10</td><td>Session hook injects next steps, the newest journal entry and the commit log</td></tr>
+          <tr><td class="num">2026-08-10</td><td>Install doctor; found two plugins present only on this machine</td></tr>
+          <tr><td class="num">2026-08-10</td><td>Workspace state contract adopted; a hook points a fresh agent at it</td></tr>
+          <tr><td class="num">2026-08-10</td><td>Loop health checks plus a daily scheduled job</td></tr>
+          <tr><td class="num">2026-08-03</td><td>Improvement loop split into measure (hook) and judge (skill)</td></tr>
+          <tr><td class="num">2026-06-21</td><td>macOS port — 29 commits: python3 hooks, zsh launcher, WezTerm workspaces</td></tr>
+          <tr><td class="num">2026-03-28</td><td>Start — PowerShell friction telemetry on Windows</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="at-risk">
+    <div class="sec-head"><span class="sec-num">07 · risk</span><h2>Live risks, with evidence</h2></div>
+    <p class="sec-lede">Speculation is excluded on purpose. <strong>A risk with no evidence is
+      anxiety</strong>; it belongs in <code>TODO.md</code> as &ldquo;measure this&rdquo; instead.</p>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Risk</th><th>Evidence</th></tr></thead>
+        <tbody>
+          <tr><td><strong>One disk, no verified backup</strong></td><td>15 commits unpushed; no upstream, and a 403-inducing credential mismatch</td></tr>
+          <tr><td><strong>A second machine silently lacks two plugins</strong></td><td>Both live here and absent from the repo's canonical settings</td></tr>
+          <tr><td><strong><code>env.PATH</code> drift breaks hooks invisibly</strong></td><td>The pinned PATH lists a directory that does not exist. The symptom is a hook that does not fire, not an error</td></tr>
+          <tr><td><strong>The loop adds rules faster than it removes them</strong></td><td>Governance is 42 KB. Density thresholds exist as counter-pressure; whether they fire is unmeasured</td></tr>
+          <tr><td><strong>Governance describes unimplemented behaviour</strong></td><td>It claims a skill defines six role flows. The skill does not — found 2026-08-10</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">08 · instrument</span><h2>How this page is kept honest</h2></div>
+    <p class="sec-lede">Two user behaviours depend on the contract, and both used to fail silently.
+      <strong>Now one command replicates them on demand.</strong></p>
+    <div class="readout"><span class="d">$ scripts/state-health.py --all</span>
+<span class="g">  ok  </span> aliases agree: scripts/workspace-state.py
+<span class="g">  ok  </span> aliases agree: scripts/open-workspace.sh
+<span class="g">  ok  </span> aliases agree: terminal.lua
+<span class="g">  ok  </span> STATE.md front matter · has a diagram · TODO sections · backlinks resolve
+<span class="g">  ok  </span> smoke: injects in-flight work, next steps, latest decision, latest commit
+<span class="g">  ok  </span> smoke: omits the backlog and superseded journal entries
+<span class="g">  ok  </span> smoke: launcher resolves the state doc · silent without a contract
+<span class="g">  ok  </span> STATE.md matches the code — verified 2026-08-10
+<span class="y">  WARN</span> two repos have no state doc — copy templates/STATE.md
+
+<span class="d">  14 ok, 2 warn, 0 fail — 4 repo(s)</span></div>
+    <ul class="tight">
+      <li><span class="pill flat">sanity</span> &nbsp;Is it wired? Front matter, a diagram present, the
+        three <code>TODO</code> sections, backlinks that resolve, and the state-doc alias list agreeing
+        across its <strong>python, bash and lua</strong> copies — three runtimes that cannot share a constant.</li>
+      <li><span class="pill flat">smoke</span> &nbsp;Does the behaviour work? Drives the <strong>real</strong>
+        hook and launcher against a throwaway git repo and asserts a fresh session could catch up.</li>
+      <li><span class="pill flat">drift</span> &nbsp;Has the code moved without the doc? Counts commits
+        after <code>last-verified</code> that touch something other than markdown. <strong>A doc edit
+        cannot clear it</strong> — only re-verifying can, which is the whole point.</li>
+    </ul>
+  </section>
+
+  <footer>
+    Source of truth: <code>~/repo/claudence/docs/STATE.md</code> · page source:
+    <code>docs/artifacts/state-review.html</code><br>
+    Sibling project: <code>~/repo/&lt;client&gt;/&lt;project&gt;/docs/STATE.md</code> — same six sections, its own
+    blocker (an unassigned graded question set)<br>
+    Regenerate the judgement behind this page with <code>scripts/state-health.py --all</code>
+  </footer>
+
+</div>

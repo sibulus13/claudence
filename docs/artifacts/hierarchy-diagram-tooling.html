@@ -1,7 +1,7 @@
 <title>Tooling — hierarchical and drill-down diagrams</title>
 
 <style>
-  /* Deliberately not the Envisio suite palette. This is a tooling note,
+  /* Deliberately not the client suite palette. This is a tooling note,
      not a product brief, and it should not read as one: warm graphite
      ground, amber accent, no teal anywhere. */
   :root {
@@ -113,17 +113,17 @@
 <div class="wrap">
 
   <header>
-    <p class="eyebrow">Tooling note · not an Envisio product document</p>
+    <p class="eyebrow">Tooling note · not a client product document</p>
     <h1>Drawing hierarchies you can click into</h1>
     <p class="standfirst">
-      Split out of the Envisio system map, where it did not belong. The question was whether a
+      Split out of a client system map, where it did not belong. The question was whether a
       component system exists for drill-down diagrams — a high-level view that expands into its own
       detail, nested several layers deep. Several do, and
       <strong>they split cleanly by whether the hierarchy is the point, or the graph is</strong>.
     </p>
     <p class="scope">
       <b>Scope</b>
-      This page is method, not company knowledge. Envisio product briefs live in their own set and
+      This page is method, not company knowledge. Client product briefs live in their own set and
       stay free of technique, so a reader opening one never has to sort the two apart.
     </p>
   </header>
@@ -207,7 +207,7 @@
       </p>
       <p>
         <strong>For a one-off page where the shape is genuinely a hierarchy: hand-roll it.</strong>
-        The Envisio system map is about 120 lines of vanilla JS over a nested JSON array. A disclosure
+        That system map is about 120 lines of vanilla JS over a nested JSON array. A disclosure
         tree is the one case where a library buys almost nothing and costs you a build step — and
         because the diagram <em>is</em> the JSON, editing it is editing data, not markup.
       </p>

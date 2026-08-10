@@ -23,7 +23,7 @@ DENYLIST = os.path.expanduser('~/.claude/claudence-denylist.txt')
 # Usernames that are obviously stand-ins, not a real account. Test fixtures and
 # docs are full of these, and flagging them trains you to --no-verify past the
 # guard — which is worse than not having one.
-PLACEHOLDER_USERS = r'(?:x|y|me|you|user|username|someone|somebody|example|test|dev|foo|bar|name)'
+PLACEHOLDER_USERS = (r'(?:[a-z]|me|you|user|username|someone|somebody|example|test|dev|foo|bar|name)')
 
 # Always-on patterns — these are unsafe in a public repo regardless of client.
 BUILTIN = [
@@ -31,7 +31,14 @@ BUILTIN = [
      'absolute home path (leaks the account name)'),
     (r'/home/(?!%s/)[a-z0-9._-]+/' % PLACEHOLDER_USERS,
      'absolute home path (leaks the account name)'),
-    (r'[A-Z]:\\\\(?:repo|Users)', 'absolute Windows path'),
+    # Only the Users form leaks anything — a bare drive+folder names no account —
+    # and it honours the placeholder list like its POSIX siblings above. Windows
+    # paths reach this scanner through Lua/JSON source, so the separator is an
+    # escaped pair. Was `[A-Z]:\\(?:repo|Users)`, which flagged D:\repo\Bar and
+    # C:\Users\m\ in the test fixtures: false positives, the one failure mode
+    # this guard cannot afford.
+    (r'[A-Z]:\\\\Users\\\\(?!%s\\\\)[a-z0-9._-]+' % PLACEHOLDER_USERS,
+     'absolute Windows path (leaks the account name)'),
     # Same reasoning: example.com and friends are reserved for documentation.
     (r'[\w.+-]+@(?!example\.(?:com|org|net)\b)[\w-]+\.[\w.]+', 'email address'),
     (r'(?i)\b(?:sk|pk|ghp|gho|github_pat)_[A-Za-z0-9_]{16,}', 'API token'),
