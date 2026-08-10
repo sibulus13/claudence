@@ -368,12 +368,26 @@ Before writing code for a new feature with a non-trivial data shape, define the 
 
 ## Audio Hooks (Do Not Interfere)
 
-Sound notifications are configured globally, played through `afplay` at 80% volume:
-- **Stop**: end of execution — `ring-half` (Glass) for a long or high-friction run, `notify-half` (Pop) otherwise
-- **PermissionRequest**: a tool call needs approval — `ding-half` (Ping)
+Sound notifications are configured globally, played through `afplay` at **56%** volume
+(30% below the Windows build's 80%). **One sound, Bottle, for every event** — the chime
+says *Claude wants you*, and nothing more; which kind of wanting is the tab bar's job,
+not the timbre's.
 
-The logical names map to macOS system sounds in `telemetry/lib/hooklib.py`; dropping a
-file named `ring-half.aiff` (or .wav) into `~/.claude/sounds/` overrides the mapping.
+A chime fires only when the agent genuinely needs you:
+- **Stop**: only when the turn actually **ran** — elapsed > 30s, or a friction score ≥ 5,
+  or a retrospective is due. A reply that lands in three seconds is silent, because it is
+  already on screen when it arrives. Throttled to one per minute across all sessions.
+- **PermissionRequest**: a tool call needs approval. Throttled per reason.
+
+Everything else stays visual: `notify-attention.py` still writes its tab-bar flag on every
+finished session, gated by nothing. Silence removes the sound, never the signal.
+
+The three logical names (`ring-half`, `notify-half`, `ding-half`) survive as the
+cross-platform contract — Windows still maps them to three distinct `.wav` files — and all
+three resolve to Bottle here. Override without touching code: drop `<name>.aiff` into
+`~/.claude/sounds/`, or set `CLAUDENCE_SOUND_<NAME>` **in `~/.claude/settings.json`'s `env`
+block** (hooks never source your profile, so `.zshrc` will not reach them).
+`CLAUDENCE_SILENT=1` mutes everything.
 
 Do not play sounds manually or adjust system volume unless explicitly asked.
 

@@ -17,6 +17,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from datetime import datetime, timedelta
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PY = sys.executable or '/usr/bin/python3'
@@ -157,6 +158,28 @@ try:
     check('log-prompt: scaffolding is not subject — a new topic splits', len(state['themes']), 2)
     check('log-prompt: label carries the subject, not the scaffolding',
           state['themes'][0]['label'], 'status bar summary section reflective working')
+finally:
+    box.close()
+
+# The Stop chime fires only for a turn that RAN. Sound itself is suppressed under
+# CLAUDENCE_SILENT, but the throttle stamp is claimed only when a chime is played,
+# so its presence is a faithful proxy for "did it make a noise".
+box = Sandbox()
+try:
+    stamp = box.path('workspaces', '.last-ding-stop')
+
+    box.run('telemetry/log-prompt.py',
+            {'session_id': SID, 'prompt': 'quick question', 'cwd': '/Users/x/repo/app'})
+    box.run('telemetry/analyze-session.py', {'session_id': SID})
+    check_true('analyze-session: a three-second reply stays silent',
+               not os.path.exists(stamp))
+
+    # Backdate the turn-start stamp past RING_ELAPSED_SECS to simulate a long run.
+    started = datetime.now().astimezone() - timedelta(seconds=120)
+    with open(box.path('telemetry', 'start-%s.stamp' % SID), 'w', encoding='utf-8') as fh:
+        fh.write(started.isoformat())
+    box.run('telemetry/analyze-session.py', {'session_id': SID})
+    check_true('analyze-session: a turn that ran does chime', os.path.exists(stamp))
 finally:
     box.close()
 

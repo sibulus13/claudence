@@ -33,12 +33,17 @@ WORKSPACES_DIR = os.path.join(CLAUDE_DIR, 'workspaces')
 # analyze-session read the same way on both platforms) -> macOS system sounds.
 # A file dropped in ~/.claude/sounds/ with the same stem overrides the mapping,
 # which is how you customize without editing code.
+BOTTLE = '/System/Library/Sounds/Bottle.aiff'
+
+# One sound for all three roles on macOS. The three names still exist because they
+# are the cross-platform contract — Windows maps them to three distinct .wav files
+# and hook args read the same on both — but a chime that only fires when Claude
+# actually wants you does not need to encode WHICH kind of wanting in its timbre.
+# Distinguishing Glass from Bottle from Ping was information nobody was decoding.
 SYSTEM_SOUNDS = {
-    'ring-half': '/System/Library/Sounds/Glass.aiff',    # was chimes.wav — Claude finished, long or high-friction
-    'notify-half': '/System/Library/Sounds/Bottle.aiff', # the ordinary session-complete chime — soft rounded
-                                                         # bloop. Was Pop.aiff, which is sharper than a chime
-                                                         # you hear dozens of times a day wants to be.
-    'ding-half': '/System/Library/Sounds/Ping.aiff',     # was Windows Ding.wav — a tool wants approval
+    'ring-half': BOTTLE,    # was Glass; before that chimes.wav
+    'notify-half': BOTTLE,  # was Pop, softened to Bottle in 27d220b — now the only voice
+    'ding-half': BOTTLE,    # was Ping; before that Windows Ding.wav
 }
 def _sound_override(name):
     """Per-machine override, so changing a chime never needs a code edit.
@@ -50,7 +55,9 @@ def _sound_override(name):
     return os.environ.get('CLAUDENCE_SOUND_' + name.upper().replace('-', '_'))
 
 
-SOUND_VOLUME = '0.8'   # matches the 80% PCM scaling setup.ps1 baked into the .wav files
+SOUND_VOLUME = '0.56'  # 30% below the 0.8 the Windows build baked into its .wav samples.
+                       # Now that the chime is rare it can also be quieter: it no longer
+                       # has to compete for notice against its own repetition.
 
 
 def read_stdin_json():

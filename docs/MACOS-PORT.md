@@ -67,8 +67,8 @@ silently replace a symlink with a regular file.
 
 | Windows | macOS |
 |---------|-------|
-| `System.Media.SoundPlayer` + `C:\Windows\Media\*.wav` | `afplay -v 0.8` + `/System/Library/Sounds/*.aiff` |
-| `setup.ps1` rewrites PCM samples to 80% volume | `afplay -v 0.8`; no files to generate |
+| `System.Media.SoundPlayer` + `C:\Windows\Media\*.wav` | `afplay -v 0.56` + `/System/Library/Sounds/Bottle.aiff` |
+| `setup.ps1` rewrites PCM samples to 80% volume | `afplay -v 0.56`; no files to generate |
 | `powershell.exe -NoExit -Command "Set-Location …; cmd"` | `$SHELL -lc "cd …; { cmd; }; exec $SHELL -l"` |
 | `default_prog` = PowerShell + PSReadLine history | nothing — zsh persists history itself |
 | Pruned `Get-ChildItem` walk for the Alt+O launcher | `find … -prune -o -name .git -print -prune` |
@@ -80,6 +80,12 @@ silently replace a symlink with a regular file.
 Sound names (`ring-half`, `notify-half`, `ding-half`) are kept as logical names so
 hook arguments read the same on both platforms. Drop `ring-half.aiff` into
 `~/.claude/sounds/` to override the mapping without touching code.
+
+**The macOS side diverges on policy, not just files.** Windows plays three distinct
+sounds on every Stop; macOS maps all three names to Bottle and plays nothing at all
+unless the turn ran longer than 30s, scored friction, or a retro is due. A chime heard
+after every reply is one you stop hearing, so it was spent only where it buys something.
+The tab-bar flag is unchanged and still marks every finished session.
 
 ## Not carried over
 

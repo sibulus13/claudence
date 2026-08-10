@@ -16,7 +16,8 @@ Friction scoring per session:
   +1  perm_repeat approved  approved twice; belongs in the allow list
   +2  perm_repeat denied    blocked and denied again; high friction
 
-Sound: elapsed > 30s OR score >= 5 OR retrospect needed -> ring, else notify.
+Sound: chime only when elapsed > 30s OR score >= 5 OR retrospect needed —
+a turn that ran, not every reply. Below that the Stop hook is silent.
 Retrospection threshold: sessions_since_review >= 3 AND cumulative score >= 6.
 """
 
@@ -297,16 +298,22 @@ def main():
 
     retrospect_needed = (int(cum.get('sessions_since_review', 0)) >= RETRO_MIN_SESSIONS
                          and int(cum.get('total_score', 0)) >= RETRO_MIN_SCORE)
-    play_ring = (elapsed > RING_ELAPSED_SECS or score >= RING_SCORE or retrospect_needed)
+    # The chime is for a turn that RAN — one you looked away from — not for every
+    # reply. A conversational answer that lands in three seconds is already on
+    # screen when it arrives; announcing it is noise, and noise heard all day is
+    # what makes a real notification easy to ignore. Same thresholds that used to
+    # pick between two chimes now decide whether there is one at all.
+    worth_a_chime = (elapsed > RING_ELAPSED_SECS or score >= RING_SCORE or retrospect_needed)
 
     # One Stop chime per minute across ALL sessions (shared on-disk stamp), so
-    # several sessions finishing together don't stack sounds. The visual flags
-    # from notify-attention.py are not throttled, so every finished session is
-    # still visible on the tab bar.
+    # several sessions finishing together don't stack sounds. Gated BEFORE the
+    # throttle so a silent turn doesn't spend the window a real one needs. The
+    # visual flags from notify-attention.py are not throttled or gated, so every
+    # finished session is still visible on the tab bar.
     stamp = os.path.join(H.WORKSPACES_DIR, '.last-ding-stop')
-    if H.throttle(stamp, DING_WINDOW_SECS):
+    if worth_a_chime and H.throttle(stamp, DING_WINDOW_SECS):
         time.sleep(0.4)
-        H.play_sound('ring-half' if play_ring else 'notify-half')
+        H.play_sound('notify-half')
 
     if retrospect_needed:
         cum['total_score'] = 0
