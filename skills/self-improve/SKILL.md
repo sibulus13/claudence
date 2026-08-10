@@ -11,7 +11,7 @@ Run the self-improvement loop: extract recurring patterns from recent sessions a
 ## When to use
 
 - Manually, when you notice you've been repeating the same reminder
-- Automatically via CronCreate (see config at `~/.claude/improve/config.json`)
+- **Automatically surfaced** — `improve/audit.py` runs on every Stop hook and `scripts/workspace-state.py` injects due-ness at SessionStart, so you are told when it is due rather than having to remember. (`CronCreate` is session-only and cannot schedule this; durable scheduling here is launchd + hooks.)
 - After any session where `/retrospect` would have been useful but wasn't run
 
 ## Steps
@@ -25,11 +25,15 @@ Read `~/.claude/improve/config.json`. Use defaults if missing:
 
 ### 2. Ingest sources
 
-Read in parallel:
+**Read `~/.claude/improve/state.json` first** — `audit.py` has already measured context density,
+cross-file duplication, staleness and due-ness. Do not re-derive those; they are deterministic and
+already done. Your job starts where judgement starts.
+
+Then read in parallel:
 - `~/.claude/telemetry/reports/*.json` — friction reports (score, overrides, friction_notes, allow_suggestions)
 - `~/.claude/projects/*/memory/MEMORY.md` — accumulated memory index files
 - `~/.claude/projects/*/memory/feedback_*.md` — existing feedback memories (to avoid duplicating)
-- Active project `context.md` files: Helm, Envoy, Crucible — look for drift notes and open decisions
+- Each active workspace's `docs/STATE.md` and `docs/TODO.md` — the state contract in the Session Start Protocol. Look for repeated blockers and items that keep moving between sessions without progressing
 
 ### 3. Extract patterns
 
@@ -57,6 +61,19 @@ For each pattern, record:
 Only patterns with `occurrences >= thresholdOccurrences` proceed.
 Patterns already documented in the target file are skipped (check before proposing).
 
+### 4b. Refactor and deduplicate — not only add
+
+**A loop that only adds rules degrades monotonically.** For every item in `state.json`:
+
+- `refactor` → propose the split. A file past 500 lines or a section past 60 gets its largest
+  section extracted to `references/` with a two-line summary left behind.
+- `duplication` → **designate one canonical home and make the other a pointer.** Never leave two
+  copies "in sync"; they drift, and the reader cannot tell which is current.
+- `stale` → either re-verify and bump `last-verified`, or archive per the knowledge-lifecycle rules.
+
+Treat these with the same threshold discipline as additions: propose, do not silently restructure
+governance.
+
 ### 5. Propose
 
 Present grouped proposals:
@@ -76,7 +93,13 @@ Present grouped proposals:
 Apply all? (y/n/selective)
 ```
 
-If `autoApply: true`, skip the prompt and apply directly.
+**Blast radius decides autonomy** (`docs/AGENT-LOOP.md` §5), not the `autoApply` flag alone:
+
+| Target | Mode |
+|---|---|
+| Allow-rules, brief templates, skill hints, per-class defaults | Auto-apply, logged and revertible |
+| Gate thresholds, model/effort routing | Auto-apply **shadow first** — one cycle recording what *would* have changed |
+| `CLAUDE.md`, memory, anything governance | **Propose only.** Agents never autonomously edit governance |
 
 ### 6. Apply changes
 
@@ -102,6 +125,12 @@ Append to `~/.claude/improve/history.jsonl`:
 }
 ```
 
+### 7b. Append to the ledger
+
+Append what was applied to `~/.claude/improve/LEDGER.md` under `## Changes`, newest first, with the
+revert id. **`history.jsonl` is the machine record; the ledger is the one a human reads** — and the
+whole point of unattended operation is that the human reads afterwards rather than gating each change.
+
 ### 8. Reset telemetry
 
 Archive processed friction reports to `~/.claude/telemetry/reports/archived/`.
@@ -124,5 +153,5 @@ Skipped (below threshold or already documented):
 - [count]
 
 Next scheduled run: [date] (every N days per config)
-View history: http://localhost:3000/system
+View history: `improve/LEDGER.md` (human) · `improve/history.jsonl` (machine)
 ```

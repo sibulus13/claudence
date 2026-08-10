@@ -92,6 +92,45 @@ def now_block(path):
     return out
 
 
+def improve_state():
+    """What the Stop-hook auditor last measured about the governance files.
+
+    Surfaced here because the auditor runs unattended and its findings are
+    otherwise invisible until someone opens a JSON file, which nobody does.
+    Only the actionable parts: whether the loop is due, and what crossed a
+    refactor or duplication threshold.
+    """
+    raw = read_text(os.path.join(os.path.expanduser('~'), '.claude', 'improve', 'state.json'))
+    if not raw:
+        return []
+    try:
+        st = json.loads(raw)
+    except Exception:
+        return []
+    c = st.get('counts') or {}
+    flagged = sum(c.get(k, 0) for k in ('refactor', 'duplication', 'stale'))
+    if not st.get('due') and not flagged:
+        return []
+
+    out = ['Self-improvement loop:']
+    if st.get('due'):
+        d = st.get('days_since_run')
+        out.append('  DUE — %s (every %s days). Run /self-improve.'
+                   % ('never run' if d is None else '%s days since the last run' % d,
+                      st.get('frequency_days')))
+    if flagged:
+        out.append('  Context density: %d refactor · %d duplication · %d stale.'
+                   % (c.get('refactor', 0), c.get('duplication', 0), c.get('stale', 0)))
+        for r in (st.get('refactor') or [])[:3]:
+            out.append('    refactor  %s (%s %s > %s)'
+                       % (r.get('target'), r.get('kind'), r.get('measured'), r.get('limit')))
+        for r in (st.get('duplication') or [])[:3]:
+            out.append('    duplicate %s <-> %s (%.2f)'
+                       % (r.get('a'), r.get('b'), r.get('similarity', 0)))
+        out.append('  Full detail: ~/.claude/improve/state.json · history: improve/LEDGER.md')
+    return out
+
+
 def main():
     try:
         raw = sys.stdin.read()
@@ -133,6 +172,11 @@ def main():
     parts.append('State these to the user in your first reply, then work from them rather than '
                  're-deriving context. When the session ends or direction changes, update TODO.md '
                  'and add a JOURNAL.md entry — that is what makes the next session cheap.')
+
+    imp = improve_state()
+    if imp:
+        parts.append('')
+        parts.extend(imp)
 
     sys.stdout.write(json.dumps({
         'hookSpecificOutput': {

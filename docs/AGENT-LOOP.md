@@ -135,6 +135,40 @@ it is falsifiable.
 
 ---
 
+### 4b · Context density — when a rule set needs refactoring, not adding
+
+§4's table notes that archive-vs-update is solved for **documents** and unsolved for **agent
+context**. That gap has one measurable half, and it is now closed: `improve/audit.py` runs from the
+**Stop hook** on every session, measures the governance surfaces, and writes findings to
+`improve/state.json` plus `improve/LEDGER.md`. No agent involved.
+
+**Why a script rather than the loop itself:** a self-improving loop that only ever *adds* rules
+degrades monotonically — CLAUDE.md grows until nobody reads it in full, and the newest rule
+contradicts an older one nobody remembers. Growth needs a counter-pressure, and the counter-pressure
+has to be measured rather than felt.
+
+| Signal | Threshold | Why that is the real trigger |
+|---|---|---|
+| **File too long** | 500 lines | Past this a governance file stops being read in full, so a rule inside it stops being in force |
+| **Section too long** | 60 lines | The unit a reader skips. Extract to `references/` and leave a two-line summary |
+| **Duplication** | ≥0.78 similarity across two files | Two rules saying the same thing means one will be edited and the other will silently contradict it |
+| **Staleness** | `last-verified` > 90 days | A doc asserting things nobody has checked |
+| **Memory sprawl** | >25 files, or any file >80 lines | One fact per file is the contract; a long memory file is several facts wearing one name |
+
+**It writes, it never edits.** Deciding *how* to split a section or which of two duplicates is
+canonical is judgement, and that belongs to `/self-improve` under §5's propose-only rule for
+governance targets. The script's job is to make the trigger unmissable, not to act on it.
+
+**Surfaced automatically** — `scripts/workspace-state.py` reads `state.json` at SessionStart and
+injects due-ness plus the top flagged items, so findings do not sit in a JSON file nobody opens.
+
+**Baseline, measured 2026-08-10:** 408-line CLAUDE.md, largest section 33 lines, 101 extracted rules,
+**zero** threshold crossings. Recorded because a checker that has never fired is indistinguishable
+from a checker that cannot — so the detectors are separately unit-tested to fire on a known
+over-long section, a 0.95-similarity rule pair, and a 200-day-stale front matter.
+
+---
+
 ## 5 · Per-use-case learning — what it can and cannot be
 
 The ask was improvement *per use case over time*. That requires a **task class** on every

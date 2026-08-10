@@ -355,7 +355,18 @@ Auto-memory is active at `~/.claude/projects/[project]/memory/`. When learning s
 
 Automated retrospective: scans session friction + memory files → clusters patterns by category (global / project / stack / user-preference) → filters by threshold (≥2 occurrences) → proposes additions to CLAUDE.md / memory / skill files → logs to `~/.claude/improve/history.jsonl`.
 
-Config at `~/.claude/improve/config.json`: `frequencyDays` (7) · `thresholdOccurrences` (2) · `maxSessionsToAnalyze` (10) · `autoApply` (false). Trigger: `/self-improve`. Scheduled weekly via durable cron; the dashboard surface, if any, is named in `CLAUDE.local.md`.
+Config at `~/.claude/improve/config.json`: `frequencyDays` (7) · `thresholdOccurrences` (2) · `maxSessionsToAnalyze` (10) · `autoApply` (false), plus the refactor thresholds in §4b of `docs/AGENT-LOOP.md`.
+
+**There is no durable cron — `CronCreate` jobs are session-only and expire after 7 days.** Durable scheduling on this machine is **launchd** (`telemetry/loop-health.py` daily at 09:15) and **hooks**, which are the only triggers that survive a session ending. So the loop is split:
+
+| Half | Trigger | What it does |
+|---|---|---|
+| **Measure** — deterministic | `improve/audit.py` on the **Stop** hook, every session | Context density, cross-file duplication, staleness, due-ness → `improve/state.json` + `improve/LEDGER.md`. Never edits a governance file |
+| **Surface** | `scripts/workspace-state.py` on **SessionStart** | Injects due-ness and the top flagged items, so findings are not left in a JSON nobody opens |
+| **Judge and apply** — needs judgement | `/self-improve` | Reads `state.json` rather than re-deriving. Blast-radius-scoped per `AGENT-LOOP.md` §5: auto-apply for allow-rules and templates, shadow-first for thresholds, **propose-only for `CLAUDE.md` and memory** |
+| **Watch the watcher** | `telemetry/loop-health.py` via launchd | `--sanity` / `--smoke` / `--health`. Non-zero exit means a human is needed |
+
+**A loop that only adds rules degrades monotonically**, so §4b's density thresholds are the counter-pressure: growth past 500 lines in a file or 60 in a section is a refactor trigger, and ≥0.78 similarity across two files is a dedupe trigger. `improve/LEDGER.md` is the human-readable record of what the loop has changed while nobody was watching.
 
 ## Repetition and Redirection Detection
 
