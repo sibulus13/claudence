@@ -87,8 +87,14 @@ and say so rather than padding it.
 | **2** | **Timeline** | Eras, not a flat list. Each entry says what it *contributed*, not just what it was. Mark the inflection point where the field changed character |
 | **3** | **What survived** | The practices still standing, each with *why it held* — and a matching list of **what did not survive**, which is more informative |
 | **4** | **Alternatives** | What else was tried, and the outcome of each. Note where the winner won on modularity or cost rather than on merit; that pattern predicts future contests |
-| **5** | **Capability envelope** | **The point of the document.** Strong at / structurally weak at, with the *mechanism* for each weakness, plus a data-type or problem-type suitability table and what to use instead |
-| **6** | **What it means here** | The caller's actual data and decision, mapped against section 5, ending in conclusions that change the plan |
+| **5** | **Capability envelope** | **The point of the document.** For each strength: *what makes it strong*, and what supplementary technology strengthens it further. For each weakness: the *mechanism*, plus **how to supplement or replace it** — naming the specific technique and who built it. Plus a suitability table by data or problem type |
+| **6** | **What it means here** | The caller's actual data and decision, mapped against section 5. **Where the caller has a system, add a column naming the module, table or component each row lands on** — that is what turns an assessment into a work item. End in conclusions that change the plan |
+| **7** | **Improvements worth making** | Two to four concrete moves, each with an explicit **value statement**: why it is underpriced, what it unblocks, what failure it removes. This is the difference between a survey and advice |
+
+**Section 5's asymmetry is deliberate.** A strength with no explanation is a claim; a weakness with
+no supplement is a dead end presented as a verdict. **Structural does not mean unaddressable** —
+almost every structural weakness in a mature field has someone's paper attached to working around
+it, and finding that paper is the job.
 
 ### 4 · Distinguish structural from incidental
 
@@ -129,13 +135,14 @@ Minimum specification:
 
 | Element | Requirement |
 |---|---|
-| **Time axis** | Origin dates positioned on an axis, so the reader sees *when* a branch opened and how long a gap was |
-| **Branch families** | Nodes grouped into parallel lanes by lineage — **colour encodes family**, so a reader tracks a branch without reading labels |
-| **Two edge kinds** | **Descent** (solid: this came out of that) and **cross-influence** (dashed: this borrowed from that). Influence edges are where the real intellectual history lives, and they are usually the ones a timeline loses |
-| **Survival status per node** | Encoded in the node's own form — a dashed outline for what did not survive. The graph should show the dead ends, not hide them |
-| **Expandable detail** | Selecting a node reveals its contribution, **pros and cons**, status, and its position in the lineage (descends from / led to / influenced) |
-| **A source backlink per node** | To the primary paper or announcement, so the reader can go read it. **Link to a canonical URL you have verified** — a guessed identifier that lands on the wrong paper is worse than no link |
-| **Interaction affordances** | Isolate-a-node's-neighbourhood and toggle influence edges, because a dense graph is unreadable without a way to subset it |
+| **Horizontal time axis** | Time runs **left to right**, families stack as horizontal lanes. A vertical timeline forces the reader to scroll past a branch to see what it became; horizontal keeps a lineage readable along its own row |
+| **Wheel scrolls the graph** | With the pointer over the graph, the mouse wheel must pan it **horizontally** — hand scrolling back to the page at either end so the reader is never trapped. Add drag-to-pan too |
+| **Branch families** | Parallel lanes by lineage — **colour encodes family**, so a branch is trackable without reading labels. Make lanes individually toggleable; a dense graph is unreadable without a way to subset it |
+| **Two edge kinds** | **Descent** (solid) and **cross-influence** (dashed). Influence edges are where the real intellectual history lives and are what a timeline loses — the refutation pointing back at what it refuted, the idea reaching forward five years into another family |
+| **Survival status per node** | Encoded in the node's own form — dashed outline for what did not survive. **Show the dead ends; they are half the lesson.** Offer a toggle to hide them, defaulting to shown |
+| **Expandable detail** | Selecting a node reveals its contribution, **pros and cons**, status, and lineage position (descends from / led to / influenced by / influenced) |
+| **A source backlink per node** | To the primary paper or announcement. **Link a canonical URL you have verified** — a guessed identifier landing on the wrong paper is worse than no link |
+| **Comprehensiveness** | Include the **niche and largely-abandoned** options, not just the canon. A dossier that lists only the winners cannot tell you what was already tried and failed — which is most of its value. Expect a real lineage to run to **100+ nodes**; that is what a fan-out is for |
 
 **Accessibility is not optional here:** nodes are focusable and operable by keyboard, the graph
 carries a text alternative, and colour is never the *only* carrier of a distinction — pair it with
