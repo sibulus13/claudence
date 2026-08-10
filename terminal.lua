@@ -225,6 +225,17 @@ local function strip_title_markers(t)
   end
 end
 
+-- Machine-specific values are NOT committed: repo root and the repo display
+-- aliases both come from a gitignored terminal.local.lua, or fall back to a
+-- sane default. Loaded here because the aliases below need it; REPO_DIR reads
+-- the same table further down. See terminal.local.example.lua.
+local function load_local_cfg()
+  local ok, t = pcall(dofile, wezterm.home_dir .. '/.claude/terminal.local.lua')
+  if ok and type(t) == 'table' then return t end
+  return {}
+end
+local LOCAL = load_local_cfg()
+
 -- Repo display aliases + leaf-only naming. Both are PURELY cosmetic: they change
 -- only what format-tab-title PAINTS. The tab's real title (tab:get_title()) stays
 -- the full rel, so session save (the ':find("/")' sentinel), restore (which
@@ -232,12 +243,9 @@ end
 -- pane-id notification/Alt+G targeting are all untouched — none of them read the
 -- rendered text. Keys are the repo path RELATIVE to the repo root, forward-
 -- slashed + lowercased. No entry => the leaf folder name (last path segment).
-local REPO_ALIASES = {
-  ['web/cashcow']         = 'Tarive',        -- legacy folder name; product rebranded to Tarive (web app)
-  ['web/tarive']          = 'Tarive (app)',  -- the Expo mobile app — disambiguated from the web tab above
-  ['stock/research 2026'] = 'Crucible',      -- algo-trading paper-gate project (#37); folder predates the name
-  ['life/second-brain']   = 'Cortex',        -- #31 second brain + Helm dashboard; product name = Cortex
-}
+-- The aliases themselves name private products, so they live in the gitignored
+-- terminal.local.lua alongside repo_root rather than in a public repo.
+local REPO_ALIASES = LOCAL.repo_aliases or {}
 
 -- ── Custom tab names (persistent) ───────────────────────────────────────────
 -- A tab's identity stays its repo-relative path (so session-restore + attention
@@ -266,7 +274,7 @@ load_tab_names()
 -- Cosmetic tab label for a repo identity `rel`. Alias wins (brand names shown
 -- verbatim); otherwise the leaf folder name with its first letter capitalized,
 -- so every tab reads uniformly Title-cased regardless of the folder's own casing:
---   'web/cashcow'  -> 'Tarive'    (alias hit, verbatim)
+--   'web/old-name' -> 'Product'   (alias hit, verbatim)
 --   'Life/vantage' -> 'Vantage'   (leaf, first letter capitalized)
 --   'Nexus'        -> 'Nexus'     (no slash: leaf is the whole thing)
 local function display_name(rel)
@@ -304,7 +312,7 @@ local function tab_label_src(tab)
     -- "Nexus" instead of the literal folder name.
     if REPO_DIR_NORM ~= '' and p:lower() == REPO_DIR_NORM then return 'Nexus' end
     if REPO_DIR_NORM ~= '' and p:lower():sub(1, #REPO_DIR_NORM + 1) == REPO_DIR_NORM .. '/' then
-      return p:sub(#REPO_DIR_NORM + 2)            -- repo-relative, e.g. web/cashcow
+      return p:sub(#REPO_DIR_NORM + 2)            -- repo-relative, e.g. web/my-app
     end
     local leaf = p:match('[^/]+$')
     if leaf and leaf ~= '' then return leaf end
@@ -758,15 +766,6 @@ end
 -- correct hook for window-state setup.
 local keymap_file = wezterm.home_dir .. '/.claude/keymap.txt'
 
--- Repo root is machine-specific, so it is NOT committed. It comes from a
--- gitignored terminal.local.lua (`return { repo_root = '...' }`) or the
--- CLAUDE_REPO_ROOT env var, falling back to ~/repo. See terminal.local.example.lua.
-local function load_local_cfg()
-  local ok, t = pcall(dofile, wezterm.home_dir .. '/.claude/terminal.local.lua')
-  if ok and type(t) == 'table' then return t end
-  return {}
-end
-local LOCAL       = load_local_cfg()
 local REPO_DIR    = LOCAL.repo_root or os.getenv('CLAUDE_REPO_ROOT') or (wezterm.home_dir .. '/repo')
 local REPO_DIR_BS = REPO_DIR:gsub('/', '\\')
 REPO_DIR_NORM     = norm_path(REPO_DIR)   -- forward-declared by the attention block; labels the home flag "Nexus"
@@ -817,17 +816,43 @@ local function keymap_popup_args()
     'read -rsn1' }
 end
 
+-- ── The project's live state document ────────────────────────────────────────
+-- Same canonical name, aliases and search order as scripts/workspace-state.py
+-- and scripts/open-workspace.sh, so the pane, the launcher and the SessionStart
+-- hook can never disagree about which file is the state of a project.
+local STATE_DOC_DIRS  = { 'docs', '.' }
+local STATE_DOC_NAMES = { 'STATE.md', 'context.md', 'workflow_state.md', 'KNOWLEDGE.md' }
+
+-- Returns a pager command for the state doc, or nil when the project has none.
+-- ponytail: raw markdown in a pager; swap in glow/bat if either lands in PATH.
+local function state_doc_cmd(cwd)
+  for _, d in ipairs(STATE_DOC_DIRS) do
+    for _, n in ipairs(STATE_DOC_NAMES) do
+      local rel = d .. '/' .. n
+      local f = io.open(cwd .. '/' .. rel, 'r')
+      if f then
+        f:close()
+        return (IS_WIN and 'more "' or 'less -R "') .. rel .. '"'
+      end
+    end
+  end
+  return nil
+end
+
 -- ── Shared helper: create a repo tab (NO keymap — that's Nexus-only) ─────────
 -- Left pane (60%): shell, or saved command (e.g. "claude --continue").
 --   Wrapped in PS so a shell prompt survives after the command exits.
--- Right pane (40%): shell, or saved service command (e.g. "pnpm dev").
+-- Right pane (40%): saved service command (e.g. "pnpm dev"), else the project's
+--   live state document, else a plain shell. A recorded recipe always wins — the
+--   state doc fills the pane that would otherwise open on an idle prompt.
 local function make_tab(mux_win, title, cwd)
   local ws  = (load_repos_cfg().workspaces or {})[title] or {}
 
   -- Both panes go through pane_launch_args: cd + saved command under a -NoExit
   -- shell, so an exited command leaves a live prompt. nil command → plain shell.
+  -- Quitting the pager therefore drops to a usable shell, not a dead pane.
   local left_args  = pane_launch_args(ws.left,  cwd)
-  local right_args = pane_launch_args(ws.right, cwd)
+  local right_args = pane_launch_args(ws.right or state_doc_cmd(cwd), cwd)
 
   local spawn_cfg = left_args and { cwd = cwd, args = left_args } or { cwd = cwd }
   local tab = mux_win:spawn_tab(spawn_cfg)
@@ -1060,7 +1085,11 @@ local function record_open(rel)
   save_repos_cfg(cfg)
 end
 
-local function launch_repo(win, pane, repo)
+-- Open a repo as a TAB in the window you're already in. Deliberately not a
+-- workspace-per-repo launcher: mux.spawn_window opens a second OS window, and
+-- SwitchToWorkspace then swaps the current window's whole tab set out of view,
+-- so Alt+O read as "my layout vanished and a stray terminal appeared".
+local function launch_repo(win, _pane, repo)
   record_open(repo.rel)
   make_tab(win:mux_window(), repo.rel, repo.path)
 end
