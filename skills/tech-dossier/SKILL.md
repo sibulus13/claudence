@@ -107,16 +107,42 @@ kind it is.**
 | Output | Where | Contains |
 |---|---|---|
 | **Detailed document** | The project's knowledge base or research repo | All six sections, front matter, sourced claims, the full tables |
-| **At-a-glance artifact** | A published Artifact | **Only the decision-changing content**, carried by visualisation |
+| **At-a-glance artifact** | A published Artifact | **Only the decision-changing content**, led by the lineage graph |
 
 **These are not long and short versions of each other.** The document is a reference to return to.
-The artifact answers *"what do I need to know to make the call?"* — typically the era arc, the
+The artifact answers *"what do I need to know to make the call?"* — the lineage graph, the
 strong/weak split, the suitability table, and the local mapping. Everything else stays in the
 document.
 
-Load `artifact-design` before writing the artifact; if it carries diagrams, load
+Load `artifact-design` before writing the artifact; if it carries diagrams beyond the graph, load
 `artifact-diagramming` too. **Register the artifact in the project's artifact index in the same
 turn** — an unregistered URL is lost.
+
+### The lineage graph is required, not optional
+
+**A timeline table is not a lineage.** A dossier's central visual is a **graph** — because the thing
+being explained is descent and divergence, and a list flattens exactly the information that matters:
+which idea came out of which, what branched off and lost, and what quietly influenced something in a
+different family years later.
+
+Minimum specification:
+
+| Element | Requirement |
+|---|---|
+| **Time axis** | Origin dates positioned on an axis, so the reader sees *when* a branch opened and how long a gap was |
+| **Branch families** | Nodes grouped into parallel lanes by lineage — **colour encodes family**, so a reader tracks a branch without reading labels |
+| **Two edge kinds** | **Descent** (solid: this came out of that) and **cross-influence** (dashed: this borrowed from that). Influence edges are where the real intellectual history lives, and they are usually the ones a timeline loses |
+| **Survival status per node** | Encoded in the node's own form — a dashed outline for what did not survive. The graph should show the dead ends, not hide them |
+| **Expandable detail** | Selecting a node reveals its contribution, **pros and cons**, status, and its position in the lineage (descends from / led to / influenced) |
+| **A source backlink per node** | To the primary paper or announcement, so the reader can go read it. **Link to a canonical URL you have verified** — a guessed identifier that lands on the wrong paper is worse than no link |
+| **Interaction affordances** | Isolate-a-node's-neighbourhood and toggle influence edges, because a dense graph is unreadable without a way to subset it |
+
+**Accessibility is not optional here:** nodes are focusable and operable by keyboard, the graph
+carries a text alternative, and colour is never the *only* carrier of a distinction — pair it with
+outline style and state the status in words in the detail panel.
+
+**Verify every source link before shipping.** One search covering several identifiers at once is
+usually enough. Where you cannot verify, link a title search rather than a guessed identifier.
 
 ## Quality bar
 
@@ -137,11 +163,15 @@ harder.
 | Don't | Do |
 |---|---|
 | Write the timeline from memory | Search; verify dates; note the cutoff gap explicitly |
+| Ship a timeline table as the visual | Ship a **branching graph** with descent and influence edges |
+| Guess a paper identifier for a backlink | Verify it, or link a title search that cannot misdirect |
+| Hide the dead ends | Encode survival status per node — the failures are half the lesson |
 | List features | Name failure modes and their mechanisms |
 | Present the current consensus as inevitable | Show which alternatives lost, and on what grounds |
 | Treat all weaknesses as tuning problems | Separate structural from incidental |
 | Duplicate the document in the artifact | Artifact = decision-changing only |
 | Stop at the general case | Section 6 — the local mapping — is the deliverable |
+| Classify a data modality by its module or table | Read it at the **column** — a "tabular" module can hold a prose corpus |
 
 ## Worked example
 
