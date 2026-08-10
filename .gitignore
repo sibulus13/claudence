@@ -78,3 +78,8 @@ plans/
 # Python bytecode
 __pycache__/
 *.pyc
+
+# Loop-health runtime state — per-machine watermarks and the scheduled job's log
+improve/last-health-check.json
+improve/ledger-baseline.json
+telemetry/health.log
