@@ -190,6 +190,16 @@ def state_file(session_id):
     return os.path.join(TELEMETRY_DIR, 'state-%s.json' % session_id)
 
 
+def meta_file(session_id):
+    """Cost and context usage, as last seen by the status line.
+
+    Its own file rather than a key in state_file: the status line writes this on
+    every assistant message while log-prompt.py read-modify-writes the state file,
+    and a merged write would clobber one or the other.
+    """
+    return os.path.join(TELEMETRY_DIR, 'meta-%s.json' % session_id)
+
+
 def running_flag(session_id):
     return os.path.join(TELEMETRY_DIR, 'running-%s.flag' % session_id)
 

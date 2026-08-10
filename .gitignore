@@ -61,6 +61,7 @@ workspaces/.last-ding-stop
 
 # Per-session telemetry state + run flags — regenerated each session, leak session ids
 telemetry/state-*.json
+telemetry/meta-*.json
 telemetry/running.flag
 telemetry/running-*.flag
 telemetry/start-*.stamp

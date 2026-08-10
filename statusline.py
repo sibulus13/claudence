@@ -275,6 +275,16 @@ def main():
     state = H.read_json(H.state_file(session_id), {}) if session_id else {}
     if not isinstance(state, dict):
         state = {}
+
+    # Only the status line's payload carries cost and context usage — the Stop hook's
+    # does not, which is why cost-ledger.jsonl recorded nulls. Park them in their own
+    # file so the read-modify-write on state-<id>.json cannot clobber them.
+    if session_id:
+        meta = {'ctx_pct': get_nested(payload, 'context_window', 'used_percentage'),
+                'cost_usd': get_nested(payload, 'cost', 'total_cost_usd'),
+                'ts': H.now_iso()}
+        if meta['ctx_pct'] is not None or meta['cost_usd'] is not None:
+            H.write_json_compact(H.meta_file(session_id), meta)
     averages = H.read_json(os.path.join(H.TELEMETRY_DIR, 'rolling-averages.json'), {})
     if not isinstance(averages, dict):
         averages = {}

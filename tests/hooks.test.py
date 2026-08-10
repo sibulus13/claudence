@@ -91,6 +91,7 @@ class Sandbox(object):
 
 
 SID = 'aabbccdd-1111-2222-3333-444455556666'
+SID2 = 'bbccddee-1111-2222-3333-444455556666'
 
 # ── log-prompt: classification, KPI state, run flag ──────────────────────────
 box = Sandbox()
@@ -249,6 +250,18 @@ try:
 
     ledger = os.path.join(box.path('telemetry', 'cost-ledger.jsonl'))
     check_true('analyze-session: cost ledger appended', os.path.exists(ledger))
+
+    # The real Stop payload carries neither cost nor context — only the status line
+    # sees them. 125 ledger rows were written with both null before the fallback
+    # existed, so assert the path Claude Code actually takes, not the seeded one.
+    box.run('telemetry/log-prompt.py', {'session_id': SID2, 'prompt': 'go',
+                                        'cwd': '/Users/x/repo/app'})
+    box.run('statusline.py', {'session_id': SID2, 'cost': {'total_cost_usd': 3.5},
+                              'context_window': {'used_percentage': 71}})
+    box.run('telemetry/analyze-session.py', {'session_id': SID2})
+    fallback = box.json_at('telemetry', 'reports', '%s.json' % SID2[:8])
+    check('analyze-session: cost recovered from the status line', fallback.get('cost_usd'), 3.5)
+    check('analyze-session: ctx recovered from the status line', fallback.get('ctx_pct'), 71)
 
     # An approved request (a later tool_done for the same tool) scores 0 and
     # becomes a suggestion instead.

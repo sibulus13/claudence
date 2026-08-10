@@ -78,6 +78,15 @@ def main():
     cost_usd = cost.get('total_cost_usd')
     ctx = (data.get('context_window') or {})
     ctx_pct = ctx.get('used_percentage')
+    if cost_usd is None or ctx_pct is None:
+        # The Stop payload carries neither field; the status line is the only process
+        # that receives them. Without this fallback the ledger records nulls forever.
+        meta = H.read_json(H.meta_file(session_id), {})
+        if isinstance(meta, dict):
+            if cost_usd is None:
+                cost_usd = meta.get('cost_usd')
+            if ctx_pct is None:
+                ctx_pct = meta.get('ctx_pct')
     ctx_pct = int(ctx_pct) if ctx_pct is not None else None
 
     # Claude has stopped — clear the spinner flag.
