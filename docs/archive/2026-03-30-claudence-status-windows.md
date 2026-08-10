@@ -1,3 +1,21 @@
+---
+as-of: 2026-03-30
+status: archived
+superseded-by: ../STATE.md
+---
+
+> **ARCHIVED — describes the pre-port Windows harness.** Superseded by
+> [`../STATE.md`](../STATE.md) on 2026-08-10. Every `.ps1` path, the Pester suite, and
+> `skills/retrospect.md` named below were replaced by python3/zsh equivalents in the macOS port
+> ([`../MACOS-PORT.md`](../MACOS-PORT.md)).
+>
+> **Kept for the root cause, not the content.** This file *was* the project's state page, and it
+> went 4½ months stale unnoticed because it sat under a filename that the state-reader shipped in
+> this same repo (`scripts/workspace-state.py`) does not recognise as `STATE.md`. A convention with
+> a reader and no writer reaches only the projects where someone typed the file out by hand — which
+> is why `templates/STATE.md` now exists. Retrieved as evidence when the same question was asked
+> again on 2026-08-10 and nobody could find where it had been answered before.
+
 # Claudence — Status TLDR
 
 > Hooks-driven friction tracking and telemetry for Claude Code on Windows.

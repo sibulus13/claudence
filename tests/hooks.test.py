@@ -465,6 +465,42 @@ try:
 finally:
     box.close()
 
+# ── open-workspace: state-doc discovery must match the hook's search order ─────
+# The launcher and workspace-state.py must never disagree about which file is the
+# state of a project, so this asserts the same canonical name, aliases and order.
+box = Sandbox()
+try:
+    launcher = os.path.join(REPO, 'scripts', 'open-workspace.sh')
+
+    def resolve(path):
+        proc = subprocess.run(['bash', launcher, '--state-doc', path],
+                              capture_output=True, text=True, timeout=30)
+        return proc.stdout.strip(), proc.returncode
+
+    empty = os.path.join(box.home, 'empty')
+    os.makedirs(empty, exist_ok=True)
+    got, code = resolve(empty)
+    check('open-workspace: no state doc reports none', got, 'none')
+    check_true('open-workspace: missing doc is not an error', code == 0, str(code))
+
+    aliased = os.path.join(box.home, 'aliased', 'docs')
+    os.makedirs(aliased, exist_ok=True)
+    open(os.path.join(aliased, 'context.md'), 'w').close()
+    got, _ = resolve(os.path.dirname(aliased))
+    check('open-workspace: legacy alias found', got, 'docs/context.md')
+
+    open(os.path.join(aliased, 'STATE.md'), 'w').close()
+    got, _ = resolve(os.path.dirname(aliased))
+    check('open-workspace: canonical name wins over an alias', got, 'docs/STATE.md')
+
+    rooted = os.path.join(box.home, 'rooted')
+    os.makedirs(rooted, exist_ok=True)
+    open(os.path.join(rooted, 'STATE.md'), 'w').close()
+    got, _ = resolve(rooted)
+    check('open-workspace: repo root searched after docs/', got, './STATE.md')
+finally:
+    box.close()
+
 # ── loop-health: the canary must fire on nulls, and stay quiet before baseline ─
 # The whole point of this check is that it caught a null ledger. A version that
 # cannot fail is decoration, so assert it fails on the bad input.

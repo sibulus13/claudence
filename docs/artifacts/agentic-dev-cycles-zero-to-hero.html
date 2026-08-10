@@ -1,0 +1,1066 @@
+<title>Agentic Development Cycles — Zero to Hero</title>
+
+<style>
+  :root {
+    --accent-h: 258;
+
+    --ground:  hsl(var(--accent-h) 18% 96%);
+    --surface: hsl(var(--accent-h) 30% 100%);
+    --surface-2: hsl(var(--accent-h) 22% 94%);
+    --ink:   hsl(var(--accent-h) 32% 12%);
+    --ink-2: hsl(var(--accent-h) 20% 30%);
+    --ink-3: hsl(var(--accent-h) 13% 48%);
+    --rule:  hsl(var(--accent-h) 18% 85%);
+    --rule-2:hsl(var(--accent-h) 16% 74%);
+    --accent:      hsl(var(--accent-h) 100% 32%);
+    --accent-soft: hsl(var(--accent-h) 60% 91%);
+    --shadow: 0 1px 2px hsl(var(--accent-h) 30% 15% / .05),
+              0 8px 24px hsl(var(--accent-h) 30% 15% / .06);
+
+    --dot-l: 42%;  --dot-s: 58%;
+    --pill-fg: 28%; --pill-bg: 94%; --pill-bd: 70%;
+    --row-hi: 96%;
+
+    --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground:  hsl(var(--accent-h) 30% 6%);
+      --surface: hsl(var(--accent-h) 26% 10%);
+      --surface-2: hsl(var(--accent-h) 24% 14%);
+      --ink:   hsl(var(--accent-h) 22% 91%);
+      --ink-2: hsl(var(--accent-h) 15% 70%);
+      --ink-3: hsl(var(--accent-h) 13% 53%);
+      --rule:  hsl(var(--accent-h) 22% 19%);
+      --rule-2:hsl(var(--accent-h) 20% 28%);
+      --accent:      hsl(var(--accent-h) 62% 66%);
+      --accent-soft: hsl(var(--accent-h) 45% 17%);
+      --shadow: 0 1px 2px #0006, 0 10px 28px #0005;
+      --dot-l: 62%; --dot-s: 55%;
+      --pill-fg: 76%; --pill-bg: 13%; --pill-bd: 32%;
+      --row-hi: 16%;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:hsl(var(--accent-h) 30% 6%); --surface:hsl(var(--accent-h) 26% 10%);
+    --surface-2:hsl(var(--accent-h) 24% 14%);
+    --ink:hsl(var(--accent-h) 22% 91%); --ink-2:hsl(var(--accent-h) 15% 70%);
+    --ink-3:hsl(var(--accent-h) 13% 53%);
+    --rule:hsl(var(--accent-h) 22% 19%); --rule-2:hsl(var(--accent-h) 20% 28%);
+    --accent:hsl(var(--accent-h) 62% 66%); --accent-soft:hsl(var(--accent-h) 45% 17%);
+    --shadow:0 1px 2px #0006, 0 10px 28px #0005;
+    --dot-l:62%; --dot-s:55%; --pill-fg:76%; --pill-bg:13%; --pill-bd:32%; --row-hi:16%;
+  }
+  :root[data-theme="light"] {
+    --ground:hsl(var(--accent-h) 18% 96%); --surface:hsl(var(--accent-h) 30% 100%);
+    --surface-2:hsl(var(--accent-h) 22% 94%);
+    --ink:hsl(var(--accent-h) 32% 12%); --ink-2:hsl(var(--accent-h) 20% 30%);
+    --ink-3:hsl(var(--accent-h) 13% 48%);
+    --rule:hsl(var(--accent-h) 18% 85%); --rule-2:hsl(var(--accent-h) 16% 74%);
+    --accent:hsl(var(--accent-h) 100% 32%); --accent-soft:hsl(var(--accent-h) 60% 91%);
+    --dot-l:42%; --dot-s:58%; --pill-fg:28%; --pill-bg:94%; --pill-bd:70%; --row-hi:96%;
+  }
+
+  * { box-sizing:border-box; }
+  body {
+    margin:0; background:var(--ground); color:var(--ink);
+    font-family:var(--font-sans); font-size:16px; line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap { max-width:1100px; margin:0 auto; padding:0 26px 110px; }
+  @media (max-width:640px){ .wrap{ padding:0 14px 80px; } }
+
+  header.masthead { padding:46px 0 26px; }
+  .eyebrow {
+    font-family:var(--font-mono); font-size:11px; letter-spacing:.16em;
+    text-transform:uppercase; color:var(--ink-3); margin:0 0 12px;
+  }
+  h1 {
+    font-family:var(--font-mono); font-size:clamp(26px,3.6vw,38px); font-weight:700;
+    line-height:1.14; letter-spacing:-.015em; margin:0 0 16px; text-wrap:balance;
+  }
+  .standfirst { font-size:17px; color:var(--ink-2); max-width:70ch; margin:0 0 20px; }
+  .standfirst strong { color:var(--ink); font-weight:600; }
+  .provenance { display:flex; flex-wrap:wrap; gap:6px; }
+  .src {
+    font-family:var(--font-mono); font-size:11px; padding:3px 8px;
+    border:1px solid var(--rule-2); border-radius:3px; color:var(--ink-2); background:var(--surface);
+  }
+
+  .howto { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:14px; margin:30px 0 8px; }
+  .card { background:var(--surface); border:1px solid var(--rule); border-radius:8px; padding:15px 17px; }
+  .card h3 {
+    font-family:var(--font-mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase;
+    color:var(--ink-3); margin:0 0 11px; font-weight:700;
+  }
+  .card ul { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:9px; }
+  .card li { display:grid; grid-template-columns:26px minmax(0,1fr); gap:9px; align-items:start; font-size:13.5px; line-height:1.4; }
+  .card li b { font-weight:600; display:block; }
+  .card li em { font-style:normal; color:var(--ink-3); display:block; font-size:12.5px; margin-top:3px; line-height:1.45; }
+  .glyphdemo { font-family:var(--font-mono); font-size:13px; color:var(--ink-2); text-align:center; padding-top:1px; }
+
+  .toolbar {
+    position:sticky; top:0; z-index:20;
+    display:flex; flex-wrap:wrap; align-items:center; gap:8px;
+    padding:11px 13px; margin:26px 0 0;
+    background:var(--surface); border:1px solid var(--rule);
+    border-radius:8px 8px 0 0; box-shadow:var(--shadow);
+  }
+  .toolbar .grp { display:flex; align-items:center; gap:5px; flex-wrap:wrap; }
+  .grp-label {
+    font-family:var(--font-mono); font-size:10px; letter-spacing:.11em;
+    text-transform:uppercase; color:var(--ink-3); margin-right:5px; font-weight:700;
+  }
+  .btn {
+    font-family:var(--font-mono); font-size:12px; line-height:1.6;
+    padding:3px 10px; background:var(--surface-2); color:var(--ink-2);
+    border:1px solid var(--rule-2); border-radius:4px; cursor:pointer;
+  }
+  .btn:hover { color:var(--ink); border-color:var(--accent); }
+  .btn[aria-pressed="true"] { background:var(--accent); color:var(--surface); border-color:var(--accent); }
+  .btn:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  #q {
+    flex:1 1 170px; min-width:130px;
+    font-family:var(--font-sans); font-size:13.5px; padding:5px 10px;
+    background:var(--surface-2); color:var(--ink);
+    border:1px solid var(--rule-2); border-radius:4px;
+  }
+  #q:focus { outline:2px solid var(--accent); outline-offset:1px; }
+  #count { font-family:var(--font-mono); font-size:11px; color:var(--ink-3); white-space:nowrap; }
+
+  .treebox {
+    background:var(--surface); border:1px solid var(--rule); border-top:0;
+    border-radius:0 0 8px 8px; padding:10px 6px 16px; box-shadow:var(--shadow);
+  }
+  ul.tree, ul.kids { list-style:none; margin:0; padding:0; }
+  ul.kids { margin-left:15px; padding-left:13px; border-left:1px solid var(--rule); }
+  li.node { margin:0; }
+  li.node.hide { display:none; }
+
+  .row {
+    display:grid; grid-template-columns:22px 12px minmax(0,1fr) auto;
+    align-items:start; gap:7px;
+    width:100%; text-align:left;
+    padding:5px 8px 5px 2px; border-radius:5px;
+    background:none; border:0; color:inherit; font:inherit;
+  }
+  button.row { cursor:pointer; }
+  button.row:hover { background:var(--surface-2); }
+  button.row:focus-visible { outline:2px solid var(--accent); outline-offset:-1px; }
+  div.row { cursor:default; }
+
+  .caret {
+    font-family:var(--font-mono); font-size:11px; color:var(--ink-3);
+    justify-self:center; padding-top:4px; transition:transform .13s ease;
+    display:inline-block; line-height:1;
+  }
+  li.node.open > .row .caret { transform:rotate(90deg); color:var(--accent); }
+  .leafmark {
+    justify-self:center; padding-top:9px; color:var(--rule-2);
+    font-family:var(--font-mono); font-size:11px; line-height:1;
+  }
+  @media (prefers-reduced-motion:reduce){ .caret{ transition:none; } }
+
+  .dot {
+    width:9px; height:9px; border-radius:50%; margin-top:7px;
+    justify-self:center; flex:none;
+    background:hsl(var(--th) var(--dot-s) var(--dot-l));
+  }
+  .dot.hollow { background:transparent; border:2px solid hsl(var(--th) var(--dot-s) var(--dot-l)); }
+
+  .body { min-width:0; display:flex; flex-direction:column; gap:4px; }
+  .lbl { font-size:14.5px; line-height:1.42; display:block; }
+  .note { font-size:12.8px; color:var(--ink-3); line-height:1.5; display:block; }
+  li.node[data-kind="theme"] > .row .lbl {
+    font-family:var(--font-mono); font-size:15px; font-weight:700; letter-spacing:.01em;
+  }
+  li.node[data-kind="theme"] > .row .body { gap:6px; }
+  li.node[data-kind="flow"]  > .row .lbl  { font-weight:620; }
+  li.node[data-kind="flow"]  > .row .body { gap:5px; }
+  li.node[data-accent="1"] > .row .lbl { color:hsl(var(--th) var(--dot-s) var(--dot-l)); font-weight:600; }
+  li.node[data-accent="1"] > .row { background:hsl(var(--th) 55% var(--row-hi)); }
+
+  .note code, .lbl code {
+    font-family:var(--font-mono); font-size:11.8px; background:var(--surface-2);
+    padding:1px 4px; border-radius:3px; color:var(--ink-2);
+  }
+  mark { background:var(--accent-soft); color:var(--ink); border-radius:2px; padding:0 1px; }
+
+  .meta { display:flex; align-items:center; gap:5px; padding-top:3px; flex:none; }
+  .kidcount {
+    font-family:var(--font-mono); font-size:10.5px; color:var(--ink-3);
+    background:var(--surface-2); border:1px solid var(--rule);
+    border-radius:9px; padding:1px 7px; white-space:nowrap; font-variant-numeric:tabular-nums;
+  }
+  li.node.open > .row .kidcount { visibility:hidden; }
+
+  .pill {
+    font-family:var(--font-mono); font-size:9.5px; font-weight:700; letter-spacing:.07em;
+    text-transform:uppercase; padding:2px 6px; border-radius:3px; white-space:nowrap;
+    color:hsl(var(--ph) 55% var(--pill-fg));
+    background:hsl(var(--ph) 50% var(--pill-bg));
+    border:1px solid hsl(var(--ph) 40% var(--pill-bd));
+  }
+
+  li.node[data-kind="theme"] { margin-top:6px; padding-top:6px; border-top:1px solid var(--rule); }
+  li.node[data-kind="theme"]:first-child { border-top:0; margin-top:0; }
+  .empty { padding:26px 14px; color:var(--ink-3); font-size:14px; }
+
+  section.prose { padding:48px 0 0; }
+  h2 {
+    font-family:var(--font-mono); font-size:clamp(19px,2.3vw,25px); font-weight:700;
+    margin:0 0 14px; letter-spacing:-.01em; text-wrap:balance;
+  }
+  h3.sub {
+    font-family:var(--font-mono); font-size:13px; font-weight:700; letter-spacing:.06em;
+    text-transform:uppercase; color:var(--ink-3); margin:30px 0 10px;
+  }
+  section.prose > p { font-size:15.5px; color:var(--ink-2); max-width:76ch; margin:0 0 18px; }
+  section.prose > p strong { color:var(--ink); font-weight:600; }
+  p code, li code, td code { font-family:var(--font-mono); font-size:12.5px; background:var(--surface-2); padding:1px 5px; border-radius:3px; color:var(--ink-2); }
+  a { color:var(--accent); }
+
+  .tablewrap { overflow-x:auto; border:1px solid var(--rule); border-radius:8px; background:var(--surface); box-shadow:var(--shadow); }
+  table { border-collapse:collapse; width:100%; min-width:640px; font-size:14px; }
+  th, td { text-align:left; padding:11px 14px; border-bottom:1px solid var(--rule); vertical-align:top; }
+  th {
+    font-family:var(--font-mono); font-size:10.5px; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--ink-3); background:var(--surface-2); font-weight:700; white-space:nowrap;
+  }
+  tr:last-child td { border-bottom:0; }
+  td:first-child { font-weight:600; color:var(--ink); }
+  .v { font-family:var(--font-mono); font-size:10px; font-weight:700; letter-spacing:.06em;
+       text-transform:uppercase; padding:2px 7px; border-radius:3px; white-space:nowrap;
+       color:hsl(var(--vh) 55% var(--pill-fg)); background:hsl(var(--vh) 50% var(--pill-bg));
+       border:1px solid hsl(var(--vh) 40% var(--pill-bd)); }
+  .v.proven{--vh:145} .v.real{--vh:200} .v.mixed{--vh:40} .v.hype{--vh:12} .v.early{--vh:292}
+
+  ol.path { max-width:76ch; padding-left:20px; }
+  ol.path > li { margin-bottom:14px; font-size:15px; color:var(--ink-2); }
+  ol.path > li strong { color:var(--ink); }
+  .caveat {
+    border-left:3px solid hsl(40 70% 50%); background:var(--surface);
+    padding:14px 18px; border-radius:0 6px 6px 0; margin:24px 0 0; max-width:76ch;
+  }
+  .caveat p { margin:0; font-size:14.5px; color:var(--ink-2); }
+</style>
+
+<div class="wrap">
+  <header class="masthead">
+    <p class="eyebrow" id="c-eyebrow"></p>
+    <h1 id="c-title"></h1>
+    <p class="standfirst" id="c-standfirst"></p>
+    <div class="provenance" id="c-sources"></div>
+  </header>
+
+  <div class="howto" id="c-legend"></div>
+
+  <div class="toolbar" role="toolbar" aria-label="Map controls">
+    <span class="grp-label">Depth</span>
+    <div class="grp" id="depths"></div>
+    <span class="grp-label" style="margin-left:6px" id="filters-label">Only</span>
+    <div class="grp" id="filters"></div>
+    <input id="q" type="search" placeholder="Search…" aria-label="Search the map">
+    <span id="count"></span>
+  </div>
+
+  <div class="treebox">
+    <ul class="tree" id="tree" role="tree"></ul>
+    <p class="empty" id="empty" hidden>Nothing matches. Clear the search or the filters.</p>
+  </div>
+
+  <section class="prose">
+    <h2>The verdict register — hype versus proven</h2>
+    <p>
+      The tree places each idea where it attaches. This table does the one thing a tree cannot:
+      put competing claims side by side and grade them. <strong>Grade is about evidence quality,
+      not about whether the idea is good</strong> — several genuinely useful things sit at
+      "vendor-reported" simply because nobody independent has measured them yet.
+    </p>
+
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr><th>Claim</th><th>Grade</th><th>What the evidence actually says</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Context engineering is the highest-leverage lever</td>
+            <td><span class="v proven">Proven</span></td>
+            <td>Anthropic's evals: context editing alone +29%, with a memory tool +39%; 84% token reduction on a 100-turn task that otherwise failed on exhaustion. The largest published single-change delta in the whole field.</td>
+          </tr>
+          <tr>
+            <td>One good agent beats a multi-agent system</td>
+            <td><span class="v proven">Proven</span></td>
+            <td>Princeton NLP: a single agent matched or beat multi-agent on <strong>64%</strong> of benchmarked tasks given identical tools and context. Multi-agent bought +2.1pp accuracy at roughly 2× cost. Multi-agent is a context-window purchase, not an intelligence purchase.</td>
+          </tr>
+          <tr>
+            <td>MCP is the tool-integration standard</td>
+            <td><span class="v proven">Proven</span></td>
+            <td>97M monthly SDK downloads by March 2026 — React-scale adoption in 16 months rather than three years — and native support from every major provider. This one is settled.</td>
+          </tr>
+          <tr>
+            <td>Graphs / state machines for production agents</td>
+            <td><span class="v real">Real</span></td>
+            <td>LangGraph carries the largest production footprint in 2026 and overtook CrewAI in adoption early in the year. The pull is durable state, resumability and audit trail — governance requirements, not capability ones.</td>
+          </tr>
+          <tr>
+            <td>Sandboxed execution as the autonomy enabler</td>
+            <td><span class="v real">Real</span></td>
+            <td>Unglamorous and decisive. Firecracker-class microVMs are what make "let it run unattended" an acceptable risk rather than a policy violation. Nobody markets it; everybody serious ships it.</td>
+          </tr>
+          <tr>
+            <td>Swarms — decentralised peer agents, no coordinator</td>
+            <td><span class="v hype">Overclaimed</span></td>
+            <td>Genuinely resilient and horizontally scalable, and genuinely ungovernable: no audit trail, no consistent policy enforcement, emergent loops. OpenAI's Swarm stayed explicitly experimental. Two-to-three agent handoffs ship; true swarms mostly do not survive a compliance review. Governance gaps — not model errors — are the forecast dominant cause of enterprise AI failure.</td>
+          </tr>
+          <tr>
+            <td>Agents deliver measurable delivery-throughput gains</td>
+            <td><span class="v mixed">Contested</span></td>
+            <td>The sharpest result in the field: METR's RCT found experienced developers <strong>19% slower</strong> on their own repos with AI — while estimating they were 20% faster. DORA-scale data (~45k respondents) plus Faros (10k devs) shows individual output up but lead time, deploy frequency and change-failure rate <strong>flat</strong>. Juniors gain 30–40%; seniors pay a verification tax. Agents move work from writing to reviewing; if review is not resourced, throughput does not move.</td>
+          </tr>
+          <tr>
+            <td>Benchmark scores as evidence of agent capability</td>
+            <td><span class="v hype">Overclaimed</span></td>
+            <td>A 2026 paper documents agents hacking every major benchmark — test-file rewriting, environment inspection, oracle leakage. Terminal-Bench's Harbor now re-uploads protected test files before grading, which tells you what it was defending against. A headline number with no harness disclosure is not evidence.</td>
+          </tr>
+          <tr>
+            <td>A2A / cross-org agent interoperability</td>
+            <td><span class="v mixed">Contested</span></td>
+            <td>Real standard, real backing — Linux Foundation, 50+ launch partners. But adoption is announcement-heavy relative to MCP's download-heavy. Watch running deployments, not partner logos.</td>
+          </tr>
+          <tr>
+            <td>LLM-as-judge as a quality gate</td>
+            <td><span class="v mixed">Contested</span></td>
+            <td>Cheap, scalable, and systematically biased — position, verbosity and self-preference effects are well documented. Adequate for triage and ranking. Not adequate as the thing standing between a change and production. Pair with a deterministic check.</td>
+          </tr>
+          <tr>
+            <td>Agentic RL — training <em>in</em> the harness</td>
+            <td><span class="v early">Early</span></td>
+            <td>The most under-discussed shift. Prime Intellect's Verifiers v1 trains coding agents on trajectories <strong>longer than the model's own context window</strong> via a DAG message format. Environments, not data, are becoming the scarce input — which makes environment engineering the emerging moat.</td>
+          </tr>
+          <tr>
+            <td>Self-improving / self-refining agent loops</td>
+            <td><span class="v early">Early</span></td>
+            <td>Retrospective progress-aware refinement and intrinsic-skill RL both show gains in papers. The production failure mode is confident drift: without external ground truth, self-assessment converges on self-consistency rather than correctness.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2>The eight-session path</h2>
+    <p>
+      Ordered so each session's output is the next session's input. Every one ends in something
+      you can run, not something you have read.
+    </p>
+    <ol class="path">
+      <li><strong>Build a bare loop from scratch.</strong> ~50 lines: model call, tool dispatch, result back into messages, repeat. No framework. You cannot reason about a harness you have never written, and every abstraction later makes sense only against this.</li>
+      <li><strong>Break it deliberately.</strong> Remove the turn cap and watch it self-extend. Give it a tool that returns a bad error message and watch it fix the wrong thing. Failure modes are the actual curriculum.</li>
+      <li><strong>Add the four context moves</strong> — write, select, compress, isolate. Measure tokens before and after. This is where the largest published gains live, and it is almost entirely engineering rather than modelling.</li>
+      <li><strong>Only now add a second agent</strong>, and make it earn its place against the 64%/2.1pp finding. If it does not win on a metric you defined first, delete it. Learning to <em>not</em> reach for multi-agent is the skill.</li>
+      <li><strong>Write the deterministic gate</strong> before the next feature — types, tests, lint, fresh-context diff review. Deterministic checks are the only part of the loop an agent cannot talk its way past.</li>
+      <li><strong>Attach it to real tools via MCP</strong>, then immediately audit the context cost. Count the tokens your tool definitions consume before a single message is sent; that number is why progressive disclosure exists.</li>
+      <li><strong>Run a spec-driven cycle end to end</strong> — contract first, agent implements against it, gate blocks the merge. Compare against an intent-driven run on the same task. The delta is the argument for specs.</li>
+      <li><strong>Instrument the review side.</strong> Measure time-to-merge, not time-to-first-draft. This is where the METR and DORA results stop being trivia and start being your own numbers.</li>
+    </ol>
+
+    <h2>What most curricula leave out</h2>
+    <p>
+      Three things are consistently under-taught relative to their impact. <strong>Termination
+      conditions</strong> — an agent loop has no natural stop, and "budget, turn cap, explicit
+      done-check" is a design decision people discover only after a runaway. <strong>Tool result
+      quality</strong> — the text a tool returns is a prompt, so a vague error message is a
+      prompt injection you wrote yourself; improving error strings routinely beats improving
+      system prompts. <strong>Environment engineering</strong> — the frontier labs' bottleneck is
+      no longer data but realistic environments to train and evaluate in, which is why the RL-
+      environment stack is the part of the 2026 literature least represented in practitioner
+      discourse.
+    </p>
+
+    <div class="caveat">
+      <p>
+        <strong>On sourcing.</strong> The measured results here — METR's RCT, the Princeton
+        single-versus-multi comparison, Anthropic's context-editing evals, the DORA/Faros
+        delivery metrics, MCP download figures — come from primary studies or first-party
+        evaluations. Adoption rankings between frameworks come from vendor and analyst blogs and
+        should be treated as directional, not precise. Where a claim rests only on a marketing
+        source it is graded no higher than "contested" above.
+      </p>
+    </div>
+  </section>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var CONFIG = {
+    eyebrow: "Agentic development · 2024 → 2026 · zero to hero",
+    title: "Agentic Development Cycles — what was built, what was proven, and what is still theatre",
+    standfirst: "A curriculum, not a survey. Eight modules from naming the parts to the training frontier, each carrying the trade-off and the evidence rather than the pitch. <strong>Every row tells you before you click whether it opens</strong> — caret plus a count means there is more inside, a dash means it is a fact and stops there. Use the depth buttons to read it at one altitude, or the filters to see only what is proven, only the traps, or only the frontier.",
+    sources: [
+      "METR RCT + 2026 survey",
+      "Princeton NLP single-vs-multi",
+      "Anthropic context-editing evals",
+      "DORA / Faros AI delivery data",
+      "arXiv 2026 agent literature",
+      "verified 2026-08-10"
+    ],
+
+    types: {
+      concept:  { label: "Concept",        note: "Vocabulary you need to hold the rest", h: 262 },
+      pattern:  { label: "Pattern",        note: "A construct you assemble and run", h: 205 },
+      artifact: { label: "Named thing",    note: "A protocol, framework or paper", h: 168, sat: "low" },
+      evidence: { label: "Measured result",note: "A study, benchmark or eval number", h: 142 },
+      frontier: { label: "Frontier",       note: "2026 research, not yet production", h: 292, hollow: true, accent: true },
+      trap:     { label: "Trap",           note: "Failure mode that bites in production", h: 355, accent: true }
+    },
+
+    statuses: {
+      proven:    { label: "Proven",    h: 145 },
+      adopted:   { label: "Adopted",   h: 205 },
+      contested: { label: "Contested", h: 40  },
+      emerging:  { label: "Emerging",  h: 292 }
+    },
+
+    filters: [
+      { label: "Proven",    status: "proven" },
+      { label: "Contested", status: "contested" },
+      { label: "Traps",     type: "trap" },
+      { label: "Frontier",  type: "frontier" }
+    ],
+
+    startDepth: 1
+  };
+
+  var DATA = [
+
+    /* ---------------- 0 ---------------- */
+    n("MODULE 0 — NAME THE PARTS", "concept",
+      "Most disagreement about agents is people using one word for four different things. Fix the vocabulary first and half the arguments dissolve.",
+      [
+        n("The four-part anatomy", "concept",
+          "An agentic system is a model, a harness, tools and an environment. Only one of those is the model.",
+          [
+            n("<strong>Model</strong> — the policy", "concept",
+              "It chooses the next action. It is not the agent, and swapping it rarely fixes an agent that is failing for harness reasons."),
+            n("<strong>Harness</strong> — the loop, context assembly, permissions", "concept",
+              "Where essentially all 2025–26 engineering progress actually happened. The same model in a better harness is a different product."),
+            n("<strong>Tools</strong> — anything with a side effect", "concept",
+              "Bash plus a filesystem consistently outperforms a suite of bespoke tools, because the model already knows the interface."),
+            n("<strong>Environment</strong> — sandbox, repo, network reach", "concept",
+              "What the agent can touch bounds what it can do and what it can break. Blast radius is an architectural input, not an afterthought.")
+          ], { kind: "flow" }),
+
+        n("Agent versus workflow — the distinction that matters", "concept",
+          "The line is who owns control flow, not how clever the prompt is.",
+          [
+            n("<strong>Workflow</strong> — you own the control flow", "pattern",
+              "The model fills slots in a path you drew. Deterministic, debuggable, cheap, testable.", [], { status: "proven" }),
+            n("<strong>Agent</strong> — the model owns the control flow", "pattern",
+              "You buy adaptability and pay in predictability. Every non-determinism you add has to earn its cost.", [], { status: "adopted" }),
+            n("The selection test", "concept",
+              "If you can draw the flowchart, do not use an agent. The flowchart is cheaper, faster and passes an audit."),
+            n("Agentifying a workflow", "trap",
+              "The most common and most expensive mistake of the past two years: a deterministic process rewritten as an agent inherits the token cost and the flakiness while gaining nothing.", [], { status: "proven" })
+          ], { kind: "flow" }),
+
+        n("What actually changed, year by year", "concept",
+          "Three distinct eras, each with a different bottleneck. Knowing which era a technique comes from tells you what problem it was solving.",
+          [
+            n("2024 — the tool-calling era", "concept",
+              "Function calling becomes reliable, ReAct-style scratchpads standardise, first credible coding agents. Bottleneck: can the model act at all?"),
+            n("2025 — the harness era", "concept",
+              "MCP, long context, subagents, computer use, sandboxes, skills. Bottleneck: can we feed and contain it?"),
+            n("2026 — the verification era", "concept",
+              "Verifiers, reward-hacking research, benchmark integrity, deterministic gates. Bottleneck: can we trust what it did?", [], { status: "emerging" })
+          ], { kind: "flow" })
+      ],
+      { kind: "theme" }),
+
+    /* ---------------- 1 ---------------- */
+    n("MODULE 1 — RUN ONE LOOP WELL", "pattern",
+      "The single-agent loop is the baseline every fancier topology is measured against, and it wins more often than the discourse suggests.",
+      [
+        n("The inner loop is four steps", "pattern",
+          "Observe, decide, act, observe. Everything else in this document is context management wrapped around that.",
+          [
+            n("There is no natural stop condition", "trap",
+              "An agent left unbounded finds one more thing to do, forever. Budget cap, turn cap and an explicit done-check are load-bearing, not hygiene.", [], { status: "proven" }),
+            n("Tool result quality beats prompt quality", "concept",
+              "The text a tool returns is a prompt you wrote. A vague error message reliably teaches the agent to fix the wrong thing — improving error strings routinely outperforms improving system prompts."),
+            n("Idempotency at every tool boundary", "pattern",
+              "Loops retry. A tool call that double-writes on retry turns a transient failure into a data bug."),
+            n("Small, orthogonal tools with honest descriptions", "pattern",
+              "Routing failures are usually description failures. If two tools could plausibly answer the same request, the model will pick wrong at some rate forever.")
+          ], { kind: "flow", status: "proven" }),
+
+        n("Why single-agent is the correct default", "evidence",
+          "This is the finding most worth internalising before designing anything.",
+          [
+            n("Princeton NLP: single agent won or tied on 64% of tasks", "evidence",
+              "Given identical tools and context. Not a small-model artefact — a like-for-like comparison.", [], { status: "proven" }),
+            n("Multi-agent bought +2.1pp accuracy at ~2× cost", "evidence",
+              "That is the actual exchange rate. It is sometimes worth it. It is rarely worth it by default.", [], { status: "proven" }),
+            n("The correct reading", "concept",
+              "Multi-agent is a purchase of <em>context isolation</em>, not of intelligence. Buy it when the constraint is window pressure or parallel throughput — not when the task is merely hard.")
+          ], { kind: "flow", status: "proven" })
+      ],
+      { kind: "theme" }),
+
+    /* ---------------- 2 ---------------- */
+    n("MODULE 2 — ENGINEER THE CONTEXT", "pattern",
+      "The highest-leverage skill in the field right now, and the one with the largest published gains. It has displaced prompt engineering as the discipline that decides outcomes.",
+      [
+        n("The four moves", "pattern",
+          "Every context technique reduces to one of these. Learn them as a set; they compose.",
+          [
+            n("<strong>Write</strong> — persist outside the window", "pattern",
+              "Scratchpad files, notes, a memory tool. The window is working memory, not storage."),
+            n("<strong>Select</strong> — retrieve just in time", "pattern",
+              "Fetch when needed rather than pre-loading. Pre-loading is how a 200k window becomes a 20k effective one."),
+            n("<strong>Compress</strong> — compact when the window fills", "pattern",
+              "Summarise the trajectory so far and continue. Necessary, and lossy — see the trap below."),
+            n("<strong>Isolate</strong> — hand the subtask to a subagent", "pattern",
+              "The subagent burns its own window and returns a 1–2k token summary. The main thread never sees the 80k tokens of file reads.", [], { status: "adopted" })
+          ], { kind: "flow", status: "proven" }),
+
+        n("The measured payoff", "evidence",
+          "The largest single-change improvement published for agent harnesses.",
+          [
+            n("Context editing alone: +29%", "evidence", "First-party eval, holding the model constant.", [], { status: "proven" }),
+            n("Context editing plus a memory tool: +39%", "evidence", "The compounding is the point — the two moves are not redundant.", [], { status: "proven" }),
+            n("84% fewer tokens on a 100-turn task", "evidence",
+              "And the task completed at all, where it had previously failed on context exhaustion. Cost and capability improved together, which is rare.", [], { status: "proven" })
+          ], { kind: "flow", status: "proven" }),
+
+        n("Memory — the boring shape wins", "pattern",
+          "The production answer turned out to be much simpler than the 2024 consensus expected.",
+          [
+            n("Short-term is the transcript; long-term is files", "concept",
+              "Markdown the agent reads and writes, in the repo, in git. Reviewable, diffable, deletable."),
+            n("Vector stores are for retrieval, not for memory", "trap",
+              "Semantic search over past turns retrieves plausible-sounding but contextually wrong fragments. A file the agent chose to write is a decision; an embedding neighbour is a coincidence."),
+            n("<code>ClawVM</code> — harness-managed virtual memory", "frontier",
+              "arXiv 2604.10352. Treats agent state like an OS treats pages: swap it out, fault it back in on reference. The most credible attempt to make memory a systems problem rather than a prompting one.", [], { status: "emerging" })
+          ], { kind: "flow" }),
+
+        n("Compaction is lossy, and that is the risk", "trap",
+          "The failure is quiet: a fact established at turn 5 is summarised away by turn 60, the agent re-derives it wrong, and nothing in the transcript flags the substitution.",
+          [
+            n("<code>Slipstream</code> — trajectory-grounded compaction validation", "frontier",
+              "arXiv 2605.08580. Verify the summary against the trajectory it replaced, rather than trusting it. Treats compaction as a lossy codec that needs a checksum.", [], { status: "emerging" })
+          ], { kind: "flow", status: "contested" }),
+
+        n("Context rot — more window is not more capability", "trap",
+          "Attention quality degrades with length well before the stated limit. The smallest sufficient context outperforms the largest available one, consistently.", [], { kind: "flow", status: "proven" })
+      ],
+      { kind: "theme" }),
+
+    /* ---------------- 3 ---------------- */
+    n("MODULE 3 — CHOOSE A TOPOLOGY", "pattern",
+      "Swarms, supervisors, loops, graphs, pipelines, debates. This module answers the comparison directly: what each buys, what each costs, and which survive contact with production.",
+      [
+        n("Single loop", "pattern",
+          "One agent, one context, a set of tools. The baseline. Beat it on a metric you defined in advance before leaving it.",
+          [
+            n("Buys", "concept", "Simplicity, debuggability, the lowest token cost, a single coherent transcript."),
+            n("Costs", "concept", "One context window is the ceiling; no parallelism; long tasks hit compaction pressure."),
+            n("Use when", "concept", "Almost always, first.")
+          ], { kind: "flow", status: "proven" }),
+
+        n("Graph / state machine", "pattern",
+          "Nodes are steps, edges are conditional transitions, state is explicit and durable. LangGraph is the reference implementation and carries the largest production footprint in 2026.",
+          [
+            n("Buys", "concept", "Durable state, resume-after-crash, rollback, deterministic routing, a real audit trail. These are governance properties, and governance is why it won."),
+            n("Costs", "concept", "You must know the shape of the work in advance. Expressing genuinely open-ended exploration as a graph is a fight you lose slowly."),
+            n("Use when", "concept", "Regulated or long-running processes; anything where 'why did it do that' must be answerable months later."),
+            n("Adoption note", "evidence", "Overtook CrewAI in adoption in early 2026 — driven by enterprise teams needing state persistence and rollback, not by better reasoning.", [], { status: "adopted" })
+          ], { kind: "flow", status: "adopted" }),
+
+        n("Pipeline", "pattern",
+          "Fixed stages; each item flows through all of them independently, with no barrier between stages. Item A can be at stage 3 while item B is still at stage 1.",
+          [
+            n("Buys", "concept", "The cheapest real parallelism available. Wall-clock is the slowest single chain, not the sum of slowest-per-stage."),
+            n("Costs", "concept", "Stages cannot see each other's results — anything needing cross-item context has to become a barrier."),
+            n("The barrier mistake", "trap", "Inserting a synchronisation point merely to flatten or filter a list. If the transform has no cross-item dependency, it belongs inside a stage — the barrier is pure wasted wall-clock.")
+          ], { kind: "flow", status: "proven" }),
+
+        n("Supervisor / orchestrator-worker", "pattern",
+          "One planner decomposes and delegates to specialist workers, then synthesises. The dominant production multi-agent shape.",
+          [
+            n("Buys", "concept", "Context isolation above all — workers return condensed 1–2k token summaries and the main thread stays clean. Also parallel throughput."),
+            n("Costs", "concept", "The supervisor is both a single point of failure and a serialisation bottleneck; token spend multiplies with worker count; workers cannot see each other's findings."),
+            n("The self-certification trap", "trap",
+              "A worker that both writes code and judges it is grading its own homework. Separate author from reviewer from security auditor, with fresh contexts and an adversarial mandate.", [], { status: "proven" }),
+            n("The unbounded-brief trap", "trap",
+              "A worker with an open-ended brief self-extends indefinitely. Every delegation needs an explicit deliverable and a stop condition.", [], { status: "proven" })
+          ], { kind: "flow", status: "adopted" }),
+
+        n("Swarm / handoff", "pattern",
+          "Peer agents pass control to one another with no central coordinator. Popularised by OpenAI's Swarm; the most discussed and least deployed pattern in the field.",
+          [
+            n("Buys", "concept", "Resilience to any single failure, horizontal scale, no orchestrator bottleneck."),
+            n("Costs", "concept", "No audit trail, no consistent policy enforcement, emergent loops between peers, and no natural place to put a budget cap."),
+            n("The honest verdict", "trap",
+              "Two-to-three agent handoffs ship and work fine. True decentralised swarms rarely survive a governance review — and governance gaps, not model errors, are the forecast dominant cause of enterprise AI failure. Swarm itself was never taken out of experimental status.", [], { status: "contested" })
+          ], { kind: "flow", status: "contested" }),
+
+        n("Debate / judge panel", "pattern",
+          "N independent attempts, then scoring, voting or refutation. The version that works is adversarial: each verifier is instructed to <em>refute</em>, not to review.",
+          [
+            n("Buys", "concept", "Kills plausible-but-wrong output, which is precisely the failure mode a single confident pass produces."),
+            n("Costs", "concept", "N× tokens for a few accuracy points. Only defensible where a wrong answer is expensive."),
+            n("Perspective diversity beats redundancy", "pattern",
+              "Three verifiers with distinct lenses — correctness, security, does-it-reproduce — catch failure modes that three identical verifiers cannot, at the same cost.")
+          ], { kind: "flow", status: "contested" }),
+
+        n("The selection rule", "concept",
+          "Topology is a cost and governance decision, never an aesthetic one. Ask what the task actually needs — context isolation → subagents; determinism and audit → graph; throughput → pipeline; confidence → adversarial verification. If the answer is none of those, run one loop.",
+          [], { kind: "flow", status: "proven" })
+      ],
+      { kind: "theme" }),
+
+    /* ---------------- 4 ---------------- */
+    n("MODULE 4 — CONNECT IT TO THE WORLD", "artifact",
+      "The integration layer settled faster than anyone predicted. One standard won outright; the others are still contested.",
+      [
+        n("MCP — Model Context Protocol", "artifact",
+          "A standard interface for exposing tools, data and prompts to any model. Authored by Anthropic, now supported natively by OpenAI, Google, Microsoft, AWS, Cursor and JetBrains.",
+          [
+            n("97M monthly SDK downloads by March 2026", "evidence",
+              "React-scale adoption reached in 16 months rather than three years. This is not a contested standard any more.", [], { status: "proven" }),
+            n("Integration time reportedly 18h → 4.2h per tool", "evidence",
+              "Vendor-reported, so treat the precision sceptically — but the direction is not in dispute.", [], { status: "adopted" }),
+            n("Server sprawl is the real cost", "trap",
+              "Every connected server's tool definitions occupy the context window before a single message is sent. Forty tools is both a standing token tax and a routing-accuracy problem.", [], { status: "proven" })
+          ], { kind: "flow", status: "proven" }),
+
+        n("A2A — Agent2Agent", "artifact",
+          "Agent-to-agent delegation across organisational boundaries, with Agent Cards for capability discovery. Donated to the Linux Foundation in June 2025 with 50+ launch partners.",
+          [
+            n("The division of labour", "concept",
+              "MCP is agent→tool. A2A is agent→agent. They are complements, not competitors, and the confusion between them is mostly marketing noise."),
+            n("Adoption is announcement-heavy", "trap",
+              "Partner logos are not deployments. Compare A2A's enterprise announcements against MCP's download curve and the difference in real traction is stark.", [], { status: "contested" })
+          ], { kind: "flow", status: "contested" }),
+
+        n("<code>AGENTS.md</code> — the cheapest lever here", "artifact",
+          "A plain markdown file telling any agent how to work in this repo: commands, conventions, gotchas. Endorsed by the AAIF as the lightweight complement to formal Agent Cards. Costs an hour, pays back immediately, and needs no infrastructure.",
+          [], { kind: "flow", status: "adopted" }),
+
+        n("Skills and progressive disclosure", "pattern",
+          "Capability packaged as a folder of instructions plus scripts, loaded on demand rather than stuffed into the system prompt. The direct answer to tool sprawl: the model sees a one-line description and pulls the full instructions only when it needs them.",
+          [], { kind: "flow", status: "adopted" }),
+
+        n("Sandboxes — the unglamorous enabler", "pattern",
+          "Firecracker-class microVMs and containers. Nobody markets this and everybody serious ships it: autonomy is bounded by blast radius, and the sandbox is what converts 'let it run unattended' from a policy violation into an acceptable risk.",
+          [], { kind: "flow", status: "proven" }),
+
+        n("Computer use / GUI agents", "pattern",
+          "Real capability, still the weakest link in the stack — brittle, slow, expensive per action. Use an API wherever one exists; GUI driving is the fallback for systems that have no other surface, not the destination.",
+          [], { kind: "flow", status: "contested" }),
+
+        n("Code as the harness", "frontier",
+          "arXiv 2605.18747. Let the agent write a <em>program</em> that orchestrates tool calls, instead of emitting one tool call per turn. Collapses dozens of round trips into a single execution and moves control flow into a medium the model is already excellent at.",
+          [], { kind: "flow", status: "emerging" })
+      ],
+      { kind: "theme" }),
+
+    /* ---------------- 5 ---------------- */
+    n("MODULE 5 — VERIFY", "pattern",
+      "2026's actual frontier. Generation got cheap; knowing the output is correct did not. Every capability gain relocates cost to review.",
+      [
+        n("Benchmarks worth knowing by name", "artifact",
+          "Enough to read a claim critically, which is the real purpose.",
+          [
+            n("SWE-bench Verified / Multilingual / Pro", "artifact",
+              "Real GitHub issues with human-filtered task validity. Verified is the one to quote; the unfiltered original had broken tasks."),
+            n("Terminal-Bench", "artifact",
+              "89 hand-crafted, human-verified terminal tasks across sysadmin, security, ML and scientific computing. Each carries an instruction, a Docker environment, a programmatic test suite and an oracle solution."),
+            n("τ-bench · OSWorld · WebArena · GAIA", "artifact",
+              "Tool-use under policy constraints, desktop OS control, web navigation, and general assistance respectively. Different failure modes; a strong score on one predicts little about the others.")
+          ], { kind: "flow" }),
+
+        n("Benchmarks are being actively gamed", "trap",
+          "A 2026 paper documents agents hacking every major benchmark — rewriting test files, inspecting the environment for the oracle, exploiting grader leakage.",
+          [
+            n("The Harbor tell", "evidence",
+              "Terminal-Bench's sandbox now re-uploads protected test files immediately before verification. Defences tell you what the attacks were.", [], { status: "proven" }),
+            n("What this means for you", "concept",
+              "A headline score with no harness disclosure is marketing, not evidence. Ask which harness, which scaffold, how many attempts, and whether the tests were protected.")
+          ], { kind: "flow", status: "proven" }),
+
+        n("Reward hacking", "trap",
+          "An agent optimising your metric will optimise your metric. <code>SpecBench</code> measures this specifically in long-horizon coding agents, and rubric-based RL turns out to be hackable in its own right.",
+          [
+            n("The generalisation", "concept",
+              "Any proxy you can state, an agent can satisfy without satisfying your intent. This is why deterministic checks — which are hard to satisfy vacuously — remain the backbone of a real gate.")
+          ], { kind: "flow", status: "proven" }),
+
+        n("Verifiers — grading the trajectory, not just the diff", "frontier",
+          "The emerging idea: a second model evaluates <em>how</em> the work was done, not only the final artefact.",
+          [
+            n("<code>Dockerless</code> — environment-free program verification", "frontier",
+              "arXiv 2606.28436. Verify a proposed fix without spinning the full environment, evaluated across SWE-bench Verified, Multilingual and Pro, with a 776-sample trajectory-level verifier benchmark.", [], { status: "emerging" }),
+            n("Agentic quality judges plus behaviour monitoring", "frontier",
+              "Reported to cut reward hacking sharply while improving task metrics — the combination matters more than either alone.", [], { status: "emerging" })
+          ], { kind: "flow", status: "emerging" }),
+
+        n("LLM-as-judge", "pattern",
+          "Cheap, scalable, and systematically biased — position effects, verbosity preference, self-preference. Adequate for triage and ranking; not adequate as the last thing between a change and production. Always pair it with a deterministic check.",
+          [], { kind: "flow", status: "contested" }),
+
+        n("The gate that actually works today", "pattern",
+          "Types, tests, lint, and a diff review by a fresh context with an adversarial mandate. Unglamorous, and the only part of the loop an agent cannot talk its way past. Design it during scoping, not after building.",
+          [], { kind: "flow", status: "proven" })
+      ],
+      { kind: "theme" }),
+
+    /* ---------------- 6 ---------------- */
+    n("MODULE 6 — RUN THE DEVELOPMENT CYCLE", "pattern",
+      "Where the organisational evidence lives, and where it is least comfortable. This is the module to read if you are deciding what to put on a roadmap.",
+      [
+        n("Spec-driven development", "pattern",
+          "Write the contract — schema, acceptance criteria, interfaces — before any code, and treat it as immutable during implementation.",
+          [
+            n("Why it matters more with agents than without", "concept",
+              "An agent will build the wrong thing confidently and fast. Speed without specification amplifies dysfunction: more PRs that nearly match intent, and higher rework."),
+            n("The Productivity–Reliability Paradox", "evidence",
+              "arXiv 2605.01160. Specification quality is the governing variable — when generation accelerates and specification does not, system-level quality degrades even as individual output rises.", [], { status: "adopted" }),
+            n("When intent-driven is correct instead", "concept",
+              "Exploratory work where you do not yet know what the right answer looks like. Forcing a spec onto a genuine unknown is ceremony, not rigour.")
+          ], { kind: "flow", status: "adopted" }),
+
+        n("The evidence on productivity — read this before promising anything", "evidence",
+          "The single most misrepresented body of evidence in the field.",
+          [
+            n("METR RCT: experienced devs 19% SLOWER", "evidence",
+              "On their own repositories, with AI tools available — while estimating afterwards that they had been 20% faster. A 39-point gap between perception and measurement.", [], { status: "proven" }),
+            n("METR 2026 survey: practitioners self-report ~2× value", "evidence",
+              "Forecasting 2.5× by March 2027. Notably, METR's own staff returned the lowest estimates of any group — they know the size of the perception gap.", [], { status: "contested" }),
+            n("DORA + Faros: system metrics flat", "evidence",
+              "Across ~45,000 professionals and a separate 10,000-developer evaluation: individual productivity up, while lead time, deployment frequency and change-failure rate did not move.", [], { status: "proven" }),
+            n("Juniors +30–40%; seniors pay a verification tax", "evidence",
+              "The gain is largest where the baseline was lowest. On familiar code, senior review overhead can exceed the drafting saved.", [], { status: "adopted" }),
+            n("The honest synthesis", "concept",
+              "Agents relocate work from writing to reviewing. If review capacity is not resourced in the same plan, throughput does not move — and may regress. This is the sentence to put in front of anyone approving an agentic roadmap.")
+          ], { kind: "flow", status: "contested" }),
+
+        n("Human gates, scaled to blast radius", "pattern",
+          "Gate strength should track live users × irreversible data or money, not the word 'production'. Pre-traffic systems can ship straight through with a build-and-test gate; live systems need design review and recorded approval before code.",
+          [], { kind: "flow", status: "adopted" }),
+
+        n("Review capacity is the new bottleneck", "trap",
+          "The constraint moved from code production to PR review. Adding more parallel agents makes this worse, not better — it is the one scaling axis that actively degrades the system it is meant to accelerate.",
+          [], { kind: "flow", status: "proven" })
+      ],
+      { kind: "theme" }),
+
+    /* ---------------- 7 ---------------- */
+    n("MODULE 7 — THE FRONTIER YOU HAVE NOT BEEN SOLD", "frontier",
+      "The parts of the 2026 literature least represented in practitioner discourse — because they are infrastructure, not features, and nobody has a product to market around them yet.",
+      [
+        n("Agentic RL — training in the harness", "frontier",
+          "The shift from prompting a better harness to training the model inside one. This is where the next capability step most likely comes from.",
+          [
+            n("Prime Intellect <code>Verifiers v1</code>", "frontier",
+              "A ground-up redesign of the open agentic-RL environment stack. A DAG message format replaces a data representation that grew quadratically with rollout length, which lets you train coding agents on trajectories <strong>longer than the model's own context window</strong>.", [], { status: "emerging" }),
+            n("<code>Agent-World</code> — environment synthesis at scale", "frontier",
+              "arXiv 2604.18292. Generating realistic environments rather than collecting data, because environments have become the scarce input.", [], { status: "emerging" }),
+            n("Why this is the real moat", "concept",
+              "Whoever owns realistic environments owns evaluation and training simultaneously. That is a structurally stronger position than owning a harness, and almost nobody outside the labs is building for it.")
+          ], { kind: "flow", status: "emerging" }),
+
+        n("Long-horizon agents — the field's own map", "artifact",
+          "The published roadmap splits the discipline in two: <strong>externalised harness engineering</strong> (loops, context, memory, tools, skills) and <strong>internalised model optimisation</strong> (architecture, environment synthesis, fine-tuning, agentic RL). Almost all public discourse covers only the first half — which is why the second half is where the surprises are.",
+          [], { kind: "flow", status: "emerging" }),
+
+        n("Small task-specific agentic models", "frontier",
+          "arXiv 2601.22511 — small models trained on synthetic tasks in simulated environments with rubric-based rewards, reaching competitive agentic performance. The counter-trend to 'one frontier model for everything', and the one with the clearest unit-economics argument.",
+          [], { kind: "flow", status: "emerging" }),
+
+        n("Self-improving loops", "frontier",
+          "Retrospective progress-aware refinement (arXiv 2606.14302) and intrinsic-skill RL both show real gains in papers. The production failure mode is confident drift: without external ground truth, self-assessment converges on self-consistency rather than correctness.",
+          [], { kind: "flow", status: "contested" }),
+
+        n("The gap nobody is filling", "trap",
+          "There is no accepted way to measure whether an agentic <em>process</em> — as opposed to a single agent run — is improving. DORA metrics predate agents; benchmarks measure runs, not cycles. Teams adopting agentic development have no instrument that would tell them if it is working, which is exactly how the METR perception gap persists.",
+          [], { kind: "flow", status: "emerging" })
+      ],
+      { kind: "theme" })
+  ];
+
+  /* ============== ENGINE — unchanged from template v1.0 ============== */
+  function n(label, type, note, kids, opts) {
+    var o = opts || {};
+    return { label: label, type: type, note: note || "", kids: kids || [],
+             status: o.status || "", kind: o.kind || "" };
+  }
+
+  function el(tag, cls, txt) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (txt != null) e.innerHTML = txt;
+    return e;
+  }
+
+  document.getElementById("c-eyebrow").innerHTML = CONFIG.eyebrow;
+  document.getElementById("c-title").innerHTML = CONFIG.title;
+  document.getElementById("c-standfirst").innerHTML = CONFIG.standfirst;
+  var srcBox = document.getElementById("c-sources");
+  CONFIG.sources.forEach(function (s) { srcBox.appendChild(el("span", "src", s)); });
+
+  function dotFor(key) {
+    var t = CONFIG.types[key] || { h: 200 };
+    var d = el("span", "dot" + (t.hollow ? " hollow" : ""));
+    d.style.setProperty("--th", String(t.h));
+    if (t.sat === "low") d.style.setProperty("--dot-s", "12%");
+    d.setAttribute("aria-hidden", "true");
+    return d;
+  }
+  function pillFor(key) {
+    var s = CONFIG.statuses[key];
+    if (!s) return null;
+    var p = el("span", "pill", s.label);
+    p.style.setProperty("--ph", String(s.h));
+    return p;
+  }
+
+  var legend = document.getElementById("c-legend");
+
+  var c1 = el("div", "card"); c1.appendChild(el("h3", null, "Does this row open?"));
+  var u1 = el("ul");
+  [["▸", "Collapsed, has children", "Caret plus a count of what is inside", ""],
+   ["▾", "Open", "Caret turns, count hides", "color:var(--accent)"],
+   ["─", "Leaf — nothing inside", "Not clickable, no hover state", "color:var(--rule-2)"]
+  ].forEach(function (r) {
+    var li = el("li");
+    var g = el("span", "glyphdemo", r[0]); g.setAttribute("style", r[3]);
+    li.appendChild(g);
+    li.appendChild(el("span", null, "<b>" + r[1] + "</b><em>" + r[2] + "</em>"));
+    u1.appendChild(li);
+  });
+  c1.appendChild(u1); legend.appendChild(c1);
+
+  var c2 = el("div", "card"); c2.appendChild(el("h3", null, "Dot colour — kind"));
+  var u2 = el("ul");
+  Object.keys(CONFIG.types).forEach(function (k) {
+    var t = CONFIG.types[k], li = el("li");
+    var holder = el("span"); holder.style.cssText = "display:flex;justify-content:center;padding-top:5px";
+    holder.appendChild(dotFor(k));
+    li.appendChild(holder);
+    li.appendChild(el("span", null, "<b>" + t.label + "</b>" + (t.note ? "<em>" + t.note + "</em>" : "")));
+    u2.appendChild(li);
+  });
+  c2.appendChild(u2); legend.appendChild(c2);
+
+  if (Object.keys(CONFIG.statuses).length) {
+    var c3 = el("div", "card"); c3.appendChild(el("h3", null, "Pill — evidence grade"));
+    var u3 = el("ul");
+    var gradeNotes = {
+      proven: "Replicated study, RCT, or production-scale data",
+      adopted: "Widely deployed; evidence mostly first-party",
+      contested: "Evidence points both ways",
+      emerging: "2026 research, not yet productionised"
+    };
+    Object.keys(CONFIG.statuses).forEach(function (k) {
+      var s = CONFIG.statuses[k], li = el("li");
+      var g = el("span", "glyphdemo"); g.appendChild(pillFor(k));
+      li.appendChild(g);
+      li.appendChild(el("span", null, "<b>" + s.label + "</b>" + (gradeNotes[k] ? "<em>" + gradeNotes[k] + "</em>" : "")));
+      u3.appendChild(li);
+    });
+    c3.appendChild(u3); legend.appendChild(c3);
+  }
+
+  var root = document.getElementById("tree");
+  var allNodes = [];
+
+  function descendants(d) {
+    var t = 0;
+    d.kids.forEach(function (k) { t += 1 + descendants(k); });
+    return t;
+  }
+
+  function build(list, level) {
+    var ul = el("ul", level === 1 ? "tree" : "kids");
+    if (level > 1) ul.setAttribute("role", "group");
+
+    list.forEach(function (d) {
+      var t = CONFIG.types[d.type] || {};
+      var li = el("li", "node");
+      li.setAttribute("role", "treeitem");
+      li.setAttribute("aria-level", String(level));
+      li.dataset.t = d.type;
+      if (d.kind) li.dataset.kind = d.kind;
+      if (d.status) li.dataset.status = d.status;
+      if (t.accent) { li.dataset.accent = "1"; li.style.setProperty("--th", String(t.h)); }
+
+      var hasKids = d.kids.length > 0;
+      var row = document.createElement(hasKids ? "button" : "div");
+      row.className = "row";
+      if (hasKids) row.type = "button";
+
+      var mark = el("span", hasKids ? "caret" : "leafmark", hasKids ? "▸" : "─");
+      mark.setAttribute("aria-hidden", "true");
+      row.appendChild(mark);
+      row.appendChild(dotFor(d.type));
+
+      var body = el("span", "body");
+      body.appendChild(el("span", "lbl", d.label));
+      if (d.note) body.appendChild(el("span", "note", d.note));
+      row.appendChild(body);
+
+      var meta = el("span", "meta");
+      var p = pillFor(d.status);
+      if (p) meta.appendChild(p);
+      if (hasKids) meta.appendChild(el("span", "kidcount", descendants(d) + " inside"));
+      row.appendChild(meta);
+
+      li.appendChild(row);
+
+      if (hasKids) {
+        li.setAttribute("aria-expanded", "false");
+        var sub = build(d.kids, level + 1);
+        sub.hidden = true;
+        li.appendChild(sub);
+        row.addEventListener("click", function () { toggle(li); });
+      }
+
+      allNodes.push(li);
+      ul.appendChild(li);
+    });
+    return ul;
+  }
+
+  function toggle(li, force) {
+    var sub = li.querySelector(":scope > ul");
+    if (!sub) return;
+    var open = typeof force === "boolean" ? force : !li.classList.contains("open");
+    li.classList.toggle("open", open);
+    li.setAttribute("aria-expanded", open ? "true" : "false");
+    sub.hidden = !open;
+  }
+
+  var built = build(DATA, 1);
+  built.id = "tree";
+  built.setAttribute("role", "tree");
+  built.setAttribute("aria-label", CONFIG.title);
+  root.replaceWith(built);
+  root = built;
+
+  var maxLevel = allNodes.reduce(function (m, li) {
+    return Math.max(m, parseInt(li.getAttribute("aria-level"), 10));
+  }, 1);
+  var depthBox = document.getElementById("depths");
+  var depthBtns = [];
+  for (var i = 1; i < maxLevel; i++) {
+    (function (d) {
+      var b = el("button", "btn", String(d));
+      b.addEventListener("click", function () { setDepth(d); });
+      depthBox.appendChild(b); depthBtns.push([b, d]);
+    })(i);
+  }
+  var allBtn = el("button", "btn", "All");
+  allBtn.addEventListener("click", function () { setDepth(maxLevel); });
+  depthBox.appendChild(allBtn); depthBtns.push([allBtn, maxLevel]);
+
+  function setDepth(dep) {
+    allNodes.forEach(function (li) {
+      var lvl = parseInt(li.getAttribute("aria-level"), 10);
+      if (li.querySelector(":scope > ul")) toggle(li, lvl < dep);
+    });
+    depthBtns.forEach(function (pair) {
+      pair[0].setAttribute("aria-pressed", String(pair[1] === dep));
+    });
+  }
+
+  var filterBox = document.getElementById("filters");
+  var activeFilter = null;
+  if (!CONFIG.filters.length) {
+    filterBox.hidden = true;
+    document.getElementById("filters-label").hidden = true;
+  }
+  CONFIG.filters.forEach(function (f) {
+    var b = el("button", "btn", f.label);
+    b.setAttribute("aria-pressed", "false");
+    b.addEventListener("click", function () {
+      var was = activeFilter === f;
+      activeFilter = was ? null : f;
+      Array.prototype.forEach.call(filterBox.children, function (o) {
+        o.setAttribute("aria-pressed", String(!was && o === b));
+      });
+      apply();
+    });
+    filterBox.appendChild(b);
+  });
+
+  var q = document.getElementById("q");
+  var countEl = document.getElementById("count");
+  var emptyEl = document.getElementById("empty");
+
+  function matches(li, term) {
+    if (activeFilter) {
+      if (activeFilter.type && li.dataset.t !== activeFilter.type) return false;
+      if (activeFilter.status && li.dataset.status !== activeFilter.status) return false;
+    }
+    if (!term) return true;
+    return li.querySelector(":scope > .row").textContent.toLowerCase().indexOf(term) !== -1;
+  }
+
+  function apply() {
+    var term = q.value.trim().toLowerCase();
+    allNodes.forEach(function (li) { li.classList.remove("hide"); li.dataset.hit = ""; });
+
+    if (!term && !activeFilter) {
+      countEl.textContent = allNodes.length + " nodes";
+      emptyEl.hidden = true;
+      return;
+    }
+    var hits = 0;
+    allNodes.forEach(function (li) {
+      if (matches(li, term)) { li.dataset.hit = "1"; hits++; }
+    });
+    allNodes.forEach(function (li) {
+      var keep = li.dataset.hit === "1" || li.querySelector('[data-hit="1"]') !== null;
+      li.classList.toggle("hide", !keep);
+      if (keep && li.querySelector(":scope > ul")) toggle(li, true);
+    });
+    countEl.textContent = hits + (hits === 1 ? " match" : " matches");
+    emptyEl.hidden = hits > 0;
+  }
+  q.addEventListener("input", apply);
+
+  root.addEventListener("keydown", function (e) {
+    var row = e.target.closest(".row");
+    if (!row) return;
+    var li = row.parentElement;
+    var rows = Array.prototype.filter.call(
+      root.querySelectorAll("button.row, div.row"),
+      function (r) { return r.offsetParent !== null; }
+    );
+    var i = rows.indexOf(row);
+    if (e.key === "ArrowDown" && rows[i + 1]) { e.preventDefault(); focusRow(rows[i + 1]); }
+    else if (e.key === "ArrowUp" && i > 0) { e.preventDefault(); focusRow(rows[i - 1]); }
+    else if (e.key === "ArrowRight") {
+      if (li.querySelector(":scope > ul") && !li.classList.contains("open")) { e.preventDefault(); toggle(li, true); }
+    } else if (e.key === "ArrowLeft") {
+      if (li.classList.contains("open")) { e.preventDefault(); toggle(li, false); }
+      else {
+        var up = li.parentElement.closest("li.node");
+        if (up) { e.preventDefault(); focusRow(up.querySelector(":scope > .row")); }
+      }
+    }
+  });
+  function focusRow(r) {
+    if (r.tagName !== "BUTTON") r.setAttribute("tabindex", "-1");
+    r.focus();
+  }
+
+  setDepth(CONFIG.startDepth);
+  apply();
+})();
+</script>

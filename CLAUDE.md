@@ -244,9 +244,23 @@ Choose the mode based on how stable and correctness-critical the target is:
 ## Session Start Protocol — the workspace state contract
 
 **Five files per workspace, in `docs/`, and a SessionStart hook points at them automatically**
-(`scripts/workspace-state.py`, which also inlines `TODO.md`'s `## Now` section into a fresh
-agent's context). The contract exists because six overlapping records had accumulated with no
-entry point, so a new session re-derived what was already written down.
+(`scripts/workspace-state.py`, which also injects `TODO.md`'s `## Now` and `## Next`, the newest
+`JOURNAL.md` entry, and the last commits into a fresh agent's context). The contract exists because
+six overlapping records had accumulated with no entry point, so a new session re-derived what was
+already written down.
+
+**The contract has a writer: `templates/STATE.md`.** Copy it to `docs/STATE.md` — it carries the
+phase diagram, the functional/non-functional requirement tables, the dependency graph, the horizon
+chart, the milestone-decision register and the progress log, so a project answers *where it is,
+what it must do, what blocks it, and what was decided* without anyone re-inventing the shape.
+`scripts/open-workspace.sh` opens that file in the workspace's right pane, and
+`scripts/open-workspace.sh --state-doc <path>` reports what a project resolves to — **`none` means
+the project is invisible to both the hook and the launcher, and that is a finding.**
+
+A convention with a reader and no writer reaches only the projects where someone typed the file out
+by hand. That is not hypothetical: `claudence`'s own status page sat under a non-canonical filename
+and went 4½ months stale, unseen by the reader shipped in the same repo
+(`docs/archive/2026-03-30-claudence-status-windows.md` keeps the root cause).
 
 | File | Its single concern | Update trigger |
 |---|---|---|
