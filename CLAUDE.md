@@ -241,9 +241,30 @@ Choose the mode based on how stable and correctness-critical the target is:
 - How: write a one-paragraph intent statement ("I want to see if adding volume confirmation to BB entries improves WR without reducing trade count"); let Claude propose the implementation; iterate on results rather than specs
 - Signal to use IDD: "I don't know what the right answer looks like yet" or "this is throwaway/exploratory code"
 
-## Session Start Protocol
+## Session Start Protocol — the workspace state contract
 
-Before touching code in any repo, read the state doc first (`context.md`, `todo.md`, `workflow_state.md`, `KNOWLEDGE.md`, or `ROADMAP.md`). Spot-check it against actual repo state (git log, file existence) for staleness, then summarize: current phase / last completed step / immediate next action. If no state doc exists, surface that explicitly — it is itself a finding.
+**Four files per workspace, in `docs/`, and a SessionStart hook points at them automatically**
+(`scripts/workspace-state.py`, which also inlines `TODO.md`'s `## Now` section into a fresh
+agent's context). The contract exists because six overlapping records had accumulated with no
+entry point, so a new session re-derived what was already written down.
+
+| File | Its single concern | Update trigger |
+|---|---|---|
+| **`STATE.md`** | Where the project is — one page, every section a glance, detail behind backlinks | A phase changes, a spike returns a verdict, a dependency clears |
+| **`TODO.md`** | **Now** (in flight or blocked-on-a-person) · **Next** (agreed, unblocked) · **Backlog** (deferred, with the reason) | Work starts, finishes, or is deferred; a session ends |
+| **`JOURNAL.md`** | Why the direction changed — newest first, including `TRIBAL` entries for load-bearing things written down nowhere else | Any material change of direction, or tribal context surfacing |
+| **`DECISIONS.md`** | ADR-lite: decision, status, rationale, revisit-when | A choice is made or an assumption taken |
+
+**Read them before acting, then work from them rather than re-deriving.** Spot-check against git
+log and file existence for staleness. If a repo has none, surface that — it is itself a finding.
+
+**`## Now` is the hot path.** The hook injects it verbatim, so keep it short and true; a stale
+`Now` is worse than an empty one because it is trusted. Legacy names (`context.md`, `todo.md`,
+`ROADMAP.md`, `workflow_state.md`) are still detected, so older repos work unchanged.
+
+**Closing a session is part of the work**, not tidying: update `TODO.md`, add a `JOURNAL.md` entry
+if direction changed, and record any decision. That is what makes the next session cheap, and it is
+the step that gets skipped.
 
 ## Local Knowledge First (Global)
 
