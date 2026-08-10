@@ -1,0 +1,159 @@
+---
+name: tech-dossier
+description: Build up working knowledge of a technology, technique, or field from its history — motivation, timeline, breakthroughs, what survived as practice, alternatives that lost, and a capability envelope naming what it is structurally bad at and which data or problem types suit it. Produces a detailed knowledge-base document plus an at-a-glance visual artifact. Use when asked to "bring me up to speed on X", "what's the history of X", "how did X come to be", "what is X good and bad at", "is X the right tool for this", "what are the alternatives to X", or when a design decision hinges on understanding a technology's failure region rather than its feature list. Triggers: "history of", "bring me up to speed", "how did this come about", "what survived", "good at vs bad at", "capability envelope", "should we use X or Y".
+version: 1.0.0
+---
+
+# /tech-dossier
+
+Produce a **capability-envelope brief** for a technology: where it came from, what problem it was
+actually invented to solve, what stuck, what died, and — the part that earns the effort — **what it
+is structurally bad at and why no amount of tuning fixes that.**
+
+## Why this exists
+
+The recurring need is not a feature list. It is the ability to say *"this technology cannot do that,
+and here is the structural reason"* before committing a design to it. A feature list tells you what
+a technology claims; a lineage tells you which of those claims were contested, which alternatives
+were tried and abandoned, and which failure modes are inherent rather than incidental.
+
+**The load-bearing output is section 5, the capability envelope.** Everything before it exists to
+make that section trustworthy.
+
+## When this is the right shape
+
+Use it when:
+
+- A design decision depends on whether a technology fits a **data shape** or **problem class**.
+- Someone needs working fluency, not a tutorial — enough to argue with a vendor or a colleague.
+- The same "what about X?" question has come up more than once.
+- A technology is being adopted by default and nobody has stated its failure region.
+
+**Don't** use it for: how-to instructions (that is documentation), API reference, or a build-vs-buy
+comparison of named products at the same layer (that is a vendor evaluation — a different shape).
+
+## The workflow
+
+```mermaid
+flowchart TD
+  A["1 · Scope<br/>subject · why now · the decision it serves"]
+  B["2 · Verify<br/>search, don't recall<br/>anchor dates and negative results"]
+  C["3 · Draft the six sections"]
+  D["4 · Map onto the caller's data<br/>the section only you can write"]
+  E["5 · Two outputs<br/>detailed doc + at-a-glance artifact"]
+
+  A --> B --> C --> D --> E
+```
+
+### 1 · Scope
+
+Pin three things before researching:
+
+| | |
+|---|---|
+| **Subject** | One technology, technique, or field. Not a product |
+| **Why now** | The decision this serves. A dossier with no decision behind it becomes a Wikipedia summary |
+| **Local context** | What data, system, or constraint the conclusion has to land against |
+
+**Check local sources first** — the project's knowledge base may already carry half of it, and the
+local-first rule applies.
+
+### 2 · Verify, don't recall
+
+**Always search, even when confident.** Timelines are exactly where model knowledge is most
+plausibly wrong: dates drift, attribution gets muddled, and anything past the knowledge cutoff is
+invisible. Three to five searches is usually enough:
+
+1. Origin and timeline — the founding papers and their years.
+2. **Current state** — deliberately scoped to the present year, to catch what changed recently.
+3. **Limitations and failure modes** — search for these *explicitly*. They are underrepresented in
+   promotional material and are the highest-value part of the dossier.
+4. Best-practice consensus — what practitioners actually kept.
+5. The specific data shape the caller cares about, if it is unusual.
+
+**Search for the negative results by name.** Fields are defined by their disconfirmations — the
+benchmark that showed the new approach generalises worse, the ablation that removed a component
+without hurting anything. Those papers are the ones that shaped practice, and they rarely appear in
+overviews.
+
+### 3 · The six sections
+
+Every dossier has the same spine. Skip a section only if the subject genuinely has nothing there,
+and say so rather than padding it.
+
+| # | Section | What it must contain |
+|---|---|---|
+| **1** | **Motivation** | The problem it was invented to solve — **which is usually not the problem it is used for now.** Name the gap between the two; it is where most misuse comes from |
+| **2** | **Timeline** | Eras, not a flat list. Each entry says what it *contributed*, not just what it was. Mark the inflection point where the field changed character |
+| **3** | **What survived** | The practices still standing, each with *why it held* — and a matching list of **what did not survive**, which is more informative |
+| **4** | **Alternatives** | What else was tried, and the outcome of each. Note where the winner won on modularity or cost rather than on merit; that pattern predicts future contests |
+| **5** | **Capability envelope** | **The point of the document.** Strong at / structurally weak at, with the *mechanism* for each weakness, plus a data-type or problem-type suitability table and what to use instead |
+| **6** | **What it means here** | The caller's actual data and decision, mapped against section 5, ending in conclusions that change the plan |
+
+### 4 · Distinguish structural from incidental
+
+The discipline that makes a dossier useful rather than decorative:
+
+- **Structural weakness** — follows from the mechanism. No tuning, no bigger model, no better
+  library removes it. *State the mechanism.*
+- **Incidental weakness** — current tooling, cost, or maturity. Will plausibly change.
+
+Conflating them produces either false pessimism (dismissing something for a fixable problem) or
+false optimism (planning around a limit that is permanent). **When you name a weakness, say which
+kind it is.**
+
+### 5 · Two outputs, deliberately different
+
+| Output | Where | Contains |
+|---|---|---|
+| **Detailed document** | The project's knowledge base or research repo | All six sections, front matter, sourced claims, the full tables |
+| **At-a-glance artifact** | A published Artifact | **Only the decision-changing content**, carried by visualisation |
+
+**These are not long and short versions of each other.** The document is a reference to return to.
+The artifact answers *"what do I need to know to make the call?"* — typically the era arc, the
+strong/weak split, the suitability table, and the local mapping. Everything else stays in the
+document.
+
+Load `artifact-design` before writing the artifact; if it carries diagrams, load
+`artifact-diagramming` too. **Register the artifact in the project's artifact index in the same
+turn** — an unregistered URL is lost.
+
+## Quality bar
+
+A dossier is finished when it can answer these without hedging:
+
+- What was this invented for, and is that what we are using it for?
+- Which of its limitations are permanent?
+- What would we use instead for the parts it cannot do?
+- Which of our data shapes suit it, and which do not?
+- What did the field try that failed, so we do not retry it?
+
+**And one test that catches a shallow dossier:** if section 5 contains no weakness the caller did
+not already suspect, the research was too shallow — go back to step 2 and search the failure modes
+harder.
+
+## Anti-patterns
+
+| Don't | Do |
+|---|---|
+| Write the timeline from memory | Search; verify dates; note the cutoff gap explicitly |
+| List features | Name failure modes and their mechanisms |
+| Present the current consensus as inevitable | Show which alternatives lost, and on what grounds |
+| Treat all weaknesses as tuning problems | Separate structural from incidental |
+| Duplicate the document in the artifact | Artifact = decision-changing only |
+| Stop at the general case | Section 6 — the local mapping — is the deliverable |
+
+## Worked example
+
+A completed dossier on **retrieval-augmented generation** is the reference for this shape. Machine-
+and client-specific paths live in `~/.claude/CLAUDE.local.md` under reference implementations, per
+the usual split.
+
+Two things in it are worth copying:
+
+- **Section 5 separates structural from incidental weaknesses**, with the mechanism stated for each
+  — "a sampled aggregate is not an aggregate", "you cannot retrieve a fragment that does not exist."
+- **Section 6 concluded that one of the two target use cases was mostly not a retrieval problem at
+  all**, because it decomposed into four of the technology's five structural failures. That finding
+  reordered the project plan, and **a feature-list comparison would never have surfaced it.** That
+  is the return this skill exists to produce.
