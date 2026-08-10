@@ -20,8 +20,8 @@ flowchart TD
   T["Telemetry + friction<br/>DONE · 6 hook events wired"]
   P["macOS port<br/>DONE · python3 + zsh"]
   L["Self-improvement loop<br/>RUNNING unattended · 2 launchd jobs"]
-  S["Workspace state contract<br/>IN PROGRESS · reader done, writer new"]
-  X["Second machine<br/>⛔ BLOCKED · cannot publish"]
+  S["Workspace state contract<br/>DONE · reader · writer · health check"]
+  X["Second machine<br/>ONE PUSH AWAY · content gate closed"]
 
   T --> P --> L
   P --> S
@@ -29,9 +29,14 @@ flowchart TD
   S --> X
 ```
 
-The harness works and measures itself: 6 hook events, 2 scheduled jobs, 170 passing python checks.
-**What does not work is leaving this machine.** Every capability is real and none of it is
-reproducible elsewhere, because the repo cannot be pushed — §3. Treat "works" as "works here".
+The harness works and measures itself: 6 hook events, 2 scheduled jobs, **194 passing python
+checks**. The state contract is now complete in all three parts — a reader (`workspace-state.py`),
+a writer (`templates/STATE.md`) and a health check (`state-health.py`).
+
+**What changed on 2026-08-10: publication stopped being blocked.** Remote access is sorted and the
+public-safe guard now passes on everything this branch would newly publish. What remains is
+mechanical — the branch has no upstream and has never been pushed, so the work still lives on one
+disk. That is a command, not a decision.
 
 ## 2 · Requirements at a glance
 
@@ -53,24 +58,33 @@ reproducible elsewhere, because the repo cannot be pushed — §3. Treat "works"
 | N-e | Governance files bounded — 500 lines/file, 60/section | `AGENT-LOOP.md` §4b. A loop that only adds rules degrades monotonically |
 | N-f | Never a hardcoded username or absolute machine path | Publication requires it; `doctor.py` checks it |
 
-## 3 · The blocking dependency
+## 3 · What blocks durability
 
 ```mermaid
 flowchart TD
-  I["Credential-helper account ≠<br/>remote owner"]
-  U["no upstream for branch macos"]
-  PUSH["Pushes 403<br/>⛔ 15 commits unpublished"]
+  C["Remote access<br/>✅ SORTED"]
+  G["Public-safe guard<br/>✅ 0 findings on new content"]
+  U["No upstream for the<br/>working branch"]
+  PUSH["Never pushed<br/>one disk, no verified backup"]
   M["Second machine · collaboration · backup"]
 
-  I --> PUSH
-  U --> PUSH
-  PUSH --> M
+  C --> U
+  G --> U
+  U --> PUSH --> M
 ```
 
-**Everything else in this document can proceed today; this cannot, and it is the only thing that
-makes the work durable.** `doctor.py` reports both, names the two accounts involved, and gives the
-fixes: grant the keychain's account access, or prefix the remote host so a separate credential entry
-is used. Until then the harness exists on exactly one disk with no verified backup.
+**The credential blocker cleared on 2026-08-10.** Two things had to be true and now both are:
+access to the remote is granted, and the guard finds nothing client-identifying in what this branch
+would newly publish — it was run against a worktree of `origin/main` to separate *already public*
+from *newly added*, which closed gaps in six files.
+
+**What is left is not a decision.** The working branch has no upstream and has never been pushed.
+Until it is, every capability in this document exists on exactly one disk.
+
+⚠️ **`doctor.py` still warns about the credential mismatch, and that warning is now stale** — it
+compares the keychain account against the remote owner, which it cannot reconcile with collaborator
+access having been granted. Treat the warning as unable-to-verify, not as a live block. Teaching it
+the difference is in [`TODO.md`](TODO.md).
 
 *(Which accounts, and on which machine, is client-specific — it lives in `~/.claude/CLAUDE.local.md`
 and in `doctor.py`'s live output, not in this public repo.)*
@@ -82,7 +96,7 @@ contract 2026-08-10.
 
 ```mermaid
 gantt
-  title Claudence — what shipped, and what is blocked
+  title Claudence — what shipped, and what is left
   dateFormat YYYY-MM-DD
   axisFormat %b %d
 
@@ -90,18 +104,21 @@ gantt
   Windows harness + telemetry  :done, win, 2026-03-28, 2026-06-21
   macOS port                   :done, port, 2026-06-21, 14d
   Improvement loop + health    :done, loop, 2026-08-03, 2026-08-10
+  State contract               :done, sc, 2026-08-10, 1d
+  Remote access + content gate :done, gate, 2026-08-10, 1d
+
+  section One command
+  Push and set upstream        :crit, pub, 2026-08-11, 1d
 
   section Unblocked now
-  State contract — writer      :active, wr, 2026-08-10, 3d
   Adopt the contract per repo  :active, ad, 2026-08-11, 7d
-
-  section Blocked on a person
-  Fix git identity             :crit, id, 2026-08-11, 1d
-  Publish + second machine     :crit, pub, after id, 3d
+  Teach doctor about access    :active, dr, 2026-08-11, 2d
+  Consolidate DECISIONS        :active, dec, 2026-08-11, 3d
 ```
 
-**Read the chart for one thing: the red bars are one decision each, and they are the only ones
-nobody can start without you.** The two `active` bars need no permission.
+**Read the chart for one thing: nothing here is blocked on a decision any more.** The single
+critical bar is a command that has not been run; everything `active` needs no permission. That is a
+change from this morning, when two bars were blocked on a person.
 
 ## 5 · Milestone decisions
 
@@ -112,6 +129,8 @@ nobody can start without you.** The two `active` bars need no permission.
 | — | **No durable cron** — launchd and hooks only | `confirmed` | `CronCreate` jobs are session-only and expire in 7 days; anything else silently stops |
 | — | **`settings.json` is copied, not symlinked** | `confirmed` | Claude Code rewrites the file; a symlink would have the app editing the checkout |
 | — | **`OVERVIEW.md` and `STATE.md` stay separate** | `confirmed` | Weekly status churn would bury a change to the premise |
+| — | **Drift is anchored on the state doc's own last commit**, not on its `last-verified` date | `confirmed` | A date is too coarse to see same-day commits, and "commits touching non-markdown" cannot fire on a docs-only project — it printed *ok* where it meant *unmeasurable* |
+| — | **An id counts as defined only where it opens a table cell or heading** | `assumed` | Counting family members flagged a legitimately single-member register; revisit if a register format appears that this misses |
 
 Full register and revisit triggers: **`DECISIONS.md` does not exist yet** — decisions currently live
 scattered across `AGENT-LOOP.md`, `MACOS-PORT.md` and commit messages. Consolidating them is in
@@ -123,6 +142,10 @@ Newest first. Reasoning is in the journal — see the §7 note on where it curre
 
 | Date | Milestone reached |
 |---|---|
+| 2026-08-10 | **Publication unblocked** — remote access sorted, and the public-safe guard run against a worktree of `origin/main` to close gaps in six files. Still unpushed |
+| 2026-08-10 | `terminal.lua` landed: the right pane opens the state doc, `Alt+O` opens a tab again, and the private repo aliases left the public repo |
+| 2026-08-10 | Status-line topic row reads the title Claude Code already generates, instead of extracting the first six non-filler words |
+| 2026-08-10 | **`state-health.py`** — `--sanity` · `--smoke` · `--drift` · `--ids`. Rebuilt after the first drift heuristic proved unable to fail on a docs-only project |
 | 2026-08-10 | State-contract **writer**: `templates/STATE.md`, workspace launcher opens the state doc, this file exists |
 | 2026-08-10 | Hook injects `## Next`, newest journal entry, and the commit log — the catch-up gap closed |
 | 2026-08-10 | Install doctor + setup flow that verifies; found two plugins present only on this machine |
@@ -153,8 +176,10 @@ exempt from it.
 
 | Risk | Evidence |
 |---|---|
-| **One disk, no verified backup** | 15 commits unpushed; `doctor.py` reports no upstream and a 403-inducing identity mismatch |
+| **One disk, no verified backup** | The working branch has never been pushed and has no upstream. No longer credential-blocked — see §3 — which makes this the cheapest open risk to close |
+| **A checker that cannot see a resolved blocker** | `doctor.py` still reports the credential mismatch after access was granted, because it compares two static values. **A false alarm trains people to ignore the alarm**, which is how the real one gets missed |
 | **A second machine silently lacks two plugins** | `doctor.py`: `datadog` and `ponytail` are live here and absent from the repo's canonical settings |
 | **`env.PATH` drift breaks hooks invisibly** | `doctor.py`: pinned PATH lists `/usr/local/bin`, which does not exist. Symptom of a bad PATH is a hook that does not fire, not an error |
 | **The loop adds rules faster than it removes them** | `CLAUDE.md` is 42 KB. §4b thresholds exist as counter-pressure; whether they fire is unmeasured |
 | **Governance describes unimplemented behaviour** | `CLAUDE.md` claims `/orchestrate` defines six role flows. It does not — found 2026-08-10 |
+| **`main` and the working branch have diverged** | `main` tracks the remote and sits well behind; all of today's work is on the working branch. The longer both live, the more the eventual reconcile costs |
