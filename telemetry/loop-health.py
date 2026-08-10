@@ -39,6 +39,8 @@ WATERMARK = os.path.join(IMPROVE_DIR, 'last-health-check.json')
 # When the ledger became trustworthy. Rows before it predate the status-line
 # fallback and are legitimately null; see the canary in sanity().
 BASELINE = os.path.join(IMPROVE_DIR, 'ledger-baseline.json')
+# Backlogged items that should resurface on a cadence rather than block.
+REMINDERS = os.path.join(IMPROVE_DIR, 'reminders.json')
 
 # A ledger row older than this predates the meta-file fallback and is expected
 # to carry nulls; only recent rows are evidence of a live regression.
@@ -251,8 +253,39 @@ def health():
         scores = [r.get('score') or 0 for r in fresh]
         lines.append('Mean friction     : %.2f' % (sum(scores) / float(len(scores))))
 
+    lines.extend(_reminders(now))
     H.write_json(WATERMARK, {'ts': H.now_iso()})
     return lines
+
+
+def _reminders(now):
+    """Backlogged items that need a nudge rather than a blocker.
+
+    A decision parked with no resurfacing mechanism is a decision dropped. The
+    daily check is already running and already read, so it is the cheapest place
+    to put a nag — no new surface, no new habit to build.
+    """
+    items = H.read_json(REMINDERS, []) or []
+    if not isinstance(items, list) or not items:
+        return []
+    out, changed = [], False
+    for it in items:
+        if it.get('done'):
+            continue
+        every = int(it.get('nag_every_days') or 7)
+        last = H.parse_ts(it.get('last_nagged'))
+        due = last is None or (now - last).days >= every
+        if due:
+            age = ''
+            created = H.parse_ts(it.get('created'))
+            if created:
+                age = ' (open %d days)' % (now - created).days
+            out.append('  ! %s%s' % (it.get('text', '?'), age))
+            it['last_nagged'] = H.now_iso()
+            changed = True
+    if changed:
+        H.write_json(REMINDERS, items)
+    return (['', 'Reminders:'] + out) if out else []
 
 
 def main():
