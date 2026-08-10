@@ -17,9 +17,14 @@ Layout (retro needed): !retro  6 Prompts  ...
   $N.NN         session cost (dim)
   Xm / Xh Ym    elapsed (dim)
   | / - \\      spinner — Claude is currently running (yellow)
+
+Then its own row: ▸ the current topic ×N turns. The label is Claude Code's own task
+title (read back from WezTerm), falling back to log-prompt.py's tracked theme.
 """
 
+import json
 import os
+import subprocess
 import sys
 from datetime import datetime
 
@@ -46,6 +51,11 @@ HELM_FRESH_HOURS = 24        # hide the breadcrumb entirely past this age
 STALE_HINT_HOURS = 4         # past this, grey the task row and append an age hint
 MAX_BLOCKER_ROWS = 3
 SPINNER_FRAMES = ('|', '/', '-', '\\')
+
+# A pane title that names no task — Claude Code before it has summarised one, or a
+# plain shell. Falling back to the tracked label beats showing "zsh" as the topic.
+GENERIC_PANE_TITLES = frozenset(('', 'claude code', 'zsh', 'bash', 'fish', 'sh'))
+WEZTERM_TIMEOUT_S = 1        # the row is worth ~10ms, never a stalled status bar
 
 EFFORT_ABBR = {'low': 'L', 'medium': 'M', 'high': 'H',
                'xhigh': 'XH', 'max': 'MX', 'auto': 'A'}
@@ -152,24 +162,59 @@ def friction_row(state, averages):
     return out
 
 
+def clean_pane_title(title):
+    """Claude Code's task title, minus the spinner glyph it prefixes.
+
+    Strips any leading non-alphanumerics rather than enumerating the glyphs, since
+    the frame set (✳, the braille cycle) is Claude Code's to change. Returns '' for
+    a title that names no task, so the caller can fall back.
+    """
+    title = ' '.join(str(title or '').split())
+    while title and not title[0].isalnum():
+        title = title[1:].lstrip()
+    return '' if title.lower() in GENERIC_PANE_TITLES else title
+
+
+def pane_title():
+    """The task title Claude Code already generated, read back out of WezTerm.
+
+    The tracked theme label is an extractive one — the first few non-filler words of
+    the prompt — so it reads as word salad next to the summary Claude Code writes to
+    the terminal title for the same turn ("Taking look open policy macOS imported"
+    vs "Fix Claudance tab behavior on macOS"). Prefer the one that was actually
+    summarised instead of sharpening the heuristic. '' when not under WezTerm.
+    """
+    pane = os.environ.get('WEZTERM_PANE')
+    if not pane:
+        return ''
+    try:
+        proc = subprocess.run(['wezterm', 'cli', 'list', '--format', 'json'],
+                              capture_output=True, text=True, timeout=WEZTERM_TIMEOUT_S)
+        panes = json.loads(proc.stdout)
+    except Exception:
+        return ''      # no wezterm on PATH, no mux, unparseable — the row is optional
+    return clean_pane_title(next((p.get('title') for p in panes
+                                  if str(p.get('pane_id')) == pane), ''))
+
+
 def theme_row(state):
     """The topic the session is currently on.
 
-    log-prompt.py has tracked these since it was written — a new theme is pushed
-    on an override or a Jaccard shift below THEME_SHIFT_JACCARD — but nothing
-    ever rendered them. Show the newest, with a turn count once it has run for
-    more than one prompt, so a long-running topic is visibly long-running.
+    Label comes from the pane title when there is one; otherwise the theme
+    log-prompt.py tracked (pushed on an override or a Jaccard shift below
+    THEME_SHIFT_JACCARD). The turn count stays tracked either way, so a
+    long-running topic is visibly long-running even as its title is rewritten.
     """
+    if not state:
+        return ''      # no session, no topic — don't invent one from the pane title
     themes = [t for t in (state.get('themes') or []) if isinstance(t, dict)]
-    if not themes:
-        return ''
-    label = str(themes[0].get('label') or '').strip()
+    label = pane_title() or (str(themes[0].get('label') or '').strip() if themes else '')
     if not label:
         return ''
     label = ' '.join(label.split())
     if len(label) > THEME_WIDTH:
         label = label[:THEME_WIDTH - 1].rstrip() + '\u2026'
-    turns = int(themes[0].get('turns') or 0)
+    turns = int(themes[0].get('turns') or 0) if themes else 0
     suffix = ('%s \u00d7%d%s' % (DIM, turns, RESET)) if turns > 1 else ''
     return '%s\u25b8%s %s%s' % (DIM, RESET, label, suffix)
 

@@ -12,6 +12,7 @@ lands on disk rather than what the code intends to write.
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -19,6 +20,11 @@ import tempfile
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PY = sys.executable or '/usr/bin/python3'
+
+# Imported for its pure helpers only — the rest of the suite drives hooks as
+# subprocesses. hooklib is path constants at import time, so this touches nothing.
+sys.path.insert(0, REPO)
+import statusline   # noqa: E402
 
 PASS = 0
 FAIL = 0
@@ -377,6 +383,9 @@ try:
     # and any helm rows follow it. Assert against the row that actually owns it.
     check_true('statusline: spinner shown while running',
                out.split('\n')[0].rstrip().endswith(('|', '/', '-', '\\', '\x1b[0m')), out)
+    # No WEZTERM_PANE in the sandbox, so the topic row must still render from the
+    # theme log-prompt.py tracked for that override prompt.
+    check_true('statusline: topic falls back to the tracked theme', 'differently' in out, out)
 
     _code, out = box.run('statusline.py', {'session_id': SID,
                                            'context_window': {'used_percentage': 91}})
@@ -386,6 +395,19 @@ try:
     code, out = box.run('statusline.py', None)
     check('statusline: empty stdin exits 0', code, 0)
     check('statusline: empty stdin prints a single blank row', out, '\n')
+
+    # The topic row prefers Claude Code's own task title, which arrives with a
+    # spinner glyph on the front and is sometimes not a task at all. Sandbox.run
+    # drops WEZTERM_PANE, so the rendered row above exercises the fallback.
+    check('statusline: spinner glyph stripped from the pane title',
+          statusline.clean_pane_title('✳ Fix Claudance tab behavior on macOS'),
+          'Fix Claudance tab behavior on macOS')
+    check('statusline: braille spinner frame stripped too',
+          statusline.clean_pane_title('⠂ Analyze the open policy'),
+          'Analyze the open policy')
+    check('statusline: a shell is not a topic', statusline.clean_pane_title('zsh'), '')
+    check('statusline: untitled Claude is not a topic',
+          statusline.clean_pane_title('✳ Claude Code'), '')
 
     # helm-status.json breadcrumb rows.
     project = os.path.join(box.home, 'project')
@@ -498,6 +520,27 @@ try:
     open(os.path.join(rooted, 'STATE.md'), 'w').close()
     got, _ = resolve(rooted)
     check('open-workspace: repo root searched after docs/', got, './STATE.md')
+
+    # The same alias list is written in python, bash and lua — three runtimes
+    # that cannot share a constant. Assert they agree, because the failure mode
+    # is silent: an alias added in one place leaves the other two blind to it.
+    def names_in(relpath, pattern):
+        with open(os.path.join(REPO, relpath), 'r', encoding='utf-8') as fh:
+            body = fh.read()
+        return set(re.findall(pattern, body))
+
+    expected = {'STATE.md', 'context.md', 'workflow_state.md', 'KNOWLEDGE.md'}
+    sources = {
+        'workspace-state.py': names_in('scripts/workspace-state.py',
+                                       r"'(STATE\.md|context\.md|workflow_state\.md|KNOWLEDGE\.md)'"),
+        'open-workspace.sh': names_in('scripts/open-workspace.sh',
+                                      r"\b(STATE\.md|context\.md|workflow_state\.md|KNOWLEDGE\.md)\b"),
+        'terminal.lua': names_in('terminal.lua',
+                                 r"'(STATE\.md|context\.md|workflow_state\.md|KNOWLEDGE\.md)'"),
+    }
+    for src, found in sources.items():
+        check_true('state-doc aliases agree: %s' % src, found == expected,
+                   'missing %s' % sorted(expected - found))
 finally:
     box.close()
 
