@@ -196,6 +196,36 @@ before trusting a run or debugging a bad one.
 Published as an artifact from `history.jsonl`, regenerated on each loop run, registered in
 `docs/ARTIFACTS.md` per the standing rule.
 
+### Is it working? — sanity, smoke, and a daily check
+
+**A loop that runs unattended needs something watching it, or "silently broken" and "nothing
+to improve" look identical.** Both halves fail quietly: an input goes null and the ledger fills
+with nothing, or the loop never fires and no one notices. **Both had already happened** — cost and
+context were null on 125 rows for six days, and `history.jsonl` has still never been written.
+
+`telemetry/loop-health.py`, three modes, cheapest first:
+
+| Mode | Asks | Cost | Catches |
+|---|---|---|---|
+| `--sanity` | Is it wired up? | <1s, no side effects | Null inputs, unparseable config, missing reports, stale run flags |
+| `--smoke` | Does it work end to end? | ~2s, throwaway `HOME` | The status-line → Stop handoff, by asserting a known cost round-trips into the report |
+| `--health` | What has it done since last time? | reads `history.jsonl` | Loop never ran, loop gone stale, and the delta since the last check |
+
+**Exit code is the contract** — non-zero means a human is needed. Scheduled daily at 09:15 by
+`scripts/com.claudence.loop-health.plist`; launchd rather than cron because a laptop sleeps
+through cron windows and launchd runs the job it missed.
+
+Two design points that decide whether anyone keeps trusting it:
+
+- **The smoke test drives the real hooks in a throwaway `HOME`**, rather than checking that files
+  look right. The regression it exists to catch was invisible to file-level inspection — the code
+  was correct, the payload simply never carried the field, and the old test passed because it
+  seeded the field itself.
+- **A baseline timestamp exempts rows written before a fix landed.** Without it the canary fails
+  for weeks after every repair and everyone learns to ignore it. **A check that cries wolf is worse
+  than no check**, and a check that cannot fail is decoration — so the suite asserts it *does* fail
+  on a null ledger, not merely that it passes on a good one.
+
 ---
 
 ## 6 · Spec → shipped drift

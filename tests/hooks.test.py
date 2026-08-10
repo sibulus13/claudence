@@ -431,6 +431,54 @@ try:
 finally:
     box.close()
 
+# ── loop-health: the canary must fire on nulls, and stay quiet before baseline ─
+# The whole point of this check is that it caught a null ledger. A version that
+# cannot fail is decoration, so assert it fails on the bad input.
+box = Sandbox()
+try:
+    tele = box.path('telemetry')
+    improve = box.path('improve')
+    os.makedirs(tele, exist_ok=True)
+    os.makedirs(os.path.join(tele, 'reports'), exist_ok=True)
+    os.makedirs(improve, exist_ok=True)
+    open(os.path.join(tele, 'reports', 'aabbccdd.json'), 'w').write('{}')
+
+    def write_ledger(rows):
+        with open(os.path.join(tele, 'cost-ledger.jsonl'), 'w') as fh:
+            for r in rows:
+                fh.write(json.dumps(r) + '\n')
+
+    def sanity_out():
+        # Not box.run: that treats a non-zero exit as a harness failure, and a
+        # non-zero exit is exactly what this check is supposed to produce.
+        env = dict(os.environ, HOME=box.home, CLAUDENCE_SILENT='1')
+        proc = subprocess.run([PY, os.path.join(REPO, 'telemetry/loop-health.py'), '--sanity'],
+                              input='', env=env, capture_output=True, text=True, timeout=60)
+        return proc.returncode, proc.stdout + proc.stderr
+
+    nulls = [{'ts': '2026-08-10T12:00:0%d-07:00' % i, 'cost_usd': None, 'ctx_pct': None}
+             for i in range(6)]
+    write_ledger(nulls)
+    code, out = sanity_out()
+    check_true('loop-health: fails when the ledger is null', code == 1, out)
+    check_true('loop-health: names the meta file in the remedy', 'meta-<id>.json' in out, out)
+
+    good = [{'ts': '2026-08-10T12:00:0%d-07:00' % i, 'cost_usd': 1.0, 'ctx_pct': 40}
+            for i in range(6)]
+    write_ledger(good)
+    code, out = sanity_out()
+    check_true('loop-health: passes when the ledger is populated', code == 0, out)
+
+    # Rows before the baseline are legitimately null and must not trip it,
+    # otherwise the check cries wolf for weeks after any fix lands.
+    with open(os.path.join(improve, 'ledger-baseline.json'), 'w') as fh:
+        json.dump({'ts': '2026-08-10T11:00:00-07:00'}, fh)
+    write_ledger([{'ts': '2026-08-09T12:00:00-07:00', 'cost_usd': None, 'ctx_pct': None}] * 30 + good)
+    code, out = sanity_out()
+    check_true('loop-health: pre-baseline nulls are exempt', code == 0, out)
+finally:
+    box.close()
+
 print('%d passed, %d failed' % (PASS, FAIL))
 for failure in FAILURES:
     print('FAIL | %s' % failure)

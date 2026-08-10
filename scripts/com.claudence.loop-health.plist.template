@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Daily health check for the self-improvement loop.
+
+  launchd rather than cron: it survives reboots and runs a job whose window was
+  missed while the machine was asleep, which a laptop needs and cron does not do.
+
+  This is a TEMPLATE: launchd requires absolute paths and does not expand ~, so
+  __HOME__ is substituted at install time rather than committed as a real path.
+
+  Install:   sed "s|__HOME__|$HOME|g" \
+               ~/repo/claudence/scripts/com.claudence.loop-health.plist.template \
+               > ~/Library/LaunchAgents/com.claudence.loop-health.plist
+             launchctl load ~/Library/LaunchAgents/com.claudence.loop-health.plist
+  Remove:    launchctl unload ~/Library/LaunchAgents/com.claudence.loop-health.plist
+             rm ~/Library/LaunchAgents/com.claudence.loop-health.plist
+  Run now:   launchctl start com.claudence.loop-health
+
+  The check is read-only apart from its own watermark file, so an unwanted run
+  costs nothing. Output lands in telemetry/health.log; a FAIL line is the signal.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.claudence.loop-health</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/opt/homebrew/bin/python3</string>
+        <string>__HOME__/.claude/telemetry/loop-health.py</string>
+    </array>
+
+    <!-- launchd does not source a profile, so PATH is pinned for the same
+         reason the hooks' PATH is pinned in settings.json. -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>9</integer>
+        <key>Minute</key>
+        <integer>15</integer>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>StandardOutPath</key>
+    <string>__HOME__/.claude/telemetry/health.log</string>
+    <key>StandardErrorPath</key>
+    <string>__HOME__/.claude/telemetry/health.log</string>
+</dict>
+</plist>
