@@ -1,9 +1,10 @@
 export const meta = {
   name: 'adversarial-research',
-  description: 'Fan out research on a topic, refute every finding independently, emit a two-layer document with per-section provenance',
-  whenToUse: 'When you need to understand a topic fast and the output must survive being quoted — a spike question, a technology survey, an unblocking analysis. Every surviving claim has been attacked by agents that did not produce it.',
+  description: 'Sweep every context channel, fan out research, refute every finding independently, emit a two-layer document with per-section provenance',
+  whenToUse: 'When you need to understand a topic fast and the output must survive being quoted — a spike question, a technology survey, an unblocking analysis. Sweeps code, database, observability, product tooling and external sources as separate blind channels, then attacks every claim with agents that did not produce it.',
   phases: [
     { title: 'Decompose', detail: 'split the topic into independent dimensions, each naming what it would unblock' },
+    { title: 'Sweep', detail: 'one agent per context channel — code, database, Datadog, Productboard, other MCP, external — each blind to the rest' },
     { title: 'Find', detail: 'one researcher per dimension, provenance required per claim' },
     { title: 'Refute', detail: 'independent skeptics per load-bearing claim, distinct lenses' },
     { title: 'Synthesize', detail: 'two-layer output — summary and detail, backlinked' },
@@ -133,6 +134,68 @@ const CRITIQUE = {
   },
 }
 
+const CHANNEL_FINDINGS = {
+  type: 'object',
+  required: ['channel', 'reachable', 'findings'],
+  properties: {
+    channel: { type: 'string' },
+    reachable: { type: 'boolean', description: 'false if the tools for this channel were absent or unauthenticated — say so rather than returning nothing' },
+    findings: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['claim', 'grade', 'how', 'source'],
+        properties: {
+          claim: { type: 'string' },
+          grade: { type: 'string', enum: ['measured', 'stated', 'inference', 'assumed'] },
+          how: { type: 'string', description: 'the exact query, file read, or tool call' },
+          source: { type: 'string', description: 'file:line, table.column, dashboard, ticket id, URL' },
+          axis: { type: 'string', enum: ['functional', 'non-functional'], description: 'what it does, versus how well it does it' },
+        },
+      },
+    },
+    absent: { type: 'array', items: { type: 'string' }, description: 'what you looked for in this channel and did NOT find — absence in a named channel is evidence' },
+  },
+}
+
+/* Context channels. Each is swept by its own agent, blind to the others, because
+   a single agent given every tool reaches for the cheapest one and stops. The
+   functional/non-functional split is explicit: code and tickets say what the
+   system does, observability says how well it does it, and a survey missing
+   either half is not an analysis of the suite. */
+const CHANNELS = [
+  {
+    key: 'code',
+    label: 'the codebase, and the functions that read and write the data',
+    brief: `Read the ACTUAL CODE. For any data this topic touches, find the model, the migration, and every function that reads or writes the column — intent lives in the model, not the column name. Report the association options verbatim (\`optional:\`, \`dependent:\`), the callers, and any service object or job in the path. Cite file:line for everything. A claim about how data behaves that is not backed by the code that handles it is an assumption.`,
+  },
+  {
+    key: 'database',
+    label: 'the database itself',
+    brief: `Query the database READ-ONLY. Name the environment on every number — the same query has returned wildly different answers against alpha and production here. Prefer aggregates; never select a column holding a person's name or a customer's content. Report distributions and null rates, not just counts: a column that is 4% populated tells a different story from one that is 96% populated.`,
+  },
+  {
+    key: 'observability',
+    label: 'Datadog — the non-functional half',
+    brief: `This channel owns the NON-FUNCTIONAL analysis. Use the Datadog tools (load the datadog skills first, as its server instructions require). Look for: p50/p95/p99 latency on the endpoints and jobs this topic touches, error and timeout rates, throughput, queue depth and worker saturation, and any monitor or incident that has fired against them. If a service or dashboard does not exist for this area, that absence IS the finding — say so explicitly rather than returning empty.`,
+  },
+  {
+    key: 'product',
+    label: 'Productboard — what product has already decided',
+    brief: `Search Productboard for features, spikes, decisions and feedback on this topic. What has product already committed to, filed, or rejected? A decision already recorded is not a proposal to re-make. Report ticket ids with their status, and quote the decision language rather than paraphrasing it.`,
+  },
+  {
+    key: 'org',
+    label: 'the other MCP servers — Notion, Slack, GitHub, Drive',
+    brief: `Sweep the remaining connected MCP servers for anything on this topic: Notion (the daily log is the primary record of stakeholder conversations, ahead of any repo), Slack (discovery meetings, #product-questions), GitHub (issues, PRs, and the wikis — note that a GitHub wiki is a SEPARATE git repo invisible to code search), Google Drive. Attribute by role rather than by name. If a server is unauthenticated, report it as unreachable rather than silently skipping it.`,
+  },
+  {
+    key: 'external',
+    label: 'outside the organisation',
+    brief: `Only after the internal channels: vendor documentation, benchmarks, papers, changelogs. Treat vendor claims as \`stated\`, never \`measured\` — a benchmark a vendor published about its own product is marketing until reproduced. Prefer primary sources and note publication dates; a two-year-old benchmark of a fast-moving system is a historical fact, not a current one.`,
+  },
+]
+
 /* ------------------------------------------------------------------ script */
 
 const topic = (args && args.topic) || args
@@ -142,8 +205,11 @@ if (!topic || typeof topic !== 'string') {
 const context = (args && args.context) || ''
 const constraints = (args && args.constraints) || ''
 
-// Scale with the turn's budget when one was set; otherwise stay inside the
-// default 15-agent guideline: 1 decompose + 3 finders + 8 refuters + 2 = 14.
+// Sizing. The channel sweep adds ~6 agents, which puts a default run around 20 —
+// deliberately past the 15-agent guideline, because a multi-source functional and
+// non-functional analysis is what this workflow is for and a sweep that skips
+// channels produces exactly the false all-clear it exists to prevent. Pass
+// args.channels to narrow it.
 const big = Boolean(budget.total && budget.total > 400000)
 const MAX_DIM = big ? 6 : 3
 const REFUTERS = big ? 3 : 2
@@ -173,6 +239,43 @@ const dims = (plan.dimensions || []).slice(0, MAX_DIM)
 log(`${dims.length} dimensions · ${dims.filter(d => d.load_bearing).length} load-bearing`)
 if (plan.excluded && plan.excluded.length) log(`excluded: ${plan.excluded.join(' · ')}`)
 
+// Channel sweep: every channel in parallel, each blind to the others. A barrier is
+// correct here — the dimension researchers need the whole sweep as context, and
+// the point is that no single agent saw all channels while sweeping.
+phase('Sweep')
+const wanted = (args && args.channels) || CHANNELS.map(c => c.key)
+const channels = CHANNELS.filter(c => wanted.includes(c.key))
+log(`Sweeping ${channels.length} channels: ${channels.map(c => c.key).join(' · ')}`)
+
+const sweeps = (await parallel(channels.map(ch => () => agent(
+  `Sweep ONE context channel for everything it knows about this topic. You are blind to the other channels by design.
+
+TOPIC: ${topic}
+${context ? `CONTEXT: ${context}` : ''}
+YOUR CHANNEL: ${ch.label}
+
+${ch.brief}
+
+Rules for every channel:
+- Provenance is mandatory: HOW you obtained it, and the SOURCE.
+- Grade honestly. measured means something returned it; stated means someone asserted it.
+- Tag each finding functional (what the system does) or non-functional (how well it does it).
+- Report what you looked for and did NOT find. Absence in a named channel is evidence; silence is not.
+- If your channel's tools are missing or unauthenticated, set reachable=false and say which tool. Do not substitute another channel's sources.
+- Read-only throughout. Modify nothing.`,
+  { schema: CHANNEL_FINDINGS, label: `sweep:${ch.key}`, phase: 'Sweep' }
+)))).filter(Boolean)
+
+const unreachable = sweeps.filter(s => !s.reachable).map(s => s.channel)
+if (unreachable.length) log(`UNREACHABLE channels: ${unreachable.join(', ')} — coverage is partial, and the synthesis will say so`)
+const sweepDigest = JSON.stringify(sweeps.map(s => ({
+  channel: s.channel, reachable: s.reachable,
+  findings: (s.findings || []).map(f => ({ claim: f.claim, grade: f.grade, source: f.source, axis: f.axis })),
+  absent: s.absent || [],
+})), null, 1)
+const fnCount = sweeps.flatMap(s => s.findings || []).filter(f => f.axis === 'non-functional').length
+log(`sweep returned ${sweeps.flatMap(s => s.findings || []).length} findings · ${fnCount} non-functional`)
+
 // Find and refute as a pipeline: a dimension's findings start being attacked as
 // soon as that dimension returns, rather than waiting for the slowest finder.
 const LENSES = [
@@ -191,6 +294,9 @@ DIMENSION: ${d.key} — ${d.question}
 WHERE TO LOOK: ${d.where_to_look}
 THIS WOULD UNBLOCK: ${d.unblocks}
 ${context ? `CONTEXT: ${context}` : ''}
+
+WHAT THE CHANNEL SWEEP ALREADY FOUND — build on it, do not re-derive it, and CONTRADICT it where you find better evidence:
+${sweepDigest}
 
 Hard requirements:
 - EVERY claim carries provenance: HOW you obtained it (the exact query, the file read, the command run) and the SOURCE (file:line, table.column, URL, or who said it).
@@ -278,7 +384,10 @@ Structure, and it is not negotiable:
 - summary_sections: scannable. At most 3 sentences each. Each names the detail_anchor it opens into and its overall confidence. This layer is for someone deciding whether to read further.
 - detail_sections: the argument in full. Each carries a provenance field stating HOW every data point in THAT section was obtained — the query, the file, the command. Provenance lives per section, so a reader checking one claim does not have to audit the whole document.
 - Never state an inference as a measurement. Where a claim is graded assumed, say so in the sentence itself, not in a footnote.
-- Where the refuters produced corrections, use the corrected weaker version, not the original.`,
+- Where the refuters produced corrections, use the corrected weaker version, not the original.
+- Cover BOTH AXES explicitly. Functional — what the system does. Non-functional — latency, error rates, throughput, cost, saturation. If the non-functional half is thin, say which channel was unreachable rather than letting the omission pass as a clean bill of health.
+- Every identifier you cite carries a short gloss of what it is: `SP-6` (\"derive a graded set from edit history\"), never a bare id. The reader tracks none of the numbering.
+${unreachable.length ? `- CHANNELS THAT COULD NOT BE REACHED: ${unreachable.join(', ')}. State this in the document; partial coverage presented as complete is the failure mode here.` : ''}`,
   { schema: TWO_LAYER, label: 'synthesize' }
 )
 
@@ -287,6 +396,8 @@ const critique = await agent(
   `You are the completeness critic. Find what this research MISSED.
 
 TOPIC: ${topic}
+CHANNELS SWEPT: ${channels.map(c => c.key).join(', ')}${unreachable.length ? ` — UNREACHABLE: ${unreachable.join(', ')}` : ''}
+NON-FUNCTIONAL FINDINGS RETURNED: ${fnCount}${fnCount === 0 ? ' — ZERO, which for a suite analysis is itself a finding' : ''}
 DIMENSIONS RESEARCHED: ${dims.map(d => d.key).join(', ')}
 DELIBERATELY EXCLUDED: ${(plan.excluded || []).join(' · ') || 'nothing was declared out of scope — itself suspicious'}
 HEADLINE PRODUCED: ${doc.headline}
@@ -314,4 +425,9 @@ return {
   unverified: carried.map(c => c.claim),
   dimensions: dims,
   excluded: plan.excluded || [],
+  coverage: {
+    channels_swept: channels.map(c => c.key),
+    channels_unreachable: unreachable,
+    non_functional_findings: fnCount,
+  },
 }
