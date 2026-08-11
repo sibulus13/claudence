@@ -405,7 +405,7 @@ Structure, and it is not negotiable:
 - Never state an inference as a measurement. Where a claim is graded assumed, say so in the sentence itself, not in a footnote.
 - Where the refuters produced corrections, use the corrected weaker version, not the original.
 - Cover BOTH AXES explicitly. Functional — what the system does. Non-functional — latency, error rates, throughput, cost, saturation. If the non-functional half is thin, say which channel was unreachable rather than letting the omission pass as a clean bill of health.
-- Every identifier you cite carries a short gloss of what it is: `SP-6` (\"derive a graded set from edit history\"), never a bare id. The reader tracks none of the numbering.
+- Every identifier you cite carries a short gloss of what it is: SP-6 ("derive a graded set from edit history"), never a bare id. The reader tracks none of the numbering.
 ${unreachable.length ? `- CHANNELS THAT COULD NOT BE REACHED: ${unreachable.join(', ')}. State this in the document; partial coverage presented as complete is the failure mode here.` : ''}`,
   { schema: TWO_LAYER, label: 'synthesize' }
 )
