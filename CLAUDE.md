@@ -93,6 +93,7 @@ plan preamble — answering *is* the plan.
 - Do not add unsolicited comments, docstrings, or type annotations to code you didn't change
 - Do not add emojis unless explicitly asked
 - Reference code by `file:line` pattern so the user can navigate directly
+- **Gloss every identifier you cite** — `SP-6` ("derive a graded set from edit history"), never bare `SP-6`. Assume the reader tracks none of the numbering
 - **Action-biased** — when a clear implementation path exists, take it. Do not present options or ask which approach to use. Make the call, implement it, then summarize the design choices and trade-offs made at the end of the response.
 
 ## Documentation Style — Visual-First (Mermaid)
@@ -337,6 +338,20 @@ the step that gets skipped.
   and the failure is silent: one project reached three prefixes meaning two different things each,
   separated only by a hyphen — `F1` a *freedom the design may spend* against `F-a` a *requirement it
   must meet*, near-opposite meanings on one letter.
+
+**Never cite a bare identifier.** `SP-6` on its own is noise to anyone not holding the register in
+their head — which includes the user, every future session, and you after a compaction. Every citation
+carries a **short gloss of what it is**, in this form:
+
+    `SP-6` ("derive a graded set from edit history")
+    `RI-018` ("the audit log stopped covering planning in 2021")
+    `A-2` ("who owns the graded set" — unassigned)
+
+The gloss is 3–10 words, states the *substance* rather than the category ("derive a graded set" beats
+"a spike about metrics"), and appears **on every citation in prose, not just the first**. A reader
+scanning for one line should not have to scroll up to learn what it refers to. This applies to
+documents, commit messages, and console replies alike — the register is a lookup table, not a
+vocabulary the reader is expected to have memorised.
 
 **Enforced, not trusted:** `~/repo/claudence/scripts/state-health.py --ids` **fails** on any cited
 prefix the legend does not declare, and warns when a family is cited in a form it did not declare.
