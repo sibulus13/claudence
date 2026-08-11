@@ -48,7 +48,7 @@ HOOK = os.path.join(REPO, 'scripts', 'workspace-state.py')
 LAUNCHER = os.path.join(REPO, 'scripts', 'open-workspace.sh')
 
 # The contract, and the same alias order the three readers use.
-STATE_DIRS = ('docs', '.')
+STATE_DIRS = ('docs', 'research', '.')
 STATE_NAMES = ('STATE.md', 'context.md', 'workflow_state.md', 'KNOWLEDGE.md')
 TODO_NAMES = ('TODO.md', 'todo.md', 'ROADMAP.md', 'BACKLOG.md')
 FRONT_FIELDS = ('purpose', 'update-trigger', 'last-verified', 'status')
@@ -410,7 +410,8 @@ def identifiers(roots):
 
     for root in roots:
         label = os.path.basename(root)
-        docs_dir = os.path.join(root, 'docs')
+        state_rel0 = find(root, STATE_NAMES)
+        docs_dir = os.path.join(root, os.path.dirname(state_rel0)) if state_rel0 else os.path.join(root, 'docs')
         if not os.path.isdir(docs_dir):
             continue
 
@@ -446,8 +447,8 @@ def docs(roots):
     """
     for root in roots:
         label = os.path.basename(root)
-        docs_dir = os.path.join(root, 'docs')
         state_rel = find(root, STATE_NAMES)
+        docs_dir = os.path.join(root, os.path.dirname(state_rel)) if state_rel else os.path.join(root, 'docs')
         if not os.path.isdir(docs_dir) or not state_rel:
             continue
         state_text = read(os.path.join(root, state_rel))

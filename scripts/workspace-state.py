@@ -46,7 +46,7 @@ CONTRACT = (
     ('JOURNAL.md', 'why the direction changed', ('journal.md',)),
     ('DECISIONS.md', 'decisions and assumptions', ('ADR.md', 'decisions.md')),
 )
-SEARCH_DIRS = ('docs', '.')
+SEARCH_DIRS = ('docs', 'research', '.')
 NOW_HEADINGS = ('## now', '## 1 · now', '## in flight')
 MAX_NOW_LINES = 14
 NEXT_HEADINGS = ('## next', '## next up', '## 2 · next')
