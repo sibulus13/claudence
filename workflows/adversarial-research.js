@@ -185,9 +185,27 @@ const CHANNELS = [
     brief: `Search Productboard for features, spikes, decisions and feedback on this topic. What has product already committed to, filed, or rejected? A decision already recorded is not a proposal to re-make. Report ticket ids with their status, and quote the decision language rather than paraphrasing it.`,
   },
   {
+    key: 'slack',
+    label: 'Slack — what people actually said, in named channels',
+    brief: `Search these channels SPECIFICALLY. Slack is where decisions get made informally and then never written down, so a topic with no Slack trace is different from one that was argued over. Channel list verified 2026-08-11 by searching the workspace; if one 404s, report it rather than substituting another.
+
+    | Channel | What to look for in it |
+    |---|---|
+    | #product-questions | Customers' and CS's real questions, in their own words — the closest thing to a demand signal. Search the topic and read the THREADS, not just the parent messages |
+    | #discoverymeetings | Discovery call notes. Who asked for what, and what they were actually trying to do. The richest source for use cases and for golden-set candidates |
+    | #engineering | Design arguments, incidents, and \"why is this slow\" threads. The place a non-functional problem surfaces before it reaches a dashboard |
+    | #ai | Prior AI work, what was tried, what was abandoned and why. Check before proposing anything — an idea already rejected here is not a new idea |
+    | #product-announcements | What actually shipped and when. Reconciles a claim about the product against the record |
+    | #zendesk-tickets | Support traffic. Recurring complaints are a non-functional signal that no dashboard captures |
+    | #customer-comms | What was promised to customers externally. Constrains what may now be claimed |
+    | #dev-sso-support | Auth, SSO and tenancy questions specifically — relevant to any isolation or per-user-visibility topic |
+
+    Use search modifiers: \`in:#channel\`, \`after:YYYY-MM-DD\` to bound recency, \`is:thread\` for discussions. Attribute by ROLE, never by name, and quote decision language verbatim rather than paraphrasing it. Report which channels you searched and found nothing in — a silent channel is evidence.`,
+  },
+  {
     key: 'org',
-    label: 'the other MCP servers — Notion, Slack, GitHub, Drive',
-    brief: `Sweep the remaining connected MCP servers for anything on this topic: Notion (the daily log is the primary record of stakeholder conversations, ahead of any repo), Slack (discovery meetings, #product-questions), GitHub (issues, PRs, and the wikis — note that a GitHub wiki is a SEPARATE git repo invisible to code search), Google Drive. Attribute by role rather than by name. If a server is unauthenticated, report it as unreachable rather than silently skipping it.`,
+    label: 'the other MCP servers — Notion, GitHub, Drive',
+    brief: `Sweep the remaining connected MCP servers. Notion FIRST: the daily log there is the primary record of stakeholder conversations and outranks any repo document when the two disagree. Then GitHub — issues, PRs, and **the wikis, which are a SEPARATE git repo invisible to both code search and the contents API**, so a repo can carry a hundred pages no grep will surface. Then Google Drive for decks and specs. Attribute by role rather than by name. If a server is unauthenticated, report it as unreachable rather than silently skipping it.`,
   },
   {
     key: 'external',
@@ -245,7 +263,8 @@ if (plan.excluded && plan.excluded.length) log(`excluded: ${plan.excluded.join('
 phase('Sweep')
 const wanted = (args && args.channels) || CHANNELS.map(c => c.key)
 const channels = CHANNELS.filter(c => wanted.includes(c.key))
-log(`Sweeping ${channels.length} channels: ${channels.map(c => c.key).join(' · ')}`)
+log(`Sweeping ${channels.length} context channels: ${channels.map(c => c.key).join(' · ')}`)
+log('Slack targets: #product-questions #discoverymeetings #engineering #ai #product-announcements #zendesk-tickets #customer-comms #dev-sso-support')
 
 const sweeps = (await parallel(channels.map(ch => () => agent(
   `Sweep ONE context channel for everything it knows about this topic. You are blind to the other channels by design.
