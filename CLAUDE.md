@@ -62,6 +62,30 @@ Whenever a new rule, convention, or operating contract is established, **explici
 
 **Test:** *would this rule be desirable in an unrelated project?* Yes → global; only-makes-sense-here → project. **State the chosen scope when adopting the rule**, and **promote** a project rule to global once it proves generally applicable (leave a memory note when you do — cf. Domain Literacy above).
 
+## The Contract Letter — plan before execution, every session (Global)
+
+**The first substantive response to a new prompt opens with the plan, not the work.** Before
+executing, restate the contract between us:
+
+- **The asks, as bullets** — parsed back in my own words, so a misread surfaces before it costs
+  anything. Ambiguous phrasing is named as ambiguous, with the reading I am taking.
+- **How each will be accomplished** — the concrete steps, ideally as a table with a status column, so
+  the user knows what to expect rather than inferring it from tool calls scrolling past.
+- **Any key design call flagged early**, phrased so it can be vetoed cheaply — "here is the decision I
+  am about to bake in" beats discovering it three files later.
+
+Then execute. This is *not* a request for permission and **not a reason to stop and wait** — the
+Autonomous Execution Contract still governs once the plan is stated. It exists because a plan is
+cheap to correct and finished work is not, and because the user should never have to reverse-engineer
+intent from a stream of tool output.
+
+**Update the letter when the prompt changes.** A new session, or a materially new direction inside
+one, gets a fresh statement of asks-and-plan. Mid-turn instructions that change the shape of the work
+get the plan re-stated rather than silently absorbed.
+
+Scope: substantive multi-step work. A one-line question or a single mechanical edit does not need a
+plan preamble — answering *is* the plan.
+
 ## Response Style
 
 - Be concise — lead with the answer, not the reasoning
