@@ -20,6 +20,7 @@ Three modes, cheapest first, mirroring telemetry/loop-health.py:
              throwaway repo and asserts a fresh session could catch up.
   --drift    has the project moved on without the doc? The behaviour-2 check.
   --ids      does every identifier a doc cites actually have a register?
+  --docs     is every document linked, and every artifact source resolvable?
 
   ./state-health.py                 all four, for the repo containing cwd
   ./state-health.py --all           every git repo two levels under ~/repo
@@ -432,6 +433,68 @@ def identifiers(roots):
                ' '.join(sorted(defined & set(cited))[:8]))
 
 
+def docs(roots):
+    """Is every document owned, and every artifact accounted for?
+
+    Two failures this exists for, both observed rather than imagined. A doc sat
+    committed and linked from nowhere for a day — nobody reads what nobody links,
+    so it silently stopped being maintained. And two artifacts spent an afternoon
+    both claiming the same concern, because they differed in format and format
+    reads like a distinction until you write both titles down.
+
+    Neither was caught by reading. Both are caught by counting.
+    """
+    for root in roots:
+        label = os.path.basename(root)
+        docs_dir = os.path.join(root, 'docs')
+        state_rel = find(root, STATE_NAMES)
+        if not os.path.isdir(docs_dir) or not state_rel:
+            continue
+        state_text = read(os.path.join(root, state_rel))
+        state_base = os.path.basename(state_rel)
+
+        # 1 · every doc must be linked from the state page — the index of record
+        linked = set(re.findall(r'\]\(([A-Za-z0-9._-]+\.md)\)', state_text))
+        orphans = []
+        for name in sorted(os.listdir(docs_dir)):
+            if not name.endswith('.md') or name in (state_base, 'ARTIFACTS.md'):
+                continue
+            if name not in linked:
+                orphans.append(name)
+        if orphans:
+            bad('%s: docs linked from nowhere' % label,
+                '%s — a document nobody links is a document nobody maintains'
+                % ', '.join(orphans[:6]))
+        else:
+            ok('%s: every doc is linked from %s' % (label, state_rel))
+
+        # 2 · the artifact index must resolve: sources exist, supersessions名 a successor
+        idx = os.path.join(docs_dir, 'ARTIFACTS.md')
+        if not os.path.isfile(idx):
+            continue
+        rows = [ln for ln in read(idx).split('\n')
+                if ln.startswith('| ') and ln.count('|') >= 5 and '---' not in ln]
+        missing_src, unmarked = [], []
+        for ln in rows:
+            cells = [c.strip() for c in ln.strip('|').split('|')]
+            if len(cells) < 5 or cells[0].lower().startswith('artifact'):
+                continue
+            name, published = cells[0][:40], cells[4].lower()
+            for m in re.findall(r'\]\((\.\./[^)]+)\)', cells[3]):
+                if not os.path.exists(os.path.normpath(os.path.join(docs_dir, m))):
+                    missing_src.append('%s -> %s' % (name, m))
+            if 'supersed' in cells[1].lower() and 'by' not in published:
+                unmarked.append(name)
+        if missing_src:
+            bad('%s: artifact source missing' % label, '; '.join(missing_src[:3]))
+        else:
+            ok('%s: every artifact source path exists' % label)
+        if unmarked:
+            bad('%s: superseded without a successor' % label, '; '.join(unmarked[:3]))
+        elif rows:
+            ok('%s: supersessions all name a successor' % label)
+
+
 # ── main ─────────────────────────────────────────────────────────────────────
 
 def main():
@@ -452,7 +515,7 @@ def main():
             return 1
         roots = [root]
 
-    run_all = not (args & {'--sanity', '--smoke', '--drift', '--ids'})
+    run_all = not (args & {'--sanity', '--smoke', '--drift', '--ids', '--docs'})
     if run_all or '--sanity' in args:
         sanity(roots)
     if run_all or '--smoke' in args:
@@ -461,6 +524,8 @@ def main():
         drift(roots)
     if run_all or '--ids' in args:
         identifiers(roots)
+    if run_all or '--docs' in args:
+        docs(roots)
 
     for line in PASS:
         sys.stdout.write('  ok   %s\n' % line)
