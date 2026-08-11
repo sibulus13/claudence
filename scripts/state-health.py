@@ -49,6 +49,7 @@ LAUNCHER = os.path.join(REPO, 'scripts', 'open-workspace.sh')
 
 # The contract, and the same alias order the three readers use.
 STATE_DIRS = ('docs', 'research', '.')
+LEGEND_NAMES = ('NAMESPACE.md', 'GLOSSARY.md', 'LEGEND.md')
 STATE_NAMES = ('STATE.md', 'context.md', 'workflow_state.md', 'KNOWLEDGE.md')
 TODO_NAMES = ('TODO.md', 'todo.md', 'ROADMAP.md', 'BACKLOG.md')
 FRONT_FIELDS = ('purpose', 'update-trigger', 'last-verified', 'status')
@@ -407,6 +408,12 @@ def identifiers(roots):
     defined_pat = re.compile(r'^(?:\|\s*|#{1,6}\s+)[*_`\[]*([A-Z]{1,3})-([0-9]{1,3})\b',
                              re.MULTILINE)
     cited_pat = re.compile(r'\b([A-Z]{1,3})-([0-9]{1,3})\b')
+    # A legend row declares a prefix in the exact form it is used, so both
+    # conventions can coexist honestly: | `A-` | ... for A-1, | `G` | ... for G1.
+    # Mixing them is not tidy, but a legend that lies about the form is worse
+    # than one that records it.
+    legend_pat = re.compile(r'^\|\s*[*_`]*([A-Z]{1,3})(-?)[*_`]*\s*\|', re.MULTILINE)
+    bare_cited_pat = re.compile(r'\b([A-Z]{1,3})([0-9]{1,3})\b')
 
     for root in roots:
         label = os.path.basename(root)
@@ -415,15 +422,60 @@ def identifiers(roots):
         if not os.path.isdir(docs_dir):
             continue
 
-        defined, cited = set(), {}
+        defined, cited, legend, legend_bare = set(), {}, set(), set()
+        cited_bare = {}
+        unhyphenated = {}
+        texts = {}
         for name in sorted(os.listdir(docs_dir)):
             if not name.endswith('.md'):
                 continue
             text = read(os.path.join(docs_dir, name))
+            texts[name] = text
+            if name in LEGEND_NAMES:
+                for pre, dash in legend_pat.findall(text):
+                    (legend if dash else legend_bare).add(pre)
             for pre, _num in defined_pat.findall(text):
                 defined.add(pre)
             for pre, _num in cited_pat.findall(text):
                 cited.setdefault(pre, set()).add(name)
+            for pre, _num in bare_cited_pat.findall(text):
+                cited_bare.setdefault(pre, set()).add(name)
+
+        # A legend is opt-in, and opting in raises the bar from warn to fail: a
+        # project that has declared its namespace has no excuse for a shorthand
+        # outside it. Without one, the old heuristic stands.
+        if legend or legend_bare:
+            undeclared = sorted(p for p in cited if p not in legend)
+            for pre in undeclared:
+                bad('%s: %s- is cited but absent from the identifier legend' % (label, pre),
+                     'in %s — declare it in the legend, or re-clarify it in prose'
+                     % ', '.join(sorted(cited[pre])))
+            # A family cited in the other form than it declares. This is the
+            # failure that reports success: `WS1` never matched the hyphenated
+            # citation pattern, so the check passed while the family was
+            # unresolvable. Only checked against declared families, because
+            # scanning for undeclared bare ids matches half the English language.
+            for pre in sorted(legend):
+                where = {n for n in cited_bare.get(pre, ()) if n not in LEGEND_NAMES}
+                if where:
+                    unhyphenated.setdefault('%s (declared %s-, cited %s1)' % (pre, pre, pre), where)
+            for pre in sorted(legend_bare):
+                where = {n for n in cited.get(pre, ()) if n not in LEGEND_NAMES}
+                if where:
+                    unhyphenated.setdefault('%s (declared %s1, cited %s-1)' % (pre, pre, pre), where)
+            for what, where in sorted(unhyphenated.items()):
+                warn('%s: %s is cited in a form it does not declare' % (label, what),
+                     'in %s — one form is invisible to this check, so it reports success either way'
+                     % ', '.join(sorted(where)))
+            if not undeclared and not unhyphenated:
+                ok('%s: every identifier cited is declared in the legend' % label,
+                   '%d prefixes: %s' % (len(legend | legend_bare),
+                                        ' '.join(sorted(legend | legend_bare))))
+            stale = sorted(p for p in legend if p not in cited)
+            if stale:
+                warn('%s: legend declares %s- but nothing cites it' % (label, ', '.join(stale)),
+                     'a legend row with no citations is a family that was retired without saying so')
+            continue
 
         dangling = sorted(p for p in cited if p not in defined)
         for pre in dangling:
@@ -432,6 +484,8 @@ def identifiers(roots):
         if cited and not dangling:
             ok('%s: %d identifier families all have registers' % (label, len(defined & set(cited))),
                ' '.join(sorted(defined & set(cited))[:8]))
+            warn('%s: no identifier legend' % label,
+                 'add NAMESPACE.md declaring every prefix, and this check fails on undeclared ones')
 
 
 def docs(roots):

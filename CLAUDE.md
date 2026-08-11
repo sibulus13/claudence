@@ -296,6 +296,53 @@ log and file existence for staleness. If a repo has none, surface that — it is
 if direction changed, and record any decision. That is what makes the next session cheap, and it is
 the step that gets skipped.
 
+## Identifier Namespace — one legend per project, machine-checked (Global)
+
+**Any shorthand a reader cannot resolve is noise.** Every project using abbreviated identifiers
+(`A-1`, `DL-013`, `SP-2`, `UC-1`) keeps **one legend** — `docs/NAMESPACE.md` or `research/NAMESPACE.md`
+— and it is the only place prefixes are defined:
+
+- **One row per prefix**, written in the **exact form it is used** (`A-` for `A-1`, `G` for `G1`). A
+  legend that tidies away a mixed convention is a legend that lies.
+- Each row names the **single register** that defines that prefix's ids, and **whether it resolves
+  from this repo at all** — external prefixes (another repo, Productboard, a private knowledge base)
+  are cited *as external*, never silently, so a reader is not hunting a dead link.
+- **A prefix absent from the legend is a defect: declare it, or re-clarify it in prose.** Never mint
+  one inline. Retired families stay in the legend marked `retired`, because history still cites them.
+- **Before introducing a prefix, check what the letter already means.** Single letters run out fast,
+  and the failure is silent: one project reached three prefixes meaning two different things each,
+  separated only by a hyphen — `F1` a *freedom the design may spend* against `F-a` a *requirement it
+  must meet*, near-opposite meanings on one letter.
+
+**Enforced, not trusted:** `~/repo/claudence/scripts/state-health.py --ids` **fails** on any cited
+prefix the legend does not declare, and warns when a family is cited in a form it did not declare.
+That second check exists because of the failure mode that matters: `WS1` was written without its
+hyphen, so the citation pattern never matched it, and the check **reported success** for weeks. A
+check that cannot see a thing reports nothing, which reads exactly like all-clear. Having a legend is
+opt-in; opting in raises undeclared prefixes from warning to failure.
+
+## Unverified Documentation — a real tier, declared as such (Global)
+
+**Keeping unverified, possibly-hallucinated analysis locally is legitimate and useful** — as long as
+the human, the orchestration, and every agent know that is what it is. The danger is never the content;
+it is forgetting. A speculative document opened six weeks later reads exactly like a verified one:
+same voice, same tables, same confident headings.
+
+So a project holding such material keeps it in a folder **named for its epistemic status, not its
+subject** (`private/unverified/`, `hypothesis/`), with a `README.md` beside the documents — not in a
+governance file nobody opens — stating:
+
+| Rule | Why |
+|---|---|
+| **Never promote a claim out by citing it** | Quoting it inside a verified tier launders it into a promise it has not met. If the fact matters, **re-derive it from the source and cite that** |
+| **A number there is a lead, not a measurement** | Re-run it. Figures have later been contradicted by 3x and 7x |
+| **Label the environment** on anything carried forward | The same query returned 68% and 20.5% depending on which database answered |
+| **No document leaves without a human reading it line by line** | Automated checks catch missing front matter and absent citations. They cannot catch a sentence that is fluent, plausible, well-structured and simply untrue — the failure mode the tier exists to contain |
+
+**A register and an elaboration are different things.** A document in this tier may legitimately
+elaborate ids defined in a verified register — the *ids* resolve, the *elaboration* does not. Cite the
+id; do not repeat what the unverified document says about it.
+
 ## Local Knowledge First (Global)
 
 **Diagnose against local sources before reaching outside.** Before a web search, an external
