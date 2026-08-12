@@ -1,41 +1,18 @@
 export const meta = {
   name: 'adversarial-research',
-  description: 'Sweep every context channel, fan out research, refute every finding independently, emit a two-layer document with per-section provenance',
-  whenToUse: 'When you need to understand a topic fast and the output must survive being quoted — a spike question, a technology survey, an unblocking analysis. Sweeps code, database, observability, product tooling and external sources as separate blind channels, then attacks every claim with agents that did not produce it.',
+  description: 'Ask one question of every source of truth independently, then rank, consolidate and refute into one report',
+  whenToUse: 'When you have one question and several places that might answer it, and the answer must survive being quoted. Each channel — code, database, Datadog, Productboard, Slack, other MCP, external — answers the same question blind to the others, so agreement is corroboration rather than echo, and disagreement between two channels is surfaced as the most valuable output rather than averaged away.',
   phases: [
-    { title: 'Decompose', detail: 'split the topic into independent dimensions, each naming what it would unblock' },
-    { title: 'Sweep', detail: 'one agent per context channel — code, database, Datadog, Productboard, other MCP, external — each blind to the rest' },
-    { title: 'Find', detail: 'one researcher per dimension, provenance required per claim' },
+    { title: 'Sweep', detail: 'every channel answers the SAME core question independently — code, database, Datadog, Productboard, Slack, other MCP, external' },
+    { title: 'Rank', detail: 'consolidate across channels: merge agreements, surface contradictions, rank by evidence weight' },
+    { title: 'Deepen', detail: 'follow only the threads ranking exposed as load-bearing or contradicted' },
     { title: 'Refute', detail: 'independent skeptics per load-bearing claim, distinct lenses' },
-    { title: 'Synthesize', detail: 'two-layer output — summary and detail, backlinked' },
-    { title: 'Critique', detail: 'what is still missing: modality not run, claim unverified' },
+    { title: 'Synthesize', detail: 'two-layer output — summary and detail, backlinked, provenance per section' },
+    { title: 'Critique', detail: 'what is still missing: channel not reached, claim unverified' },
   ],
 }
 
 /* ---------------------------------------------------------------- schemas */
-
-const DECOMPOSITION = {
-  type: 'object',
-  required: ['dimensions'],
-  properties: {
-    dimensions: {
-      type: 'array', minItems: 2, maxItems: 6,
-      items: {
-        type: 'object',
-        required: ['key', 'question', 'unblocks', 'where_to_look'],
-        properties: {
-          key: { type: 'string', description: 'short kebab-case slug' },
-          question: { type: 'string', description: 'the one question this dimension answers' },
-          unblocks: { type: 'string', description: 'what downstream decision or gate this would unblock' },
-          where_to_look: { type: 'string', description: 'concrete sources: files, tables, docs, external' },
-          load_bearing: { type: 'boolean', description: 'true if a wrong answer here changes a decision' },
-        },
-      },
-    },
-    excluded: { type: 'array', items: { type: 'string' }, description: 'dimensions deliberately out of scope, and why' },
-  },
-}
-
 // Provenance is mandatory per claim. A claim without it is dropped in synthesis
 // rather than published unsourced — the whole point of the workflow.
 const FINDINGS = {
@@ -158,6 +135,53 @@ const CHANNEL_FINDINGS = {
   },
 }
 
+const CONSOLIDATION = {
+  type: 'object',
+  required: ['ranked', 'contradictions'],
+  properties: {
+    ranked: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['claim', 'weight', 'channels_agreeing', 'grade'],
+        properties: {
+          claim: { type: 'string', description: 'the merged claim, stated once' },
+          weight: { type: 'integer', description: '1-10. Corroboration across INDEPENDENT channels raises it; a single channel caps it low however confident that channel sounded' },
+          channels_agreeing: { type: 'array', items: { type: 'string' } },
+          channels_silent: { type: 'array', items: { type: 'string' }, description: 'channels that should have seen this and did not — silence is data' },
+          grade: { type: 'string', enum: ['measured', 'stated', 'inference', 'assumed'] },
+          axis: { type: 'string', enum: ['functional', 'non-functional'] },
+          why_it_matters: { type: 'string' },
+        },
+      },
+    },
+    contradictions: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['subject', 'positions'],
+        properties: {
+          subject: { type: 'string' },
+          positions: { type: 'array', items: { type: 'string' }, description: 'what each channel says, attributed to the channel' },
+          how_to_settle: { type: 'string', description: 'the one cheap check that would resolve it' },
+        },
+      },
+    },
+    threads_to_deepen: {
+      type: 'array', maxItems: 4,
+      items: {
+        type: 'object',
+        required: ['question', 'why'],
+        properties: {
+          question: { type: 'string' },
+          why: { type: 'string', description: 'load-bearing, or contradicted, or a channel was silent where it should not have been' },
+          where_to_look: { type: 'string' },
+        },
+      },
+    },
+  },
+}
+
 /* Context channels. Each is swept by its own agent, blind to the others, because
    a single agent given every tool reaches for the cheapest one and stops. The
    functional/non-functional split is explicit: code and tickets say what the
@@ -233,67 +257,95 @@ const MAX_DIM = big ? 6 : 3
 const REFUTERS = big ? 3 : 2
 const MAX_VERIFY = big ? 8 : 4
 
-phase('Decompose')
-log(`Topic: ${topic}`)
-const plan = await agent(
-  `Decompose this research topic into INDEPENDENT dimensions that can be researched in parallel.
-
-TOPIC: ${topic}
-${context ? `CONTEXT: ${context}` : ''}
-${constraints ? `CONSTRAINTS: ${constraints}` : ''}
-
-Rules:
-- Dimensions must be MECE — no two should return the same finding.
-- Each must name what downstream decision or gate it would unblock. A dimension that unblocks nothing is not worth a dimension.
-- Name CONCRETE places to look: file paths, database tables, specific documents. "Research the literature" is not a place.
-- At most ${MAX_DIM} dimensions. Fewer is fine. Mark the ones where a wrong answer changes a decision as load_bearing.
-- Also list what you are deliberately excluding and why — scope exclusions are findings too.
-
-Read before deciding: any state/spec documents in the working directory that describe what is already known, so you do not commission research that has already been done.`,
-  { schema: DECOMPOSITION, label: 'decompose' }
-)
-
-const dims = (plan.dimensions || []).slice(0, MAX_DIM)
-log(`${dims.length} dimensions · ${dims.filter(d => d.load_bearing).length} load-bearing`)
-if (plan.excluded && plan.excluded.length) log(`excluded: ${plan.excluded.join(' · ')}`)
-
-// Channel sweep: every channel in parallel, each blind to the others. A barrier is
-// correct here — the dimension researchers need the whole sweep as context, and
-// the point is that no single agent saw all channels while sweeping.
+// CHANNEL-FIRST. Every channel answers the SAME core question independently,
+// because the question of interest is "what does each source of truth say about
+// this?" — not "how do I subdivide the topic". Subdivision comes later, and only
+// where ranking shows it is needed. Each channel is blind to the others so that
+// agreement between two of them is real corroboration rather than an echo.
 phase('Sweep')
+log(`Core question: ${topic}`)
 const wanted = (args && args.channels) || CHANNELS.map(c => c.key)
 const channels = CHANNELS.filter(c => wanted.includes(c.key))
-log(`Sweeping ${channels.length} context channels: ${channels.map(c => c.key).join(' · ')}`)
+log(`${channels.length} channels, each answering the same question: ${channels.map(c => c.key).join(' · ')}`)
 log('Slack targets: #product-questions #discoverymeetings #engineering #ai #product-announcements #zendesk-tickets #customer-comms #dev-sso-support')
 
 const sweeps = (await parallel(channels.map(ch => () => agent(
-  `Sweep ONE context channel for everything it knows about this topic. You are blind to the other channels by design.
+  `Answer ONE question from ONE source of truth. You are blind to the other channels by design — if you and another channel agree, that agreement must be earned independently.
 
-TOPIC: ${topic}
+THE CORE QUESTION: ${topic}
 ${context ? `CONTEXT: ${context}` : ''}
+${constraints ? `CONSTRAINTS: ${constraints}` : ''}
+
 YOUR CHANNEL: ${ch.label}
 
 ${ch.brief}
+
+Answer the core question AS YOUR CHANNEL SEES IT. Do not hedge toward what you imagine other channels would say, and do not broaden into the general topic — stay on the question.
 
 Rules for every channel:
 - Provenance is mandatory: HOW you obtained it, and the SOURCE.
 - Grade honestly. measured means something returned it; stated means someone asserted it.
 - Tag each finding functional (what the system does) or non-functional (how well it does it).
-- Report what you looked for and did NOT find. Absence in a named channel is evidence; silence is not.
-- If your channel's tools are missing or unauthenticated, set reachable=false and say which tool. Do not substitute another channel's sources.
+- **Report what you looked for and did NOT find.** A channel that should know about this and does not is one of the most informative results available, and it is lost if you return only hits.
+- If your channel's tools are missing or unauthenticated, set reachable=false and name the tool. Do not substitute another channel's sources.
 - Read-only throughout. Modify nothing.`,
   { schema: CHANNEL_FINDINGS, label: `sweep:${ch.key}`, phase: 'Sweep' }
 )))).filter(Boolean)
 
-const unreachable = sweeps.filter(s => !s.reachable).map(s => s.channel)
-if (unreachable.length) log(`UNREACHABLE channels: ${unreachable.join(', ')} — coverage is partial, and the synthesis will say so`)
-const sweepDigest = JSON.stringify(sweeps.map(s => ({
-  channel: s.channel, reachable: s.reachable,
-  findings: (s.findings || []).map(f => ({ claim: f.claim, grade: f.grade, source: f.source, axis: f.axis })),
-  absent: s.absent || [],
+const unreachable = sweeps.filter(x => !x.reachable).map(x => x.channel)
+if (unreachable.length) log(`UNREACHABLE: ${unreachable.join(', ')} — coverage is partial and the report will say so`)
+const allChannelFindings = sweeps.flatMap(x => (x.findings || []).map(f => ({ ...f, channel: x.channel })))
+const fnCount = allChannelFindings.filter(f => f.axis === 'non-functional').length
+log(`${allChannelFindings.length} findings across ${sweeps.length} channels · ${fnCount} non-functional`)
+
+if (!allChannelFindings.length) {
+  log('Every channel came back empty. That is the finding — the organisation has no recorded position on this question.')
+  return { topic, headline: 'No channel had anything to say. There is no recorded position on this question.', coverage: { channels_swept: channels.map(c => c.key), channels_unreachable: unreachable } }
+}
+
+// Rank and consolidate. A barrier is genuinely required: the whole point is to
+// compare channels against each other, which cannot be done per-channel.
+phase('Rank')
+const consolidated = await agent(
+  `Consolidate what SEVEN INDEPENDENT CHANNELS said about one question. Merge, rank, and surface disagreement.
+
+THE CORE QUESTION: ${topic}
+
+WHAT EACH CHANNEL RETURNED:
+${JSON.stringify(sweeps.map(x => ({ channel: x.channel, reachable: x.reachable, findings: x.findings, absent: x.absent || [] })), null, 1)}
+
+Your job, in this order:
+
+1. MERGE. Where channels say the same thing, state it once. Do not let one claim appear three times because three agents phrased it differently.
+
+2. RANK by evidence weight, 1-10. The ranking rule that matters: **corroboration across INDEPENDENT channels raises weight; a single channel caps it low no matter how confident that channel sounded.** A claim the code proves AND the database confirms outranks a claim someone asserted in Slack, even an emphatic assertion. A vendor's own benchmark is weight 2 whatever it says.
+
+3. SURFACE CONTRADICTIONS explicitly. Two channels disagreeing is the single most valuable output here — it is where the organisation's understanding of itself is wrong. For each, name the positions by channel and **the one cheap check that would settle it**. Never average two contradicting positions into a compromise; that manufactures a claim no channel made.
+
+4. NOTE SILENCE. A channel that should have known about this and returned nothing is evidence — a feature with no Slack trace and no Productboard entry is probably not a real commitment.
+
+5. PROPOSE AT MOST 4 THREADS TO DEEPEN — only what is load-bearing, contradicted, or suspiciously silent. Not a general research agenda.`,
+  { schema: CONSOLIDATION, label: 'rank-and-consolidate' }
+)
+
+log(`${(consolidated.ranked || []).length} merged claims · ${(consolidated.contradictions || []).length} contradictions · ${(consolidated.threads_to_deepen || []).length} threads to deepen`)
+for (const c of (consolidated.contradictions || [])) log(`CONTRADICTION: ${String(c.subject).slice(0, 90)}`)
+
+// Deepen only where ranking earned it, then refute. Pipeline, so a thread starts
+// being attacked as soon as it returns.
+phase('Deepen')
+const dims = (consolidated.threads_to_deepen || []).slice(0, MAX_DIM).map((t, i) => ({
+  key: `thread-${i + 1}`,
+  question: t.question,
+  unblocks: t.why,
+  where_to_look: t.where_to_look || 'follow the channels that raised it',
+  load_bearing: true,
+}))
+if (!dims.length) log('Ranking proposed no threads worth deepening — going straight to synthesis on the consolidated claims.')
+
+const sweepDigest = JSON.stringify((consolidated.ranked || []).map(r => ({
+  claim: r.claim, weight: r.weight, channels: r.channels_agreeing, grade: r.grade,
 })), null, 1)
-const fnCount = sweeps.flatMap(s => s.findings || []).filter(f => f.axis === 'non-functional').length
-log(`sweep returned ${sweeps.flatMap(s => s.findings || []).length} findings · ${fnCount} non-functional`)
 
 // Find and refute as a pipeline: a dimension's findings start being attacked as
 // soon as that dimension returns, rather than waiting for the slowest finder.
@@ -314,7 +366,7 @@ WHERE TO LOOK: ${d.where_to_look}
 THIS WOULD UNBLOCK: ${d.unblocks}
 ${context ? `CONTEXT: ${context}` : ''}
 
-WHAT THE CHANNEL SWEEP ALREADY FOUND — build on it, do not re-derive it, and CONTRADICT it where you find better evidence:
+THE RANKED CONSOLIDATION FROM ALL CHANNELS — build on it, do not re-derive it, and CONTRADICT it where you find better evidence:
 ${sweepDigest}
 
 Hard requirements:
@@ -326,7 +378,7 @@ Hard requirements:
 - Read-only. Do not modify any file or database.
 
 Prefer few well-sourced findings to many plausible ones.`,
-    { schema: FINDINGS, label: `find:${d.key}`, phase: 'Find' }
+    { schema: FINDINGS, label: `deepen:${d.key}`, phase: 'Deepen' }
   ),
   (res, d) => {
     if (!res || !res.findings) return { dimension: d.key, verified: [], killed: [] }
@@ -418,7 +470,8 @@ TOPIC: ${topic}
 CHANNELS SWEPT: ${channels.map(c => c.key).join(', ')}${unreachable.length ? ` — UNREACHABLE: ${unreachable.join(', ')}` : ''}
 NON-FUNCTIONAL FINDINGS RETURNED: ${fnCount}${fnCount === 0 ? ' — ZERO, which for a suite analysis is itself a finding' : ''}
 DIMENSIONS RESEARCHED: ${dims.map(d => d.key).join(', ')}
-DELIBERATELY EXCLUDED: ${(plan.excluded || []).join(' · ') || 'nothing was declared out of scope — itself suspicious'}
+CHANNELS THAT RETURNED NOTHING THEY EXPECTED TO FIND: ${sweeps.flatMap(x => (x.absent || []).map(a => `${x.channel}: ${a}`)).join(' · ') || 'none reported — itself suspicious, since a channel that looked and found nothing should say so'}
+CONTRADICTIONS SURFACED: ${(consolidated.contradictions || []).map(c => c.subject).join(' · ') || 'none — suspicious across seven independent channels'}
 HEADLINE PRODUCED: ${doc.headline}
 CLAIMS SURVIVING: ${surviving.length} · REFUTED: ${killed.length} · UNVERIFIED: ${carried.length}
 DEAD ENDS REPORTED: ${rolled.flatMap(r => r.dead_ends || []).join(' · ') || 'none'}
@@ -443,7 +496,8 @@ return {
   refuted: killed.map(k => ({ claim: k.claim, votes_against: k.votes_against, votes_total: k.votes_total })),
   unverified: carried.map(c => c.claim),
   dimensions: dims,
-  excluded: plan.excluded || [],
+  contradictions: consolidated.contradictions || [],
+  ranked: consolidated.ranked || [],
   coverage: {
     channels_swept: channels.map(c => c.key),
     channels_unreachable: unreachable,
