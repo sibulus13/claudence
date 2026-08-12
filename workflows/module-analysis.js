@@ -91,6 +91,7 @@ const LENSES = [
   { key: 'code', brief: `Read the code that WRITES and READS these columns. Intent lives in the model, not the column name. Report association options verbatim — \`optional:\`, \`dependent:\`, \`through:\` — and note where a \`has_many\` has NO \`dependent:\` while siblings do, because that is a decision. Find every service, job and concern in the path. Cite file:line. Flag any place a value is computed rather than stored.` },
   { key: 'ui', brief: `Open the running application and look. Map each visible element to the table and column behind it. **What the user sees is frequently not what is stored** — a formatted value, a rounded number, a computed indicator. Count the interactions needed to reach each piece of data. Report anything that is correctly built and still hard to read, which no schema inspection can reveal. Use a demo or training tenant, never customer data.` },
   { key: 'intent', brief: `Find who asked for this and why. Search the wikis first — note that a GitHub wiki is a SEPARATE repo invisible to code search, and its diagrams are usually raster images invisible to grep. Then Productboard for filed decisions, then Slack for the argument that produced them. Quote decision language verbatim. A requirement with no recorded intent is OUR inference and must be labelled as such.` },
+  { key: 'crosscutting', brief: `What this module SHARES with others rather than owns. Find the mixins, concerns and base classes its models include — those are the codebase's own cross-module themes and they cut the schema differently from ownership. Report which behaviours are shared (taggable, orderable, favouritable, reportable) and which tables outside this module share them, because a change to a shared concern changes every one of them. Also find the tables this module reaches that belong to another, and say whether the relationship is enforced.` },
   { key: 'observability', brief: `The non-functional half. Latency percentiles on the endpoints and jobs this module touches, error rates, throughput, queue depth, saturation. **Scope every figure to production** — unscoped spans have overstated a tail by 6.7x. If a metric does not exist for this area, that ABSENCE is the finding: say which search you ran and what came back, because an unmeasurable requirement cannot be verified by anyone.` },
 ]
 
@@ -103,6 +104,9 @@ if (!target || typeof target !== 'string') {
 const context = (args && args.context) || ''
 const constraints = (args && args.constraints) || 'READ-ONLY everywhere. Never select a column holding a person name, email, or customer content. Label every number with its environment.'
 
+// Seven lenses plus scope plus report is 9 agents before spot-checks; a default run
+// lands near 16. The spot-check cap is the lever — raising it buys confidence, not
+// coverage, because every claim it checks was already found.
 const big = Boolean(budget.total && budget.total > 400000)
 const SPOT_CAP = big ? 10 : 6
 
@@ -117,7 +121,13 @@ CONSTRAINTS: ${constraints}
 
 Produce: every table that belongs to this module with its production row count and one line on why it belongs; the controllers, services and jobs that are its entry points; the wiki pages that document it; and the tables you are deliberately EXCLUDING with the reason.
 
-Two warnings from prior passes. **A table-name prefix is not a module boundary** — one prefix in this system spans two unrelated products. And **the module's own tables usually extend well beyond the obvious set**: a four-module map covered 26 tables where the modules actually span far more.`,
+Before you enumerate anything, **read the project's lookup register if one exists** (`research/WHERE-TO-LOOK.md` or similar). It records where information actually lives and which assumptions have already produced wrong published claims. Re-deriving what it already answers is the most common waste in this work.
+
+Four warnings from prior passes, each of which produced a wrong published number:
+- **A table-name prefix is not a module boundary.** One prefix in this system spans two unrelated products, and a prefix-scoped filter leaked HR records into analytics answers.
+- **A module's tables extend well beyond the obvious set.** A four-module map covered 26 tables where those modules actually span 100+.
+- **Model files are not all in \`app/models/\`.** 82 of 225 live in namespaced subdirectories, and a script reading only the top level reported 58 tables as having no model when 43 did.
+- **Row counts that exclude dynamically-named tables are wrong by an order of magnitude.** One module read 1.77M rows until 12,540 per-source cell tables were counted, at which point it read 31.5M.`,
   { schema: SCOPE, label: `scope:${target}` }
 )
 const tableList = (scope.tables || []).map(t => t.name).join(', ')
@@ -217,7 +227,11 @@ ${JSON.stringify(absent, null, 1)}
 
 Rules. Lead every section with the finding, not with an identifier. State the consequence, not just the fact. Put provenance per detail section — the exact query or file:line — so one claim can be checked without auditing the document. Say plainly in the caveats what this analysis does NOT establish, and name any lens that returned nothing.
 
-**A corrected claim is more valuable than a confirmed one.** Where a spot-check narrowed something, show the chain — it teaches the next reader where the trap was.`,
+**A corrected claim is more valuable than a confirmed one.** Where a spot-check narrowed something, show the chain — it teaches the next reader where the trap was.
+
+Two things this report must not do, both observed in a prior pass:
+- **Do not present a count without saying what population it covers.** A binding table measured at 86% turned out to describe one third of the visual estate while being reported as describing the module.
+- **Do not let an absent lens read as a clean result.** If observability returned nothing, say the area is unmeasured rather than implying it is healthy.`,
   { schema: REPORT, label: 'report' }
 )
 
@@ -229,8 +243,10 @@ return {
   caveats: report.caveats || [],
   corrected: corrected.map(c => ({ original: c.claim, corrected: c.spot?.corrected_claim, verdict: c.spot?.verdict })),
   unresolved: unresolved.map(c => ({ claim: c.claim, next_check: c.spot?.next_check })),
-  // Feeds research/WHERE-TO-LOOK.md so the next analysis does not repeat the search.
+  // Feeds the project's lookup register directly. Shaped as rows so it can be pasted
+  // rather than re-read: what was sought, where it was found, the obvious place it was not.
   locations,
+  lookup_rows: locations.map(l => `| ${l.looking_for} | ${l.not_in || '—'} | ${l.found_in} | this analysis |`),
   scope: { tables: (scope.tables || []).map(t => t.name), excluded: scope.excluded || [] },
   coverage: { lenses_run: rolled.map(r => r.lens), lenses_expected: LENSES.map(l => l.key) },
 }
