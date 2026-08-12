@@ -324,6 +324,29 @@ log and file existence for staleness. If a repo has none, surface that — it is
 if direction changed, and record any decision. That is what makes the next session cheap, and it is
 the step that gets skipped.
 
+## The Shared Tier is Explicit-Request-Only (Global)
+
+**A project's shareable output surface is never written to without being asked.** Where a repo has a
+tier whose contents a reader may quote — `shared/`, `public/`, a published artifact set — that tier is
+**the controlled surface**: what the organisation shows end users, technical stakeholders and
+non-technical stakeholders. Its value comes from someone deciding what belongs there.
+
+So the default is: **work lands in the research tier or stays untracked.** Touching the shared tier
+requires an explicit instruction naming it. This holds even when the change is an improvement — a
+correction, a disclosed caveat, a regenerated figure. **Improving something unasked is still deciding
+on someone else's behalf what their stakeholders see.**
+
+| Situation | Where it goes |
+|---|---|
+| New analysis, a measurement, a draft | Research tier |
+| Raw output, dumps, anything unverified | Untracked |
+| A correction to something already shared | **Propose it. Say what is wrong and what the fix is, then wait** |
+| An explicit "update the shared X" | Shared tier, and register it in the same turn |
+
+When you find something in the shared tier that is wrong, that is **urgent to surface and not urgent to
+fix**: a wrong claim already published is a real problem, and silently amending it removes the owner's
+chance to decide whether it needs a correction notice, a re-share, or a conversation.
+
 ## Identifier Namespace — one legend per project, machine-checked (Global)
 
 **Any shorthand a reader cannot resolve is noise.** Every project using abbreviated identifiers
