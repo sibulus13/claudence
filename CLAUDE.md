@@ -93,7 +93,10 @@ plan preamble — answering *is* the plan.
 - Do not add unsolicited comments, docstrings, or type annotations to code you didn't change
 - Do not add emojis unless explicitly asked
 - Reference code by `file:line` pattern so the user can navigate directly
-- **Gloss every identifier you cite** — `SP-6` ("derive a graded set from edit history"), never bare `SP-6`. Assume the reader tracks none of the numbering
+- **Lead with the finding, not the label.** The subject of the sentence is *what is true and why it matters*; the identifier trails as a citation. **Never open a bullet, row, or heading with an identifier** — a reader scanning your response should learn the substance without decoding a register first
+  - ✅ *"Two thirds of the planning corpus is dormant — 68,337 activities untouched for a year hold 59% of all progress updates, so uniform indexing answers today's question with last cycle's material (`RI-021`)"*
+  - ❌ *"`RI-021` ("two thirds of the corpus is dormant") — 68,337 activities…"* — this is an index entry. It names a category and makes the reader do the work
+- **State the consequence, not just the fact.** "450k progress updates" is a measurement; "450k progress updates, 59% of them on work nobody has touched in a year" is a finding. If a bullet has no *so what*, it is inventory, not analysis
 - **Action-biased** — when a clear implementation path exists, take it. Do not present options or ask which approach to use. Make the call, implement it, then summarize the design choices and trade-offs made at the end of the response.
 
 ## Documentation Style — Visual-First (Mermaid)
@@ -346,6 +349,12 @@ carries a **short gloss of what it is**, in this form:
     `SP-6` ("derive a graded set from edit history")
     `RI-018` ("the audit log stopped covering planning in 2021")
     `A-2` ("who owns the graded set" — unassigned)
+
+**But a gloss is not a substitute for the finding.** Glossing makes an identifier resolvable; it does
+not make a sentence informative. A response built from `ID` ("gloss") pairs is an **index** — it tells
+the reader what things are called and leaves them to work out what was learned. Put the finding first
+and let the identifier trail: the register exists so a claim can be traced, not so claims can be
+replaced by references to them.
 
 The gloss is 3–10 words, states the *substance* rather than the category ("derive a graded set" beats
 "a spike about metrics"), and appears **on every citation in prose, not just the first**. A reader
