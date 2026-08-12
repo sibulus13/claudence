@@ -121,12 +121,12 @@ CONSTRAINTS: ${constraints}
 
 Produce: every table that belongs to this module with its production row count and one line on why it belongs; the controllers, services and jobs that are its entry points; the wiki pages that document it; and the tables you are deliberately EXCLUDING with the reason.
 
-Before you enumerate anything, **read the project's lookup register if one exists** (`research/WHERE-TO-LOOK.md` or similar). It records where information actually lives and which assumptions have already produced wrong published claims. Re-deriving what it already answers is the most common waste in this work.
+Before you enumerate anything, **read the project's lookup register if one exists** (research/WHERE-TO-LOOK.md or similar). It records where information actually lives and which assumptions have already produced wrong published claims. Re-deriving what it already answers is the most common waste in this work.
 
 Four warnings from prior passes, each of which produced a wrong published number:
 - **A table-name prefix is not a module boundary.** One prefix in this system spans two unrelated products, and a prefix-scoped filter leaked HR records into analytics answers.
 - **A module's tables extend well beyond the obvious set.** A four-module map covered 26 tables where those modules actually span 100+.
-- **Model files are not all in \`app/models/\`.** 82 of 225 live in namespaced subdirectories, and a script reading only the top level reported 58 tables as having no model when 43 did.
+- **Model files are not all in app/models/.** 82 of 225 live in namespaced subdirectories, and a script reading only the top level reported 58 tables as having no model when 43 did.
 - **Row counts that exclude dynamically-named tables are wrong by an order of magnitude.** One module read 1.77M rows until 12,540 per-source cell tables were counted, at which point it read 31.5M.`,
   { schema: SCOPE, label: `scope:${target}` }
 )

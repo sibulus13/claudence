@@ -14,6 +14,15 @@ const file = process.argv[2];
 if (!file) { console.error('usage: smoke-test.mjs <workflow.js>'); process.exit(2); }
 let src = fs.readFileSync(file, 'utf8').replace(/^export const meta/m, 'const meta');
 
+// Unescaped backticks inside a template literal silently truncate the prompt and then
+// fail as a confusing "missing )" far from the cause. This has happened three times, so
+// it is checked before anything else runs.
+const ticks = (src.match(/(?<!\\)`/g) || []).length;
+if (ticks % 2 !== 0) {
+  console.log('FAIL: odd number of unescaped backticks (' + ticks + ') — a template literal is unterminated');
+  process.exit(1);
+}
+
 const calls = [];
 // Fakes are matched off the schema's own field names, so a new schema shape needs
 // a new branch here — deliberately, since a silently-empty return would make the
