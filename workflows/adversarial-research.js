@@ -269,7 +269,13 @@ const channels = CHANNELS.filter(c => wanted.includes(c.key))
 log(`${channels.length} channels, each answering the same question: ${channels.map(c => c.key).join(' · ')}`)
 log('Slack targets: #product-questions #discoverymeetings #engineering #ai #product-announcements #zendesk-tickets #customer-comms #dev-sso-support')
 
-const sweeps = (await parallel(channels.map(ch => () => agent(
+// Each thunk carries its channel key through success AND failure, because
+// `parallel` resolves a dead agent to null and `.filter(Boolean)` then erases
+// which channel died. That is exactly how this workflow reported
+// `channels_unreachable: []` on a run where an agent had been killed by an API
+// error mid-response — a false all-clear, produced by the tool built to prevent
+// false all-clears.
+const sweepAttempts = await parallel(channels.map(ch => () => agent(
   `Answer ONE question from ONE source of truth. You are blind to the other channels by design — if you and another channel agree, that agreement must be earned independently.
 
 THE CORE QUESTION: ${topic}
@@ -290,10 +296,16 @@ Rules for every channel:
 - If your channel's tools are missing or unauthenticated, set reachable=false and name the tool. Do not substitute another channel's sources.
 - Read-only throughout. Modify nothing.`,
   { schema: CHANNEL_FINDINGS, label: `sweep:${ch.key}`, phase: 'Sweep' }
-)))).filter(Boolean)
+).then(r => ({ key: ch.key, ok: Boolean(r), result: r }))
+  .catch(e => ({ key: ch.key, ok: false, result: null, error: String(e && e.message || e) }))))
 
-const unreachable = sweeps.filter(x => !x.reachable).map(x => x.channel)
-if (unreachable.length) log(`UNREACHABLE: ${unreachable.join(', ')} — coverage is partial and the report will say so`)
+const sweeps = sweepAttempts.filter(a => a && a.ok).map(a => ({ ...a.result, channel: a.result.channel || a.key }))
+const died = sweepAttempts.filter(a => !a || !a.ok).map(a => (a && a.key) || 'unknown')
+const selfReportedDown = sweeps.filter(x => !x.reachable).map(x => x.channel)
+const unreachable = [...new Set([...died, ...selfReportedDown])]
+if (died.length) log(`AGENT DIED, channel not covered: ${died.join(', ')} — counted as unreachable, not silently dropped`)
+if (selfReportedDown.length) log(`TOOLS MISSING: ${selfReportedDown.join(', ')}`)
+if (unreachable.length) log(`COVERAGE IS PARTIAL — ${unreachable.length} of ${channels.length} channels unreachable; the report will say so`)
 const allChannelFindings = sweeps.flatMap(x => (x.findings || []).map(f => ({ ...f, channel: x.channel })))
 const fnCount = allChannelFindings.filter(f => f.axis === 'non-functional').length
 log(`${allChannelFindings.length} findings across ${sweeps.length} channels · ${fnCount} non-functional`)
@@ -499,8 +511,11 @@ return {
   contradictions: consolidated.contradictions || [],
   ranked: consolidated.ranked || [],
   coverage: {
-    channels_swept: channels.map(c => c.key),
+    channels_requested: channels.map(c => c.key),
+    channels_answered: sweeps.map(x => x.channel),
     channels_unreachable: unreachable,
+    channels_agent_died: died,
+    channels_tools_missing: selfReportedDown,
     non_functional_findings: fnCount,
   },
 }
