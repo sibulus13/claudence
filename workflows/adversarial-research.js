@@ -299,7 +299,9 @@ Rules for every channel:
 ).then(r => ({ key: ch.key, ok: Boolean(r), result: r }))
   .catch(e => ({ key: ch.key, ok: false, result: null, error: String(e && e.message || e) }))))
 
-const sweeps = sweepAttempts.filter(a => a && a.ok).map(a => ({ ...a.result, channel: a.result.channel || a.key }))
+// The agent fills `channel` with the human label, not the key, so anything doing a
+// keyed lookup downstream silently matches nothing. Keep both.
+const sweeps = sweepAttempts.filter(a => a && a.ok).map(a => ({ ...a.result, channel: a.key, channel_label: a.result.channel || a.key }))
 const died = sweepAttempts.filter(a => !a || !a.ok).map(a => (a && a.key) || 'unknown')
 const selfReportedDown = sweeps.filter(x => !x.reachable).map(x => x.channel)
 const unreachable = [...new Set([...died, ...selfReportedDown])]
@@ -510,6 +512,14 @@ return {
   dimensions: dims,
   contradictions: consolidated.contradictions || [],
   ranked: consolidated.ranked || [],
+  // The whole sweep, returned. An earlier run produced 154 findings across six
+  // channels — 27 of them measured Datadog numbers — and the caller saw only the six
+  // claims that survived refutation, because nothing below the synthesis was returned.
+  // Every one of those findings was recoverable only by hand-parsing the journal.
+  channel_findings: sweeps.map(x => ({
+    channel: x.channel, label: x.channel_label, reachable: x.reachable,
+    findings: x.findings || [], absent: x.absent || [],
+  })),
   coverage: {
     channels_requested: channels.map(c => c.key),
     channels_answered: sweeps.map(x => x.channel),
