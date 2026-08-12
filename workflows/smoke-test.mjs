@@ -27,6 +27,10 @@ const agent = async (prompt, opts = {}) => {
   if (s.includes('refuted')) return { refuted: false, reasoning: 'r' };
   if (s.includes('summary_sections')) return { headline: 'H', summary_sections: [{ heading: 'a', body: 'b', detail_anchor: 'x' }], detail_sections: [{ anchor: 'x', heading: 'a', body: 'b', provenance: 'p' }] };
   if (s.includes('gaps')) return { gaps: [{ what: 'w', why_it_matters: 'm' }], verdict: 'v' };
+  if (s.includes('entry_points')) return { tables: [{ name: 't1', rows: 10, why: 'w' }], entry_points: ['c#a'], wiki_pages: ['P'], excluded: ['x'] };
+  if (s.includes('load_bearing') && s.includes('lens')) return { lens: 'stub', findings: [{ claim: 'c', grade: 'measured', how: 'h', source: 's', environment: 'production', load_bearing: true, dull_explanation: 'd' }], absent: ['a'], locations: [{ looking_for: 'x', found_in: 'y', not_in: 'z' }] };
+  if (s.includes('corrected_claim')) return { verdict: 'narrowed', reasoning: 'r', corrected_claim: 'cc', queries_run: ['q'] };
+  if (s.includes('caveats')) return { headline: 'H', summary_sections: [{ heading: 'a', body: 'b', confidence: 'measured' }], detail_sections: [{ heading: 'a', body: 'b', provenance: 'p' }], caveats: ['c'] };
   return {};
 };
 const parallel = async (thunks) => Promise.all(thunks.map(t => t()));
@@ -39,7 +43,9 @@ const phases = [];
 const phase = (t) => phases.push(t);
 const log = () => {};
 const budget = { total: null, spent: () => 0, remaining: () => Infinity };
-const args = { topic: 'smoke-test question', context: 'ctx', constraints: 'read-only' };
+// Superset of the arg names workflows read, so one harness smoke-tests any of them.
+const args = { topic: 'smoke-test question', module: 'smoke-test-module',
+               context: 'ctx', constraints: 'read-only' };
 
 const fn = new Function('agent', 'parallel', 'pipeline', 'phase', 'log', 'budget', 'args',
   '"use strict"; return (async()=>{' + src + '})()');
