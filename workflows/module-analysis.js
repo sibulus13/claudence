@@ -235,12 +235,17 @@ Two things this report must not do, both observed in a prior pass:
   { schema: REPORT, label: 'report' }
 )
 
+// The report agent returns null when it dies on a session limit. Everything above
+// it — the lens sweep and every spot-check — is already done and paid for, so a
+// failed synthesis must degrade rather than discard it.
 return {
   module: target,
-  headline: report.headline,
-  summary_sections: report.summary_sections,
-  detail_sections: report.detail_sections,
-  caveats: report.caveats || [],
+  headline: report ? report.headline : 'SYNTHESIS FAILED — the lens findings and spot-checks below are complete and unsynthesised',
+  synthesis_failed: !report,
+  summary_sections: report ? report.summary_sections : [],
+  detail_sections: report ? report.detail_sections : [],
+  lens_findings: rolled.map(r => ({ lens: r.lens, findings: r.findings || [], absent: r.absent || [] })),
+  caveats: report ? (report.caveats || []) : [],
   corrected: corrected.map(c => ({ original: c.claim, corrected: c.spot?.corrected_claim, verdict: c.spot?.verdict })),
   unresolved: unresolved.map(c => ({ claim: c.claim, next_check: c.spot?.next_check })),
   // Feeds the project's lookup register directly. Shaped as rows so it can be pasted
