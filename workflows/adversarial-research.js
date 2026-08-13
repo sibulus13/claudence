@@ -3,12 +3,12 @@ export const meta = {
   description: 'Ask one question of every source of truth independently, then rank, consolidate and refute into one report',
   whenToUse: 'When you have one question and several places that might answer it, and the answer must survive being quoted. Each channel — code, database, Datadog, Productboard, Slack, other MCP, external — answers the same question blind to the others, so agreement is corroboration rather than echo, and disagreement between two channels is surfaced as the most valuable output rather than averaged away.',
   phases: [
-    { title: 'Sweep', detail: 'every channel answers the SAME core question independently — code, database, Datadog, Productboard, Slack, other MCP, external' },
-    { title: 'Rank', detail: 'consolidate across channels: merge agreements, surface contradictions, rank by evidence weight' },
-    { title: 'Deepen', detail: 'follow only the threads ranking exposed as load-bearing or contradicted' },
-    { title: 'Refute', detail: 'independent skeptics per load-bearing claim, distinct lenses' },
-    { title: 'Synthesize', detail: 'two-layer output — summary and detail, backlinked, provenance per section' },
-    { title: 'Critique', detail: 'what is still missing: channel not reached, claim unverified' },
+    { title: 'Sweep', model: 'haiku + sonnet by channel', detail: 'every channel answers the SAME core question independently — code, database, Datadog, Productboard, Slack, other MCP, external' },
+    { title: 'Rank', model: 'opus', detail: 'consolidate across channels: merge agreements, surface contradictions, rank by evidence weight' },
+    { title: 'Deepen', model: 'sonnet', detail: 'follow only the threads ranking exposed as load-bearing or contradicted' },
+    { title: 'Refute', model: 'opus', detail: 'independent skeptics per load-bearing claim, distinct lenses' },
+    { title: 'Synthesize', model: 'opus', detail: 'two-layer output — summary and detail, backlinked, provenance per section' },
+    { title: 'Critique', model: 'sonnet', detail: 'what is still missing: channel not reached, claim unverified' },
   ],
 }
 
@@ -187,28 +187,74 @@ const CONSOLIDATION = {
    functional/non-functional split is explicit: code and tickets say what the
    system does, observability says how well it does it, and a survey missing
    either half is not an analysis of the suite. */
+// ---------------------------------------------------------------------------
+// PERSONAS — who runs each stage, and at what tier.
+//
+// Canonical assignment and the reasoning for every row:
+//   ~/repo/claudence/docs/WORKFLOW-PERSONAS.md
+// Persona -> model tier authority:
+//   ~/.claude/CLAUDE.md, "Agent Personas — Model Tier Allocation"
+//
+// Before 2026-08-13 every agent here inherited the main-loop model, so a
+// 28-agent run executed 28 Opus agents — including the one whose job was a
+// table listing. Two runs that day burned ~4.5M subagent tokens each and ended
+// on a session limit.
+//
+// The shape of the rule: MANY agents at the gathering edge run cheap; the FEW
+// whose output every later stage depends on run expensive. The saving is spent
+// where it changes the answer, not banked.
+//
+// NOTE: workflow scripts are self-contained — no imports, no filesystem — so
+// this literal is duplicated in module-analysis.js. Change a tier in BOTH
+// and in the doc. A single source of truth the scripts cannot read is not one.
+// ---------------------------------------------------------------------------
+const PERSONAS = {
+  // Gathering. Bounded judgement, many instances.
+  researcher:      { model: 'haiku',  effort: 'low'    },  // enumerate, retrieve
+  researcher_mid:  { model: 'haiku',  effort: 'medium' },  // retrieve + summarise
+  researcher_deep: { model: 'sonnet', effort: 'high'   },  // read code, write SQL
+  designer:        { model: 'sonnet', effort: 'high'   },  // shape and contract questions
+  surveyor:        { model: 'sonnet', effort: 'medium' },  // UI, telemetry, structure
+
+  // Judgement. Few instances, and every later stage depends on them.
+  // Deliberately raised ABOVE the gathering tier so no agent certifies its own
+  // finding — the author and the refuter are never the same tier.
+  reviewer_adversarial: { model: 'opus', effort: 'high' },  // the gate
+  architect:            { model: 'opus', effort: 'high' },  // the document
+
+  // A cheap stage reporting ABSENCE is the dangerous case: a script reading one
+  // directory once reported 58 modelless tables when 43 had models. Absence
+  // claims belong here or above.
+  absence_safe: { model: 'sonnet', effort: 'high' },
+}
+
 const CHANNELS = [
   {
+    persona: 'researcher_deep',
     key: 'code',
     label: 'the codebase, and the functions that read and write the data',
     brief: `Read the ACTUAL CODE. For any data this topic touches, find the model, the migration, and every function that reads or writes the column — intent lives in the model, not the column name. Report the association options verbatim (\`optional:\`, \`dependent:\`), the callers, and any service object or job in the path. Cite file:line for everything. A claim about how data behaves that is not backed by the code that handles it is an assumption.`,
   },
   {
+    persona: 'researcher_deep',
     key: 'database',
     label: 'the database itself',
     brief: `Query the database READ-ONLY. Name the environment on every number — the same query has returned wildly different answers against alpha and production here. Prefer aggregates; never select a column holding a person's name or a customer's content. Report distributions and null rates, not just counts: a column that is 4% populated tells a different story from one that is 96% populated.`,
   },
   {
+    persona: 'surveyor',
     key: 'observability',
     label: 'Datadog — the non-functional half',
     brief: `This channel owns the NON-FUNCTIONAL analysis. Use the Datadog tools (load the datadog skills first, as its server instructions require). Look for: p50/p95/p99 latency on the endpoints and jobs this topic touches, error and timeout rates, throughput, queue depth and worker saturation, and any monitor or incident that has fired against them. If a service or dashboard does not exist for this area, that absence IS the finding — say so explicitly rather than returning empty.`,
   },
   {
+    persona: 'researcher',
     key: 'product',
     label: 'Productboard — what product has already decided',
     brief: `Search Productboard for features, spikes, decisions and feedback on this topic. What has product already committed to, filed, or rejected? A decision already recorded is not a proposal to re-make. Report ticket ids with their status, and quote the decision language rather than paraphrasing it.`,
   },
   {
+    persona: 'researcher_mid',
     key: 'slack',
     label: 'Slack — what people actually said, in named channels',
     brief: `Search these channels SPECIFICALLY. Slack is where decisions get made informally and then never written down, so a topic with no Slack trace is different from one that was argued over. Channel list verified 2026-08-11 by searching the workspace; if one 404s, report it rather than substituting another.
@@ -227,11 +273,13 @@ const CHANNELS = [
     Use search modifiers: \`in:#channel\`, \`after:YYYY-MM-DD\` to bound recency, \`is:thread\` for discussions. Attribute by ROLE, never by name, and quote decision language verbatim rather than paraphrasing it. Report which channels you searched and found nothing in — a silent channel is evidence.`,
   },
   {
+    persona: 'researcher',
     key: 'org',
     label: 'the other MCP servers — Notion, GitHub, Drive',
     brief: `Sweep the remaining connected MCP servers. Notion FIRST: the daily log there is the primary record of stakeholder conversations and outranks any repo document when the two disagree. Then GitHub — issues, PRs, and **the wikis, which are a SEPARATE git repo invisible to both code search and the contents API**, so a repo can carry a hundred pages no grep will surface. Then Google Drive for decks and specs. Attribute by role rather than by name. If a server is unauthenticated, report it as unreachable rather than silently skipping it.`,
   },
   {
+    persona: 'surveyor',
     key: 'external',
     label: 'outside the organisation',
     brief: `Only after the internal channels: vendor documentation, benchmarks, papers, changelogs. Treat vendor claims as \`stated\`, never \`measured\` — a benchmark a vendor published about its own product is marketing until reproduced. Prefer primary sources and note publication dates; a two-year-old benchmark of a fast-moving system is a historical fact, not a current one.`,
@@ -295,7 +343,8 @@ Rules for every channel:
 - **Report what you looked for and did NOT find.** A channel that should know about this and does not is one of the most informative results available, and it is lost if you return only hits.
 - If your channel's tools are missing or unauthenticated, set reachable=false and name the tool. Do not substitute another channel's sources.
 - Read-only throughout. Modify nothing.`,
-  { schema: CHANNEL_FINDINGS, label: `sweep:${ch.key}`, phase: 'Sweep' }
+  { schema: CHANNEL_FINDINGS, label: `sweep:${ch.key}`, phase: 'Sweep',
+    ...(PERSONAS[ch.persona] || PERSONAS.researcher_mid) }
 ).then(r => ({ key: ch.key, ok: Boolean(r), result: r }))
   .catch(e => ({ key: ch.key, ok: false, result: null, error: String(e && e.message || e) }))))
 
@@ -339,7 +388,7 @@ Your job, in this order:
 4. NOTE SILENCE. A channel that should have known about this and returned nothing is evidence — a feature with no Slack trace and no Productboard entry is probably not a real commitment.
 
 5. PROPOSE AT MOST 4 THREADS TO DEEPEN — only what is load-bearing, contradicted, or suspiciously silent. Not a general research agenda.`,
-  { schema: CONSOLIDATION, label: 'rank-and-consolidate' }
+  { schema: CONSOLIDATION, label: 'rank-and-consolidate', ...PERSONAS.architect }
 )
 
 // An agent that dies returns null. Without this guard every downstream read of
@@ -396,7 +445,7 @@ Hard requirements:
 - Read-only. Do not modify any file or database.
 
 Prefer few well-sourced findings to many plausible ones.`,
-    { schema: FINDINGS, label: `deepen:${d.key}`, phase: 'Deepen' }
+    { schema: FINDINGS, label: `deepen:${d.key}`, phase: 'Deepen', ...PERSONAS.designer }
   ),
   (res, d) => {
     if (!res || !res.findings) return { dimension: d.key, verified: [], killed: [] }
@@ -418,7 +467,8 @@ AUTHOR SAYS THIS WOULD FALSIFY IT: ${f.would_falsify || '(nothing stated — its
 YOUR LENS: ${lens}
 
 Go to the named source and check. Default to refuted=true when you cannot confirm it — an unconfirmed claim must not survive by inertia. If a weaker version of the claim does hold, state that version as the correction.`,
-          { schema: VERDICT, label: `refute:${f.claim.slice(0, 28)}`, phase: 'Refute' }
+          { schema: VERDICT, label: `refute:${f.claim.slice(0, 28)}`, phase: 'Refute',
+            ...PERSONAS.reviewer_adversarial }
         )
       )).then(votes => {
         const real = votes.filter(Boolean)
@@ -489,7 +539,7 @@ Structure, and it is not negotiable:
 - Cover BOTH AXES explicitly. Functional — what the system does. Non-functional — latency, error rates, throughput, cost, saturation. If the non-functional half is thin, say which channel was unreachable rather than letting the omission pass as a clean bill of health.
 - Every identifier you cite carries a short gloss of what it is: SP-6 ("derive a graded set from edit history"), never a bare id. The reader tracks none of the numbering.
 ${unreachable.length ? `- CHANNELS THAT COULD NOT BE REACHED: ${unreachable.join(', ')}. State this in the document; partial coverage presented as complete is the failure mode here.` : ''}`,
-  { schema: TWO_LAYER, label: 'synthesize' }
+  { schema: TWO_LAYER, label: 'synthesize', ...PERSONAS.architect }
 )
 
 phase('Critique')
@@ -513,7 +563,7 @@ Ask specifically:
 - Does the headline overreach what the claims support?
 
 Then state whether the output is safe to quote yet, and if not, exactly what closes the gap. Being unhelpful here is the failure mode — find something real.`,
-  { schema: CRITIQUE, label: 'critique' }
+  { schema: CRITIQUE, label: 'critique', ...PERSONAS.surveyor }
 )
 
 return {

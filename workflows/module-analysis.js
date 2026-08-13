@@ -3,10 +3,10 @@ export const meta = {
   description: 'Analyse one module end to end — schema, relations, code path, UI, and every assumption spot-checked against production',
   whenToUse: 'When a module or subsystem needs to be understood well enough that claims about it can be quoted. Fans out one agent per lens, then forces every load-bearing claim through a data spot-check before it is allowed into the report. Derived from the analytics pass that took a full session by hand.',
   phases: [
-    { title: 'Scope', detail: 'enumerate the module — tables, row counts, code paths, wiki pages' },
-    { title: 'Lenses', detail: 'one agent per lens: schema, relations, code, UI, intent, observability' },
-    { title: 'Spotcheck', detail: 'every load-bearing claim re-measured, dull explanation tested first' },
-    { title: 'Report', detail: 'two-layer output, provenance per section, unverified claims labelled' },
+    { title: 'Scope', model: 'haiku', detail: 'enumerate the module — tables, row counts, code paths, wiki pages' },
+    { title: 'Lenses', model: 'haiku + sonnet by lens', detail: 'one per lens: schema, relations, code, UI, intent, crosscutting, observability' },
+    { title: 'Spotcheck', model: 'opus', detail: 'every load-bearing claim re-measured, dull explanation tested first' },
+    { title: 'Report', model: 'opus', detail: 'two-layer output, provenance per section, unverified claims labelled' },
   ],
 }
 
@@ -85,14 +85,56 @@ const REPORT = {
    single one was sufficient: the schema alone missed that formulas live in an
    EAV table, the code alone missed that 92% of grids are tall, and only the UI
    showed that a correctly-built chart can still be illegible. */
+
+// ---------------------------------------------------------------------------
+// PERSONAS — who runs each stage, and at what tier.
+//
+// Canonical assignment and the reasoning for every row:
+//   ~/repo/claudence/docs/WORKFLOW-PERSONAS.md
+// Persona -> model tier authority:
+//   ~/.claude/CLAUDE.md, "Agent Personas — Model Tier Allocation"
+//
+// Before 2026-08-13 every agent here inherited the main-loop model, so a
+// 51-agent run executed 51 Opus agents — including the one whose job was a
+// table listing. Two runs that day burned ~4.5M subagent tokens each and ended
+// on a session limit.
+//
+// The shape of the rule: MANY agents at the gathering edge run cheap; the FEW
+// whose output every later stage depends on run expensive. The saving is spent
+// where it changes the answer, not banked.
+//
+// NOTE: workflow scripts are self-contained — no imports, no filesystem — so
+// this literal is duplicated in adversarial-research.js. Change a tier in BOTH
+// and in the doc. A single source of truth the scripts cannot read is not one.
+// ---------------------------------------------------------------------------
+const PERSONAS = {
+  // Gathering. Bounded judgement, many instances.
+  researcher:      { model: 'haiku',  effort: 'low'    },  // enumerate, retrieve
+  researcher_mid:  { model: 'haiku',  effort: 'medium' },  // retrieve + summarise
+  researcher_deep: { model: 'sonnet', effort: 'high'   },  // read code, write SQL
+  designer:        { model: 'sonnet', effort: 'high'   },  // shape and contract questions
+  surveyor:        { model: 'sonnet', effort: 'medium' },  // UI, telemetry, structure
+
+  // Judgement. Few instances, and every later stage depends on them.
+  // Deliberately raised ABOVE the gathering tier so no agent certifies its own
+  // finding — the author and the refuter are never the same tier.
+  reviewer_adversarial: { model: 'opus', effort: 'high' },  // the gate
+  architect:            { model: 'opus', effort: 'high' },  // the document
+
+  // A cheap stage reporting ABSENCE is the dangerous case: a script reading one
+  // directory once reported 58 modelless tables when 43 had models. Absence
+  // claims belong here or above.
+  absence_safe: { model: 'sonnet', effort: 'high' },
+}
+
 const LENSES = [
-  { key: 'schema', brief: `The tables, columns and REAL Postgres types. Dump every column with its type and nullability. Report populated rates, not just counts — a 4%-populated column tells a different story from a 96% one. Name every place a type is DECLARED somewhere other than where the value is stored, because that is where a consumer will get it wrong.` },
-  { key: 'relations', brief: `How these tables actually connect. Distinguish DECLARED foreign keys from relations that exist only as id overlap in the data, and give the match rate and orphan count for each. For anything below 100%, do not assume deletion without cascade — check whether the model declares \`dependent:\`, whether the table soft-deletes, and whether the orphan rate varies by creation year. Report cross-boundary relations separately from internal ones.` },
-  { key: 'code', brief: `Read the code that WRITES and READS these columns. Intent lives in the model, not the column name. Report association options verbatim — \`optional:\`, \`dependent:\`, \`through:\` — and note where a \`has_many\` has NO \`dependent:\` while siblings do, because that is a decision. Find every service, job and concern in the path. Cite file:line. Flag any place a value is computed rather than stored.` },
-  { key: 'ui', brief: `Open the running application and look. Map each visible element to the table and column behind it. **What the user sees is frequently not what is stored** — a formatted value, a rounded number, a computed indicator. Count the interactions needed to reach each piece of data. Report anything that is correctly built and still hard to read, which no schema inspection can reveal. Use a demo or training tenant, never customer data.` },
-  { key: 'intent', brief: `Find who asked for this and why. Search the wikis first — note that a GitHub wiki is a SEPARATE repo invisible to code search, and its diagrams are usually raster images invisible to grep. Then Productboard for filed decisions, then Slack for the argument that produced them. Quote decision language verbatim. A requirement with no recorded intent is OUR inference and must be labelled as such.` },
-  { key: 'crosscutting', brief: `What this module SHARES with others rather than owns. Find the mixins, concerns and base classes its models include — those are the codebase's own cross-module themes and they cut the schema differently from ownership. Report which behaviours are shared (taggable, orderable, favouritable, reportable) and which tables outside this module share them, because a change to a shared concern changes every one of them. Also find the tables this module reaches that belong to another, and say whether the relationship is enforced.` },
-  { key: 'observability', brief: `The non-functional half. Latency percentiles on the endpoints and jobs this module touches, error rates, throughput, queue depth, saturation. **Scope every figure to production** — unscoped spans have overstated a tail by 6.7x. If a metric does not exist for this area, that ABSENCE is the finding: say which search you ran and what came back, because an unmeasurable requirement cannot be verified by anyone.` },
+  { persona: 'surveyor', key: 'schema', brief: `The tables, columns and REAL Postgres types. Dump every column with its type and nullability. Report populated rates, not just counts — a 4%-populated column tells a different story from a 96% one. Name every place a type is DECLARED somewhere other than where the value is stored, because that is where a consumer will get it wrong.` },
+  { persona: 'researcher_deep', key: 'relations', brief: `How these tables actually connect. Distinguish DECLARED foreign keys from relations that exist only as id overlap in the data, and give the match rate and orphan count for each. For anything below 100%, do not assume deletion without cascade — check whether the model declares \`dependent:\`, whether the table soft-deletes, and whether the orphan rate varies by creation year. Report cross-boundary relations separately from internal ones.` },
+  { persona: 'researcher_deep', key: 'code', brief: `Read the code that WRITES and READS these columns. Intent lives in the model, not the column name. Report association options verbatim — \`optional:\`, \`dependent:\`, \`through:\` — and note where a \`has_many\` has NO \`dependent:\` while siblings do, because that is a decision. Find every service, job and concern in the path. Cite file:line. Flag any place a value is computed rather than stored.` },
+  { persona: 'surveyor', key: 'ui', brief: `Open the running application and look. Map each visible element to the table and column behind it. **What the user sees is frequently not what is stored** — a formatted value, a rounded number, a computed indicator. Count the interactions needed to reach each piece of data. Report anything that is correctly built and still hard to read, which no schema inspection can reveal. Use a demo or training tenant, never customer data.` },
+  { persona: 'researcher_mid', key: 'intent', brief: `Find who asked for this and why. Search the wikis first — note that a GitHub wiki is a SEPARATE repo invisible to code search, and its diagrams are usually raster images invisible to grep. Then Productboard for filed decisions, then Slack for the argument that produced them. Quote decision language verbatim. A requirement with no recorded intent is OUR inference and must be labelled as such.` },
+  { persona: 'designer', key: 'crosscutting', brief: `What this module SHARES with others rather than owns. Find the mixins, concerns and base classes its models include — those are the codebase's own cross-module themes and they cut the schema differently from ownership. Report which behaviours are shared (taggable, orderable, favouritable, reportable) and which tables outside this module share them, because a change to a shared concern changes every one of them. Also find the tables this module reaches that belong to another, and say whether the relationship is enforced.` },
+  { persona: 'surveyor', key: 'observability', brief: `The non-functional half. Latency percentiles on the endpoints and jobs this module touches, error rates, throughput, queue depth, saturation. **Scope every figure to production** — unscoped spans have overstated a tail by 6.7x. If a metric does not exist for this area, that ABSENCE is the finding: say which search you ran and what came back, because an unmeasurable requirement cannot be verified by anyone.` },
 ]
 
 /* ------------------------------------------------------------------ script */
@@ -128,7 +170,7 @@ Four warnings from prior passes, each of which produced a wrong published number
 - **A module's tables extend well beyond the obvious set.** A four-module map covered 26 tables where those modules actually span 100+.
 - **Model files are not all in app/models/.** 82 of 225 live in namespaced subdirectories, and a script reading only the top level reported 58 tables as having no model when 43 did.
 - **Row counts that exclude dynamically-named tables are wrong by an order of magnitude.** One module read 1.77M rows until 12,540 per-source cell tables were counted, at which point it read 31.5M.`,
-  { schema: SCOPE, label: `scope:${target}` }
+  { schema: SCOPE, label: `scope:${target}`, ...PERSONAS.researcher }
 )
 const tableList = (scope.tables || []).map(t => t.name).join(', ')
 log(`${(scope.tables || []).length} tables · ${(scope.entry_points || []).length} entry points · ${(scope.wiki_pages || []).length} wiki pages`)
@@ -156,7 +198,8 @@ For every finding: state it as one falsifiable sentence, grade it (measured / st
 **And for every load-bearing finding, state the DULL EXPLANATION** — the boring reading that would also fit your evidence. Prior passes published three striking claims that turned out to be instrumentation changes, sampling artefacts, or one table mistaken for a whole module.
 
 Also report **non-obvious locations**: anything you found somewhere other than the obvious place. Those feed a lookup register so the next analysis does not repeat the search.`,
-    { schema: LENS_OUT, label: `lens:${L.key}`, phase: 'Lenses' }
+    { schema: LENS_OUT, label: `lens:${L.key}`, phase: 'Lenses',
+      ...(PERSONAS[L.persona] || PERSONAS.surveyor) }
   ),
   (out, L) => {
     if (!out || !out.findings) return { lens: L.key, confirmed: [], corrected: [], unresolved: [] }
@@ -180,7 +223,8 @@ Your job, in this order:
 4. If you cannot settle it, say **unresolved** and name the ONE cheapest check that would. Do not guess a mechanism.
 
 ${constraints}`,
-        { schema: SPOT, label: `spot:${String(f.claim).slice(0, 30)}`, phase: 'Spotcheck' }
+        { schema: SPOT, label: `spot:${String(f.claim).slice(0, 30)}`, phase: 'Spotcheck',
+          ...PERSONAS.reviewer_adversarial }
       ).then(v => ({ ...f, spot: v }))
     )).then(checked => ({
       lens: L.key,
@@ -232,7 +276,7 @@ Rules. Lead every section with the finding, not with an identifier. State the co
 Two things this report must not do, both observed in a prior pass:
 - **Do not present a count without saying what population it covers.** A binding table measured at 86% turned out to describe one third of the visual estate while being reported as describing the module.
 - **Do not let an absent lens read as a clean result.** If observability returned nothing, say the area is unmeasured rather than implying it is healthy.`,
-  { schema: REPORT, label: 'report' }
+  { schema: REPORT, label: 'report', ...PERSONAS.architect }
 )
 
 // The report agent returns null when it dies on a session limit. Everything above
