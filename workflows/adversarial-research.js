@@ -320,7 +320,7 @@ if (!allChannelFindings.length) {
 // Rank and consolidate. A barrier is genuinely required: the whole point is to
 // compare channels against each other, which cannot be done per-channel.
 phase('Rank')
-const consolidated = await agent(
+const consolidatedRaw = await agent(
   `Consolidate what SEVEN INDEPENDENT CHANNELS said about one question. Merge, rank, and surface disagreement.
 
 THE CORE QUESTION: ${topic}
@@ -342,6 +342,10 @@ Your job, in this order:
   { schema: CONSOLIDATION, label: 'rank-and-consolidate' }
 )
 
+// An agent that dies returns null. Without this guard every downstream read of
+// `.ranked` crashes the run and discards the channel sweep that already succeeded.
+const consolidated = consolidatedRaw || { ranked: [], contradictions: [], threads_to_deepen: [] }
+if (!consolidatedRaw) log('RANK STAGE FAILED — proceeding with zero merged claims; the channel findings are still returned in full')
 log(`${(consolidated.ranked || []).length} merged claims · ${(consolidated.contradictions || []).length} contradictions · ${(consolidated.threads_to_deepen || []).length} threads to deepen`)
 for (const c of (consolidated.contradictions || [])) log(`CONTRADICTION: ${String(c.subject).slice(0, 90)}`)
 
@@ -447,7 +451,19 @@ log(`${surviving.length} survived · ${killed.length} refuted · ${carried.lengt
 
 if (!surviving.length) {
   log('Nothing survived refutation. Emitting the graveyard rather than a document — that IS the finding.')
-  return { topic, headline: 'No claim survived independent refutation.', surviving: [], killed, carried, plan }
+  return {
+    topic,
+    headline: 'No claim survived independent refutation.',
+    surviving: [], killed, carried,
+    channel_findings: sweeps.map(x => ({
+      channel: x.channel, label: x.channel_label, reachable: x.reachable,
+      findings: x.findings || [], absent: x.absent || [],
+    })),
+    unreachable,
+    why: 'Every ranked finding was refuted, or every refuter failed. Check the per-agent '
+       + 'journal before concluding the question has no answer — an agent that dies on a '
+       + 'session limit is indistinguishable here from one that found nothing.',
+  }
 }
 
 phase('Synthesize')
@@ -486,7 +502,7 @@ NON-FUNCTIONAL FINDINGS RETURNED: ${fnCount}${fnCount === 0 ? ' — ZERO, which 
 DIMENSIONS RESEARCHED: ${dims.map(d => d.key).join(', ')}
 CHANNELS THAT RETURNED NOTHING THEY EXPECTED TO FIND: ${sweeps.flatMap(x => (x.absent || []).map(a => `${x.channel}: ${a}`)).join(' · ') || 'none reported — itself suspicious, since a channel that looked and found nothing should say so'}
 CONTRADICTIONS SURFACED: ${(consolidated.contradictions || []).map(c => c.subject).join(' · ') || 'none — suspicious across seven independent channels'}
-HEADLINE PRODUCED: ${doc.headline}
+HEADLINE PRODUCED: ${doc ? doc.headline : '(synthesis failed — no headline)'}
 CLAIMS SURVIVING: ${surviving.length} · REFUTED: ${killed.length} · UNVERIFIED: ${carried.length}
 DEAD ENDS REPORTED: ${rolled.flatMap(r => r.dead_ends || []).join(' · ') || 'none'}
 
@@ -502,13 +518,14 @@ Then state whether the output is safe to quote yet, and if not, exactly what clo
 
 return {
   topic,
-  headline: doc.headline,
+  headline: doc ? doc.headline : 'SYNTHESIS FAILED — the channel findings below are complete and unsynthesised',
   summary_sections: doc.summary_sections,
   detail_sections: doc.detail_sections,
   gaps: critique.gaps,
   safe_to_quote: critique.verdict,
   refuted: killed.map(k => ({ claim: k.claim, votes_against: k.votes_against, votes_total: k.votes_total })),
   unverified: carried.map(c => c.claim),
+  synthesis_failed: !doc,
   dimensions: dims,
   contradictions: consolidated.contradictions || [],
   ranked: consolidated.ranked || [],

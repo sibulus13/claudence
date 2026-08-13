@@ -27,9 +27,19 @@ const calls = [];
 // Fakes are matched off the schema's own field names, so a new schema shape needs
 // a new branch here — deliberately, since a silently-empty return would make the
 // test pass on a workflow that cannot actually run.
+// MODE is set per pass below. 'happy' is the original behaviour.
+let MODE = 'happy';
 const agent = async (prompt, opts = {}) => {
   calls.push(opts.label || '(unlabelled)');
   const s = JSON.stringify(opts.schema || {});
+  // A real agent returns null when it dies on a session limit or a terminal API
+  // error. Any dereference of its result without a guard is a crash waiting for
+  // a bad afternoon, so one pass makes every agent do it.
+  if (MODE === 'agent-dies' && !s.includes('entry_points') && !s.includes('reachable')) return null;
+  // When every claim is refuted, the "nothing survived" branches run — the ones
+  // that shipped a reference to a deleted variable twice.
+  if (MODE === 'refute-all' && s.includes('refuted')) return { refuted: true, reasoning: 'r' };
+  if (MODE === 'refute-all' && s.includes('corrected_claim')) return { verdict: 'refuted', reasoning: 'r', corrected_claim: null, queries_run: ['q'] };
   if (s.includes('reachable')) return { channel: 'stub', reachable: true, findings: [{ claim: 'c', grade: 'measured', how: 'h', source: 's', axis: 'functional' }], absent: ['nothing'] };
   if (s.includes('ranked')) return { ranked: [{ claim: 'c', weight: 8, channels_agreeing: ['code', 'database'], grade: 'measured', axis: 'functional' }], contradictions: [{ subject: 'x', positions: ['a', 'b'], how_to_settle: 'q' }], threads_to_deepen: [{ question: 'q1', why: 'load-bearing', where_to_look: 'code' }] };
   if (s.includes('would_falsify')) return { dimension: 'thread-1', findings: [{ claim: 'c2', grade: 'measured', provenance: { how: 'h', source: 's', environment: 'production' }, load_bearing: true, would_falsify: 'w' }], dead_ends: [] };
@@ -56,15 +66,25 @@ const budget = { total: null, spent: () => 0, remaining: () => Infinity };
 const args = { topic: 'smoke-test question', module: 'smoke-test-module',
                context: 'ctx', constraints: 'read-only' };
 
+const MODES = ['happy', 'refute-all', 'agent-dies'];
 const fn = new Function('agent', 'parallel', 'pipeline', 'phase', 'log', 'budget', 'args',
   '"use strict"; return (async()=>{' + src + '})()');
-try {
-  const out = await fn(agent, parallel, pipeline, phase, log, budget, args);
-  console.log('phases   :', phases.join(' -> '));
-  console.log('agents   :', calls.length, '·', calls.join(' '));
-  console.log('returns  :', Object.keys(out || {}).join(', ') || '(nothing — suspicious)');
-  console.log('PASS');
-} catch (e) {
-  console.log('FAIL:', e.message);
-  process.exit(1);
+let failed = 0;
+for (const m of MODES) {
+  MODE = m;
+  calls.length = 0; phases.length = 0;
+  try {
+    const out = await fn(agent, parallel, pipeline, phase, log, budget, args);
+    const keys = Object.keys(out || {});
+    console.log(`[${m}] phases: ${phases.join(' -> ')}`);
+    console.log(`[${m}] agents: ${calls.length}`);
+    console.log(`[${m}] returns: ${keys.join(', ') || '(nothing — suspicious)'}`);
+    if (!keys.length) { console.log(`[${m}] FAIL: returned nothing`); failed++; }
+    else console.log(`[${m}] PASS`);
+  } catch (e) {
+    console.log(`[${m}] FAIL: ${e.message}`);
+    failed++;
+  }
 }
+if (failed) { console.log(`FAIL — ${failed} of ${MODES.length} mode(s) broke`); process.exit(1); }
+console.log(`PASS — all ${MODES.length} modes (happy, refute-all, agent-dies)`);
