@@ -29,6 +29,11 @@
             "type": "command",
             "command": "powershell.exe -NoProfile -File $USERPROFILE/.claude/scripts/record-pane-session.ps1",
             "shell": "bash"
+          },
+          {
+            "type": "command",
+            "command": "powershell.exe -NoProfile -File $USERPROFILE/.claude/scripts/resolve-docs-root.ps1 -Hook",
+            "shell": "bash"
           }
         ]
       }

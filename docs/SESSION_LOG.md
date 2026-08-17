@@ -53,3 +53,38 @@ Not disabled — the contract text sits in `CLAUDE.md` lines 100–109 and was l
 *2. The contract had no landing zone.* It routes anything longer than one sentence to a repo doc and says each repo names its own docs in its CLAUDE.md. `~/.claude` had only `docs/claudence-status.md` — no session log, no decision log, and CLAUDE.md named neither. With nowhere to send detail, the terminal was the only channel available, so the contract could not be satisfied here even in principle.
 
 **Fix.** Added a *Precedence over output styles* bullet to the contract (educational depth is kept but written here and cited in one line — terseness governs the channel, not the depth), named this repo's two docs in the same section, and created `docs/DECISIONS.md` + this file. Plugin left enabled — see D3.
+
+---
+
+## 2026-08-16 - Per-workspace docs roots
+
+**Ask.** One designated doc set per workspace, so version-control lines stay segregated per project; when cwd is not a version-controlled workspace, either treat it as the workspace or walk up to the nearest parent that qualifies; and a key / mapping / environment variable to pin the answer.
+
+**Shape of the problem, from the real layout.** `D:/repo` is not a repo, but most projects under it are - and `Life` is a repo whose *subfolders* (`Life/pylon`, `Life/karaoke`) are workspaces in their own right without their own VC. So nearest-`.git` answers most cases correctly and is genuinely ambiguous for exactly the nested-workspace case. That is the case the override mechanisms exist for, rather than being a general-purpose knob.
+
+**Resolver** - `scripts/resolve-docs-root.ps1`, six rules, first hit wins:
+
+| # | rule | when it is the right answer |
+|---|---|---|
+| 1 | `$CLAUDE_DOCS_ROOT` | one-off redirect for a single shell or session |
+| 2 | `.claude-docs-root` marker, nearest ancestor | the pin should travel with the repo and be committed alongside it |
+| 3 | `~/.claude/workspaces/doc-roots.json` pin, longest match | the pin is machine-local, or the repo must not carry a marker |
+| 4 | nearest ancestor holding `.git` | the default - docs land on the project's own VC line |
+| 5 | `<repo root>/<Category>/<project>` | a workspace under the repo-org convention with no VC of its own |
+| 6 | `~/.claude/docs` | nothing matched; reported as source `fallback`, never as a confident answer |
+
+An empty marker file means "the folder I sit in"; a marker holding one line names the root, absolute or relative to the marker. The repo root for rule 5 is read from `CLAUDE_REPO_ROOT` or `terminal.local.lua`, the same sources `terminal.lua` uses - never hardcoded, so the machine stays relocatable.
+
+**Two flags the record carries beyond the path.** `tracked` is false when the resolved root is not under version control at all; `shared` is true when the root sits inside a *parent* repo, which is legal but means the log would land in a history shared with sibling projects. The SessionStart hook turns both into an explicit instruction to confirm with the user rather than write blind - the resolver surfaces ambiguity instead of guessing past it.
+
+**Wiring.** A third SessionStart hook (`resolve-docs-root.ps1 -Hook`) states the resolved root at session open. CLAUDE.md's Terse-Output Contract now describes the resolution instead of naming claudence's docs directly, and its stale "each repo names its own docs in its project CLAUDE.md" clause was retired.
+
+**Verification.** 23 Pester cases in `tests/docs-root.tests.ps1`, registered in `tests/run-tests.ps1`. Every case builds a throwaway tree under `$TestDrive`; a directory named `.git` is enough to look like a repo, so no test shells out to git or touches a real project. Three env seams (`CLAUDE_DOCS_ROOT`, `CLAUDE_REPO_ROOT`, `CLAUDE_DOC_ROOTS_FILE`) are reset per test and restored afterwards, so the live registry is never read or written by the suite.
+
+**Caveats hit.**
+- The script parsed as ANSI and died on its own em dashes: Windows PowerShell 5.1 treats a BOM-less `.ps1` as ANSI, and the mojibake landed inside string literals. Resolved by keeping the file pure ASCII (noted at the top of it), which matches the BOM-less convention of the other scripts here.
+- Pester 5 rejects a `BeforeEach` at the container root, and expands `<...>` inside an `It` name as a data placeholder - a test called "falls back to `<repo root>/<Category>/<project>`" failed to parse. Resolved by scoping the setup per `Describe` and renaming the test.
+- The `-Hook` tests initially read nothing: `[Console]::In.ReadToEnd()` reads *process* stdin, which a PowerShell-pipeline pipe never reaches. Resolved by driving the script as a child process (`$payload | powershell.exe -File ... -Hook`), which is also how the real hook runs it.
+
+**Left open.** `doc-roots.json` ships empty - no workspace is pinned yet. `Life/pylon` and `Life/karaoke` currently resolve to the `Life` repo (flagged `shared`); whether either should keep its own log is the user's call.
+

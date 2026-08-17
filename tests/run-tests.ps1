@@ -23,7 +23,8 @@ $config = New-PesterConfiguration
 $config.Run.Path           = @(
     "$PSScriptRoot\classification.tests.ps1",
     "$PSScriptRoot\system.tests.ps1",
-    "$PSScriptRoot\keymap.tests.ps1"
+    "$PSScriptRoot\keymap.tests.ps1",
+    "$PSScriptRoot\docs-root.tests.ps1"
 )
 $config.Output.Verbosity   = 'Detailed'
 $config.Run.PassThru       = $true
