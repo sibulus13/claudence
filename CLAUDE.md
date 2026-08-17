@@ -76,6 +76,14 @@ Write every doc / spec / context **visual-first**: lead with **Mermaid diagrams*
 - **≤ 5 elements per row** — lay out for portrait/vertical space; prefer top-down (`flowchart TD`); ≤5 participants per sequence diagram; wrap/stack wide chains.
 - A doc opens with a diagram, not a paragraph. (Promoted from a project rule 2026-06-27. Exemplar: `D:\repo\Life\pylon\Catalog\chatbox-assistant\ASK-BOT-SPEC.md`.)
 
+## Turn Contract (bookends — plan at the open, account at the close)
+
+Every non-trivial turn is bookended, so the user reads a **map before the walk** and a **reconciliation after** — both terse (per the Terse-Output Contract), detail to docs.
+
+- **Open with a plan (before executing).** Lead a multi-step turn with a terse high-level plan: a bullet list of the tasks, and for each task the one-line action you'll take. This is *state-then-execute*, NOT ask-approval — action-bias holds; you show the map, then walk it without pausing for a go-ahead (unless a real blocker or an irreversible/consequential call needs one). Skip only for a single trivial task.
+- **Close by accounting for the plan.** End with the outcome bullets AND the **End-of-Response Contract** below — which now includes **Caveats & how overcome**: acknowledge each obstacle hit and pair it with its one-line fix, so nothing that bit us is silent and nothing resolved is left looking open.
+- The bookends mirror each other: what you planned at the open is what you account for at the close (done · caveats-and-fixes · still-open). Adopted 2026-08-16 (global).
+
 ## End-of-Response Contract
 
 Applies to every project. At the end of the final response in a turn, surface anything not yet addressed — skip any section with nothing outstanding, don't restate what's already been fully resolved/acknowledged earlier in the same response:
@@ -84,9 +92,19 @@ Applies to every project. At the end of the final response in a turn, surface an
 - **Session to-dos / reminders (open loops)** — the running ledger of what's still outstanding IN THIS SESSION: in-flight background work (name what completes it — e.g. "sweep running → I finish the regen+restart on completion"), changes **staged but not yet deployed**, queued next actions, and **decisions awaiting the user**. This is the "don't drop the thread" list — surface every open loop so nothing started-but-unfinished is silently lost. Tag each: ⏳ in-flight · 🅿️ staged · ⛔ blocked-on-you.
 - **Next-step proposals** — concrete, named next actions; not "let me know if you want me to continue"
 - **Open findings** — anything discovered but not yet acted on or decided
+- **Caveats & how overcome** — every obstacle/caveat hit during the work, each paired with the ONE-line resolution (`caveat → how it was overcome`). A caveat with no resolution stays an open loop above; a resolved one is recorded here so the user sees both what bit us and that it's handled. Multi-sentence detail → the session log, not this bullet.
 - **Vocabulary / domain knowledge** — for any non-trivial domain term, tool, or concept used in the response: a short "what it is" + "why it matters here" gloss, so the user builds a working mental model of the area, not just the specific fix
 
 Keep this compact — bullets, not prose. If everything in a turn was simple and fully resolved with nothing pending, this contract produces nothing extra (don't pad).
+
+## Terse-Output Contract (terminal = abstract · repo doc = record)
+
+Adopted 2026-08-15 (global). Governs HOW the End-of-Response Contract renders. **Goal: minimize the reading the user does in the terminal.** The response is the *abstract*; the workspace doc holds the *length*.
+
+- **Terminal bullets are terse** — a phrase or a single clause each, not multi-sentence paragraphs. Lead with the outcome. If a bullet wants a second sentence, that sentence belongs in a doc.
+- **>1 sentence of explanation ⇒ it goes to a repo doc, not the terminal.** Any console-log/output explanation, trade-off, caveat, mechanism, or back-length narrative that needs more than one sentence is WRITTEN to a workspace doc and cited by a one-line pointer (`→ docs/X` + a ≤1-line what-it-says). Never paste a long console dump or its multi-sentence explanation into the response.
+- **Route by kind:** decisions / trade-offs → the repo's decision log (`docs/KNOWLEDGE.md ## Decisions` or `docs/DECISIONS.md`); other verbose session detail (console-output explanations, run narratives, caveat back-length) → the repo's **session log** (append-only, e.g. `docs/SESSION_LOG.md`). Each repo names its own docs in its project CLAUDE.md; reuse an existing doc before creating one.
+- **The contract layer:** terminal carries outcomes + pointers; docs carry the detail. A reader who wants depth follows the pointer — they are never forced to read it inline. This SHARPENS the existing "complex analyses → docs/, terminal shows abstract + path" rule and binds it to every session summary.
 
 ## Code Quality — Universal
 
