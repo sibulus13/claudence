@@ -75,9 +75,13 @@ config.audible_bell = 'Disabled'
 -- unaffected. -NoProfile keeps parity with the rest of the file; PSReadLine
 -- auto-loads on the first Set-PSReadLineOption call, then -NoExit drops to the
 -- interactive shell.
+-- Hoisted so pane_launch_args can give a RESTORED pane the same history setup an
+-- arg-less spawn gets — a restored pane can no longer use default_prog (see there).
+local PSREADLINE_INIT =
+  'Set-PSReadLineOption -HistorySaveStyle SaveIncrementally -MaximumHistoryCount 10000'
+
 config.default_prog = {
-  'powershell.exe', '-NoProfile', '-NoLogo', '-NoExit', '-Command',
-  'Set-PSReadLineOption -HistorySaveStyle SaveIncrementally -MaximumHistoryCount 10000',
+  'powershell.exe', '-NoProfile', '-NoLogo', '-NoExit', '-Command', PSREADLINE_INIT,
 }
 
 -- ── Tab bar ───────────────────────────────────────────────────────────────────
@@ -524,7 +528,21 @@ local CLAUDE_RESTORE_CMD = 'claude --continue --permission-mode auto'
 -- WEZTERM_PANE the hook saw). This is what lets N tabs in the SAME repo each
 -- resume THEIR conversation instead of all colliding on --continue's guess.
 local PANE_SESSIONS_DIR = wezterm.home_dir .. '/.claude/workspaces/pane-sessions'
-local function pane_session_id(pane)
+
+-- True when Claude still holds a transcript for `sid` under project dir `cwd`.
+-- Only the separators Claude is known to fold (colon, slashes, space) are replaced,
+-- an unmapped character degrades to "not found" -> --continue, never a bad resume.
+local function transcript_exists(sid, cwd)
+  if not cwd or cwd == '' then return false end
+  local slug = cwd:gsub('[:/\\ ]', '-')
+  local f = io.open(wezterm.home_dir .. '/.claude/projects/' .. slug .. '/' .. sid .. '.jsonl', 'r')
+  if not f then return false end
+  f:close()
+  return true
+end
+-- `expect_cwd` is the repo dir this binding is about to be attributed to; the
+-- binding is rejected unless the file was written for that same directory.
+local function pane_session_id(pane, expect_cwd)
   local ok, pid = pcall(function() return pane:pane_id() end)
   if not ok or not pid then return nil end
   local f = io.open(PANE_SESSIONS_DIR .. '/pane-' .. tostring(pid) .. '.json', 'r')
@@ -533,11 +551,28 @@ local function pane_session_id(pane)
   raw = raw:gsub('^\239\187\191', '')                 -- strip UTF-8 BOM if present
   local ok2, data = pcall(wezterm.json_parse, raw)
   if not ok2 or type(data) ~= 'table' then return nil end
+  -- WezTerm RESTARTS pane ids at 0 on every relaunch, so pane-<id>.json is
+  -- routinely a leftover written by a DIFFERENT repo's pane that held this id in
+  -- an earlier run (the hook's own reap only expires files after 7 days — an
+  -- eternity next to a restart). Claude scopes conversations per project dir, so
+  -- resuming such an id here dies with "No conversation found with session ID"
+  -- and the pane drops to a bare prompt. The recorded cwd is the guard: trust the
+  -- binding only when it names the directory we are about to open. On a mismatch
+  -- return nil, and the caller falls back to --continue (this cwd's most recent).
+  if expect_cwd and norm_path(data.cwd or '') ~= norm_path(expect_cwd) then return nil end
   local sid = data.session
   -- Only trust a UUID-shaped id (guards against a malformed file injecting shell
   -- text — the id is interpolated into the launch command).
-  if type(sid) == 'string' and sid:match('^[%w%-]+$') then return sid end
-  return nil
+  if type(sid) ~= 'string' or not sid:match('^[%w%-]+$') then return nil end
+  -- Last guard: the conversation must still EXIST. Claude reaps old transcripts
+  -- (and a short-lived session may never have persisted one), and --resume on a
+  -- vanished id fails outright — the pane then sits at a bare prompt with an error
+  -- where the agent should be. Transcripts live at
+  -- ~/.claude/projects/<cwd with colon, slashes and spaces folded to '-'>/<id>.jsonl.
+  -- A wrong guess here only costs us the exact resume: we fall back to --continue,
+  -- exactly what this code did before per-pane binding existed.
+  if not transcript_exists(sid, expect_cwd or data.cwd) then return nil end
+  return sid
 end
 
 -- Programs worth re-launching on restore. Claude is matched by name (its
@@ -553,12 +588,13 @@ local RESUMABLE = {
   cargo = true, go = true, docker = true, ['docker-compose'] = true,
 }
 
--- Quote a single argv token for a PowerShell single-quoted context (only when
--- it contains whitespace, to keep the common case readable). Embedded single
--- quotes are doubled per PowerShell escaping.
+-- Quote a single argv token for a PowerShell single-quoted context. EVERY token
+-- is quoted, not just the whitespace-carrying ones: an unquoted token is still
+-- parsed by PowerShell, so a stray `$`, `@`, `(` or `` ` `` in an argument either
+-- expands to something else or aborts the parse. Single quotes suppress all of
+-- it; embedded single quotes are doubled per PowerShell escaping.
 local function quote_arg(a)
-  if a:find('%s') then return "'" .. a:gsub("'", "''") .. "'" end
-  return a
+  return "'" .. a:gsub("'", "''") .. "'"
 end
 
 -- The command to relaunch in a pane on restore, or nil if the pane holds an
@@ -567,13 +603,13 @@ end
 -- session, even while shelling out mid-tool); other whitelisted programs are
 -- reconstructed verbatim from argv. Wrapped in pcall so an unsupported build or
 -- a dead pane degrades to "no command" instead of breaking the whole config.
-local function pane_resume_cmd(pane)
+local function pane_resume_cmd(pane, expect_cwd)
   local name = (pane:get_foreground_process_name() or ''):lower()
   if name:find('claude') then
     -- Prefer the pane's exact session (claude --resume <id>); fall back to the
     -- most-recent guess only when no binding was captured (older session, hook
     -- not yet fired, or restore reaped the file).
-    local sid = pane_session_id(pane)
+    local sid = pane_session_id(pane, expect_cwd)
     if sid then return 'claude --resume ' .. sid .. ' --permission-mode auto' end
     return CLAUDE_RESTORE_CMD
   end
@@ -586,7 +622,12 @@ local function pane_resume_cmd(pane)
   if type(argv) ~= 'table' or #argv == 0 then return nil end
   local parts = {}
   for _, a in ipairs(argv) do parts[#parts + 1] = quote_arg(a) end
-  return table.concat(parts, ' ')
+  -- The call operator is REQUIRED: a statement that begins with a quoted string is
+  -- a PowerShell *expression*, not an invocation, and a second string after it is a
+  -- parse error. PowerShell parses the whole -Command block up front, so that error
+  -- also kills the Set-Location that pane_launch_args puts in front of this — the
+  -- pane then opens in the window's cwd instead of the repo. `&` invokes it instead.
+  return '& ' .. table.concat(parts, ' ')
 end
 
 -- Build the PowerShell spawn args for a restored pane: cd into the repo, then
@@ -596,11 +637,24 @@ end
 -- Shared by both panes so quoting is handled uniformly by PowerShell (the old
 -- right-pane path split on whitespace, which broke any quoted argument).
 local function pane_launch_args(cmd, cwd)
-  if not cmd or cmd == '' then return nil end
   local safe = cwd:gsub("'", "''")
+  -- Set-Location is what actually places the pane. The spawn-time `cwd` field is
+  -- NOT enough: MuxWindow:spawn_tab{cwd=...} is ignored on the gui-startup path
+  -- (verified — the tab inherits the mux window's cwd, i.e. the repo ROOT), so a
+  -- pane with no command of its own used to land in REPO_DIR and every ↑-recalled
+  -- command from the previous session failed there. So EVERY restored pane is
+  -- launched through PowerShell now, command or not; a command-less pane just gets
+  -- the same PSReadLine history setup an arg-less default_prog spawn would give it.
+  local body = "Set-Location '" .. safe .. "'; " .. PSREADLINE_INIT
+  if cmd and cmd ~= '' then
+    -- Repair recipes captured before the call-operator fix in pane_resume_cmd: a
+    -- leading quoted path parses as an expression and takes the whole block —
+    -- Set-Location included — down with it. See the note there.
+    if cmd:sub(1, 1) == "'" then cmd = '& ' .. cmd end
+    body = body .. '; ' .. cmd
+  end
   return {
-    'powershell.exe', '-NoProfile', '-NoLogo', '-NoExit', '-Command',
-    "Set-Location '" .. safe .. "'; " .. cmd,
+    'powershell.exe', '-NoProfile', '-NoLogo', '-NoExit', '-Command', body,
   }
 end
 
@@ -628,10 +682,15 @@ save_session = function(window)
     -- service, or resizing the split, is reflected on restore (the old code only
     -- ever ADDED fields, so stale commands lingered forever). left/right are
     -- each detected independently, so Claude in EITHER pane is now captured.
+    -- The repo dir this tab's recipe is filed under; pane_resume_cmd uses it to
+    -- reject a recycled pane-id binding that belongs to some other repo.
+    -- REPO_DIR_NORM is a global (assigned at config load, always set by now) —
+    -- REPO_DIR itself is declared further down and so is not in lexical scope here.
+    local tab_cwd = (REPO_DIR_NORM or '') .. '/' .. title
     local rec = { split = pinfo[2] ~= nil }
-    if pinfo[1] then rec.left = pane_resume_cmd(pinfo[1].pane) end
+    if pinfo[1] then rec.left = pane_resume_cmd(pinfo[1].pane, tab_cwd) end
     if pinfo[2] then
-      rec.right = pane_resume_cmd(pinfo[2].pane)
+      rec.right = pane_resume_cmd(pinfo[2].pane, tab_cwd)
       -- Direction + size from the actual pane rectangle. size = the new (second)
       -- pane's fraction of the split axis — exactly what pane:split{size=..}
       -- expects — so restore reproduces the real proportions, not a fixed 40%.
@@ -791,13 +850,25 @@ end
 local function make_tab(mux_win, title, cwd)
   local ws  = (load_repos_cfg().workspaces or {})[title] or {}
 
-  -- Both panes go through pane_launch_args: cd + saved command under a -NoExit
-  -- shell, so an exited command leaves a live prompt. nil command → plain shell.
-  local left_args  = pane_launch_args(ws.left,  cwd)
-  local right_args = pane_launch_args(ws.right, cwd)
+  -- A saved recipe can go stale between save and restore: Claude reaps old
+  -- transcripts on its own schedule, and `--resume <gone-id>` leaves the pane
+  -- showing "No conversation found" instead of an agent. Re-check at the moment
+  -- of use and downgrade to --continue (this cwd's most recent conversation).
+  local function sanitize(cmd)
+    local id = cmd and cmd:match('^claude %-%-resume ([%w%-]+)')
+    if id and not transcript_exists(id, cwd) then return CLAUDE_RESTORE_CMD end
+    return cmd
+  end
 
-  local spawn_cfg = left_args and { cwd = cwd, args = left_args } or { cwd = cwd }
-  local tab = mux_win:spawn_tab(spawn_cfg)
+  -- Both panes go through pane_launch_args: Set-Location + saved command under a
+  -- -NoExit shell, so an exited command leaves a live prompt IN THE REPO.
+  local left_args  = pane_launch_args(sanitize(ws.left),  cwd)
+  local right_args = pane_launch_args(sanitize(ws.right), cwd)
+
+  -- cwd is still passed (it IS honoured on the runtime Alt+O path, and costs
+  -- nothing when ignored at startup); the Set-Location inside left_args is what
+  -- makes the placement reliable either way.
+  local tab = mux_win:spawn_tab { cwd = cwd, args = left_args }
   if not tab then return nil end
   tab:set_title(title)
   local left_pane = tab:active_pane()
