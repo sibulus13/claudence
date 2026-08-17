@@ -225,6 +225,23 @@ local REPO_ALIASES = {
   ['life/second-brain']   = 'Cortex',        -- #31 second brain + Helm dashboard; product name = Cortex
 }
 
+-- Projects that are NOT their own git repo — they live inside a parent repo, or
+-- sit behind a discover_repos() prune — but are still first-class tabs.
+-- Discovery keys on a `.git` child, so without this list `Life/pylon` (a PINNED
+-- FAVORITE in repos.json) was unreachable from Alt+O, and every Life sub-project
+-- hid behind the single `Life` monorepo entry. Paths are relative to REPO_DIR,
+-- forward-slashed. A path that no longer exists is dropped silently at scan time.
+local EXTRA_PROJECTS = {
+  'Life/pylon',              -- Pylon consulting studio
+  'Life/vantage',            -- Vantage job-search copilot
+  'Life/second-brain',       -- Cortex (aliased above)
+  'Life/karaoke',
+  'Life/Resume workshop',
+  'Life/Europe 2026',
+  'Life/Traction Complete',
+  '_Misc/Music/spotifyDL',   -- active project; '_Misc' is pruned by discover_repos
+}
+
 -- ── Custom tab names (persistent) ───────────────────────────────────────────
 -- A tab's identity stays its repo-relative path (so session-restore + attention
 -- keep working); this map overlays a user-chosen DISPLAY label on top, keyed by
@@ -978,6 +995,10 @@ local function discover_repos()
   -- node_modules) on EVERY Alt+O — ~400ms of the ~500ms latency. Pruning at the
   -- directory door cuts the walk to ~150ms and returns the identical repo set.
   -- 'example[s]' is pruned by segment name to match the old regex exclusion.
+  -- EXTRA_PROJECTS is tested inside this SAME process — a per-entry cmd.exe
+  -- spawn from Lua would have cost more than the whole walk.
+  local ex = {}
+  for _, rel in ipairs(EXTRA_PROJECTS) do ex[#ex + 1] = "'" .. rel .. "'" end
   local ps =
     "$r='" .. REPO_DIR_BS .. "';$md=4;" ..
     "$p=@{'node_modules'=1;'.git'=1;'dist'=1;'.next'=1;'build'=1;'out'=1;" ..
@@ -992,6 +1013,11 @@ local function discover_repos()
     "try{foreach($d in [System.IO.Directory]::EnumerateDirectories($c.P)){" ..
     "$n=[System.IO.Path]::GetFileName($d);" ..
     "if($p.ContainsKey($n)){continue};$s.Push(@{P=$d;D=$c.D+1})}}catch{}};" ..
+    -- -LiteralPath: folder names containing [ ] would otherwise be read as
+    -- wildcard patterns and blow up Test-Path.
+    "foreach($e in @(" .. table.concat(ex, ',') .. ")){" ..
+    "$q=Join-Path $r ($e -replace '/','\\');" ..
+    "if(Test-Path -LiteralPath $q -PathType Container){$o.Add($q)}};" ..
     "$o|Sort-Object -Unique"
   local ok, stdout = wezterm.run_child_process({
     'powershell.exe', '-NoProfile', '-NoLogo', '-NonInteractive', '-Command', ps,
@@ -1032,9 +1058,14 @@ local function sorted_choices(repos, cfg)
   for _, e in ipairs(cfg.extras or {}) do
     table.insert(choices, { id = e.path, label = '~ ' .. e.label })
   end
+  -- The label carries the PRODUCT name as well as the path whenever the two
+  -- differ (REPO_ALIASES), so fuzzy-searching 'Crucible' finds 'Stock/Research
+  -- 2026'. The launcher callback resolves rel from `id`, never from this text.
   for _, r in ipairs(repos) do
     local prefix = fav_idx[r.rel] and '\u{2605} ' or (rec_idx[r.rel] and '  ' or '  ')
-    table.insert(choices, { id = r.path, label = prefix .. r.rel })
+    local alias  = REPO_ALIASES[r.rel:gsub('\\', '/'):lower()]
+    local label  = alias and (alias .. '  \u{00B7}  ' .. r.rel) or r.rel
+    table.insert(choices, { id = r.path, label = prefix .. label })
   end
   return choices
 end
@@ -1133,6 +1164,11 @@ config.keys = {
       if #repos == 0 then return end
       local cfg     = load_repos_cfg()
       local choices = sorted_choices(repos, cfg)
+      -- id (absolute path) -> repo record. Parsing the label was already fragile
+      -- (it had to strip the star prefix); with alias-prefixed labels it would be
+      -- wrong outright, and a wrong rel poisons recents/frequency/workspaces.
+      local by_id = {}
+      for _, r in ipairs(repos) do by_id[r.path] = r end
       win:perform_action(act.InputSelector {
         title  = '\u{2605} favorites  ·  recent  ·  all repos',
         choices = choices,
@@ -1145,8 +1181,9 @@ config.keys = {
             make_tab(w:mux_window(), title, id)
             return
           end
-          local rel = label:match('^[%s\u{2605}]*(.+)$') or label
-          launch_repo(w, p, { path = id, rel = rel, ws = path_to_ws_name(rel) })
+          local r = by_id[id]
+          if not r then return end
+          launch_repo(w, p, r)
         end),
       }, pane)
     end) },

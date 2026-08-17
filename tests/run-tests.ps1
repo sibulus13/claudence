@@ -20,12 +20,15 @@ if (-not $pester -or $pester.Version.Major -lt 5) {
 Import-Module Pester -MinimumVersion 5.0 -Force
 
 $config = New-PesterConfiguration
-$config.Run.Path           = @(
-    "$PSScriptRoot\classification.tests.ps1",
-    "$PSScriptRoot\system.tests.ps1",
-    "$PSScriptRoot\keymap.tests.ps1",
-    "$PSScriptRoot\docs-root.tests.ps1"
-)
+# Globbed, not enumerated: a hardcoded manifest silently drops any test file
+# added later, and the gate then reports green over tests it never ran.
+$testFiles = @(Get-ChildItem -Path $PSScriptRoot -Filter '*.tests.ps1' -File |
+    Sort-Object Name | ForEach-Object { $_.FullName })
+if ($testFiles.Count -eq 0) {
+    Write-Host 'No *.tests.ps1 found — refusing to report a vacuous pass.' -ForegroundColor Red
+    exit 1
+}
+$config.Run.Path           = $testFiles
 $config.Output.Verbosity   = 'Detailed'
 $config.Run.PassThru       = $true
 $config.TestResult.Enabled = $false
