@@ -758,6 +758,82 @@ try:
 finally:
     box.close()
 
+# ---------------------------------------------------------------------------
+# Bindings against declarations.
+#
+# A hook is TWO facts in two files: the event settings.json binds it to, and the
+# event its own header says it serves. Nothing compared them, so a hook could be
+# MOVED between events and still read as though it had not been -- one such
+# misbinding survived until it was read by hand, because a hook on the wrong
+# event is not an error, it is just a hook that never fires when you expect.
+#
+# The second property is scope. The installed settings.json is COPIED from
+# settings.macos.json by setup.sh, not symlinked, so a binding added to the live
+# file and not to the template is reverted the next time setup runs -- silently,
+# since a hook that stops existing produces no output. Project-scoped hooks
+# (those pointing outside ~/.claude) are the exception and must NOT reach the
+# template: it installs on every machine, where that path does not exist.
+
+
+def _bindings(path):
+    with open(path) as fh:
+        data = json.load(fh)
+    out = []
+    for event, groups in (data.get('hooks') or {}).items():
+        for group in groups:
+            for entry in group.get('hooks') or []:
+                out.append((event, entry.get('command') or ''))
+    return out
+
+
+def _find_in_repo(basename):
+    for root, dirs, files in os.walk(REPO):
+        dirs[:] = [d for d in dirs if d not in ('.git', '__pycache__', 'node_modules')]
+        if basename in files:
+            return os.path.join(root, basename)
+    return None
+
+
+LIVE_SETTINGS = os.path.expanduser('~/.claude/settings.json')
+if not os.path.exists(LIVE_SETTINGS):
+    check_true('bindings: skipped, no installed settings.json', True)
+else:
+    template, template_cmds = set(), set()
+    for event, command in _bindings(os.path.join(REPO, 'settings.macos.json')):
+        template_cmds.add((event, command))
+        for name in re.findall(r'[\w\-.]+\.(?:py|sh)', command):
+            template.add((event, name))
+            break
+
+    for event, command in _bindings(LIVE_SETTINGS):
+        names = re.findall(r'[\w\-.]+\.(?:py|sh)', command)
+        if not names:
+            # An inline command names no script, so it can declare nothing -- but it is still
+            # revertible, and the injected reply contract lives here. Compare it verbatim.
+            check_true('inline %s command is in the template too' % event,
+                       (event, command) in template_cmds)
+            continue
+        name = names[0]
+        machine_wide = '$HOME/.claude' in command or '~/.claude' in command
+
+        if not machine_wide:
+            # Project-scoped: belongs to one repo, so the shared template must not carry it.
+            check_true('binding is project-scoped and stays out of the template: %s' % name,
+                       (event, name) not in template)
+            continue
+
+        path = _find_in_repo(name)
+        check_true('bound hook exists in the checkout: %s' % name, path is not None)
+        if path:
+            with open(path) as fh:
+                header = ''.join(fh.readlines()[:15])
+            # The header may also mention an event it was MOVED OFF -- that is history, and
+            # legitimate. The property is that the event it is bound to is one it claims.
+            check_true('%s declares the event it is bound to (%s)' % (name, event),
+                       event.replace('Stop', 'Stop') in header)
+        check_true('machine-wide binding is in the template too: %s on %s' % (name, event),
+                   (event, name) in template)
+
 print('%d passed, %d failed' % (PASS, FAIL))
 for failure in FAILURES:
     print('FAIL | %s' % failure)

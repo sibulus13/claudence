@@ -29,6 +29,18 @@
             "type": "command",
             "command": "python3 \"$HOME/.claude/scripts/record-pane-session.py\"",
             "shell": "bash"
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$HOME/.claude/scripts/workspace-state.py\""
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$HOME/.claude/improve/audit.py\""
           }
         ]
       }
@@ -40,6 +52,11 @@
             "type": "command",
             "command": "python3 \"$HOME/.claude/telemetry/log-prompt.py\"",
             "shell": "bash"
+          },
+          {
+            "type": "command",
+            "command": "printf '%s' 'CONTRACT — two things, and nothing else is owed:' '' 'OPEN: your asks as bullets, each one line, plus a nested line for how each' '      will be addressed. This IS the plan; do not also narrate it.' '' 'CLOSE: how each ask was addressed · caveats hit, each with its prevention ·' '       what remains, named. Terse nested bullets, one line each.' '' 'NEVER a bare identifier. Say what the thing IS, not its index.' 'EXTEND before creating — augment or supersede an existing thing first.' 'VERIFY end to end before claiming: front-end chain, to code, to data, to UI.' 'ACT, do not ask. Naming a next step does not end the turn — do it.'",
+            "shell": "bash"
           }
         ]
       }
@@ -49,14 +66,18 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$HOME/.claude/telemetry/analyze-session.py\"",
-            "shell": "bash"
-          },
-          {
-            "type": "command",
             "command": "python3 \"$HOME/.claude/telemetry/notify-attention.py\" --reason stop --silent",
             "shell": "bash",
             "async": true
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$HOME/.claude/telemetry/analyze-session.py\"",
+            "shell": "bash"
           }
         ]
       }
