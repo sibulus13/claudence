@@ -12,6 +12,7 @@ local SHELL  = os.getenv('SHELL') or '/bin/zsh'
 -- terminal.lua does only the impure I/O; all the rules live in this module, so
 -- the tested logic IS the runtime logic.
 local A = dofile(wezterm.home_dir .. '/.claude/attention.lua')
+local L = dofile(wezterm.home_dir .. '/.claude/linkrules.lua')
 
 -- Auto-reload on file save — no Ctrl+Shift+R needed after edits.
 -- WezTerm watches the resolved symlink target, so saving terminal.lua
@@ -24,6 +25,7 @@ if wezterm.add_to_config_reload_watch_list then
   -- attention.lua is dofile'd too, so watch it as well — otherwise editing the
   -- notification logic alone wouldn't trigger a reload (stale-config trap).
   wezterm.add_to_config_reload_watch_list(wezterm.home_dir .. '/.claude/attention.lua')
+  wezterm.add_to_config_reload_watch_list(wezterm.home_dir .. '/.claude/linkrules.lua')
 end
 
 -- ── Appearance ────────────────────────────────────────────────────────────────
@@ -1378,17 +1380,11 @@ table.insert(config.hyperlink_rules, {
 -- like a local file opens in VS Code at its line via open-in-vscode.ps1 (which
 -- also flips markdown into preview mode).
 wezterm.on('open-uri', function(_window, pane, uri)
-  local is_local = uri:match('^file:') ~= nil
-  if IS_WIN then
-    is_local = is_local or uri:match('^/?%a:[/\\]') ~= nil
-  else
-    is_local = is_local or uri:match('^/') ~= nil or uri:match('^~/') ~= nil
-    -- A bare filename (no directory) is local too — the bare-name hyperlink rule below
-    -- matches these, and open-in-editor.sh resolves them against CLAUDENCE_LINK_ROOTS.
-    -- Without this they fall through and WezTerm hands "OBSERVABILITY.md" to the browser.
-    is_local = is_local or uri:match('^[%w%-%+@_.]+%.%a[%w]*$') ~= nil
-                        or uri:match('^[%w%-%+@_.]+%.%a[%w]*:%d+') ~= nil
-  end
+  -- The predicate lives in linkrules.lua because it was WRONG here for two days: its character
+  -- class excluded '/' while anchored ^...$, so a repo-relative path -- the commonest shape in
+  -- agent output, and the one the hyperlink rule above was fixed to match whole -- was routed to
+  -- the browser. Inline logic in a config file has no test; the module has 21 cases.
+  local is_local = L.is_local_target(uri, IS_WIN)
   if not is_local then
     return  -- not a local file → let WezTerm open it (browser, etc.)
   end

@@ -96,3 +96,5 @@ improve/scheduled-run.log
 # Client-specific skills — this repo is public. A procedure naming a customer's
 # hosts, tenants or admin paths cannot live here; it stays local and unversioned.
 skills/envisio-local/
+.last-link-results.txt
+.last-load-results.txt

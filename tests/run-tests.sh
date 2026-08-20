@@ -48,6 +48,29 @@ run_python_suite 'classification (unit)' 'tests/classification.test.py'
 run_python_suite 'hooks (integration)' 'tests/hooks.test.py'
 run_python_suite 'hyperlinks (config+resolver)' 'tests/hyperlinks.test.py'
 
+# ── linkrules.lua, via WezTerm's bundled Lua ─────────────────────────────────
+# The click-routing predicate. Lua patterns are NOT regex and emulating them from python is how
+# a check passes while the runtime fails, so this runs in the same interpreter the config does.
+note '== link routing (lua, via wezterm)'
+LINK_OUT="$REPO/tests/.last-link-results.txt"
+if ! command -v wezterm >/dev/null 2>&1; then
+  record 'link routing (lua)' 1 'wezterm not on PATH'
+else
+  rm -f "$LINK_OUT"
+  wezterm --config-file "$REPO/tests/linkrules.test.lua" show-keys >/dev/null 2>&1
+  if [ ! -f "$LINK_OUT" ]; then
+    record 'link routing (lua)' 1 'no results written — the test file failed to load'
+  else
+    note "$(tail -1 "$LINK_OUT")"
+    [ "$QUIET" = 1 ] || grep '^FAIL' "$LINK_OUT" || true
+    if grep -q '^FAIL' "$LINK_OUT"; then
+      record 'link routing (lua)' 1 "$(tail -1 "$LINK_OUT")"
+    else
+      record 'link routing (lua)' 0 "$(tail -1 "$LINK_OUT")"
+    fi
+  fi
+fi
+
 # ── attention.lua, via WezTerm's bundled Lua ─────────────────────────────────
 note '== attention (lua, via wezterm)'
 LUA_OUT="$REPO/tests/.last-results.txt"
@@ -75,14 +98,41 @@ fi
 # terminal.lua resolves attention.lua from ~/.claude, so this only means anything
 # once setup.sh has run. A missing install is reported as a skip, not a failure.
 note '== terminal.lua (load check)'
+
+# Every module terminal.lua dofiles from ~/.claude MUST be installed there, or the live config
+# dies on reload with a runtime error in a popup — which is exactly what adding linkrules.lua to
+# the checkout and not to ~/.claude did on 2026-08-20. The dependency is read out of the file
+# rather than from setup.sh's link list, so the two cannot drift apart. Optional modules loaded
+# through pcall are skipped: absent is a legitimate state for those.
+MISSING=""
+while read -r mod; do
+  [ -e "$HOME/.claude/$mod" ] || MISSING="$MISSING $mod"
+done <<EOF
+$(grep "dofile(wezterm.home_dir" "$REPO/terminal.lua" | grep -v pcall \
+    | sed -E "s|.*/\.claude/([A-Za-z0-9_.-]+\.lua).*|\1|")
+EOF
+if [ -n "$MISSING" ]; then
+  record 'terminal.lua modules installed' 1 "not in ~/.claude:$MISSING — run ./setup.sh"
+else
+  record 'terminal.lua modules installed' 0
+fi
+
 if [ ! -e "$HOME/.claude/attention.lua" ]; then
   SUMMARY+=('  skip  terminal.lua load check  (not installed yet — run ./setup.sh)')
   note '  skipped: ~/.claude/attention.lua missing'
 else
-  if wezterm --config-file "$REPO/terminal.lua" show-keys >/dev/null 2>&1; then
-    record 'terminal.lua load check' 0
+  # Neither the exit code NOR stderr can report this: WezTerm falls back to its default config
+  # and exits 0, and show-keys prints nothing about the failure. So the config is loaded inside
+  # a pcall by a test config that reports through a file we own.
+  LOAD_OUT="$REPO/tests/.last-load-results.txt"
+  rm -f "$LOAD_OUT"
+  wezterm --config-file "$REPO/tests/configload.test.lua" show-keys >/dev/null 2>&1
+  if [ ! -f "$LOAD_OUT" ]; then
+    record 'terminal.lua load check' 1 'no result written — the test config itself failed to load'
+  elif grep -q '^FAIL' "$LOAD_OUT"; then
+    record 'terminal.lua load check' 1 "$(grep '^FAIL' "$LOAD_OUT" | head -1 | cut -c1-100)"
   else
-    record 'terminal.lua load check' 1 'wezterm rejected the config'
+    record 'terminal.lua load check' 0
   fi
 fi
 

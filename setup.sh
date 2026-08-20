@@ -30,6 +30,7 @@ LINKS=(
   CLAUDE.md
   terminal.lua
   attention.lua
+  linkrules.lua
   keymap.txt
   statusline.py
   startup-reminder.py
