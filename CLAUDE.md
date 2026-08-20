@@ -523,7 +523,7 @@ Config at `~/.claude/improve/config.json`: `frequencyDays` (7) · `thresholdOccu
 
 | Half | Trigger | What it does |
 |---|---|---|
-| **Measure** — deterministic | `improve/audit.py` on the **Stop** hook, every session | Context density, cross-file duplication, staleness, due-ness → `improve/state.json` + `improve/LEDGER.md`. Never edits a governance file |
+| **Measure** — deterministic | `improve/audit.py` at **SessionStart**, once a day | Context density, cross-file duplication, staleness, due-ness → `improve/state.json` + `improve/LEDGER.md`. Never edits a governance file |
 | **Surface** | `scripts/workspace-state.py` on **SessionStart** | Injects due-ness and the top flagged items, so findings are not left in a JSON nobody opens |
 | **Judge and apply** — needs judgement | `/self-improve` | Reads `state.json` rather than re-deriving. Blast-radius-scoped per `AGENT-LOOP.md` §5: auto-apply for allow-rules and templates, shadow-first for thresholds, **propose-only for `CLAUDE.md` and memory** |
 | **Watch the watcher** | `telemetry/loop-health.py` via launchd | `--sanity` / `--smoke` / `--health`. Non-zero exit means a human is needed |

@@ -84,7 +84,11 @@ it changes the answer.
    tables when 43 had models. Absence claims belong at sonnet or above, or must be re-verified.
 3. **Effort is the cheaper dial than model.** Prefer `effort: 'high'` on sonnet before reaching for
    opus; reserve opus for stages where the *shape* of the reasoning matters, not just its depth.
-4. **The literal is duplicated in each script, deliberately.** Workflow scripts are self-contained —
+4. **An agent with no explicit persona/tier configured runs `haiku · medium`.** The default is the
+   floor, not the average — inheriting the main-loop model is what produced the 51-Opus enumeration
+   run. Any stage that needs more must say so explicitly, which is the point: tier is a decision,
+   not an inheritance. (Set by the user 2026-08-13.)
+5. **The literal is duplicated in each script, deliberately.** Workflow scripts are self-contained —
    no imports, no filesystem — so each carries its own `PERSONAS` table with a pointer back here. **If
    you change a tier, change it in both scripts and here.** A single source of truth that scripts
    cannot read is not a source of truth.
