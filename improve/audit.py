@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """audit.py — the deterministic half of the self-improvement loop.
 
+OBJECTIVE — measure whether the governance surface is drifting, so the judgement half has data rather than impressions.
+
 Runs from the Stop hook on every session, with no agent involved. It measures
 what can be measured and writes the findings down; it never edits a governance
 file, because deciding *how* to split or merge a rule needs judgement.
@@ -210,6 +212,19 @@ def last_run():
 def main():
     if not os.path.isdir(IMPROVE):
         return
+    # ONCE PER DAY, not once per session. This runs 703 pairwise difflib comparisons over the
+    # knowledge base — O(files²) × O(text²), measured at 10.3s on 2026-08-20 and **98% of all
+    # hook cost on this machine**. It was moved off Stop earlier that day for being slow and
+    # landed on SessionStart, which moved the ten seconds from the end of one session to the
+    # start of the next rather than removing it. **What it measures accumulates over weeks, so
+    # measuring it per session was always the wrong cadence** — and the cost grows quadratically
+    # with the very corpus it audits, so it gets slower exactly as the knowledge base succeeds.
+    # `--force` runs it regardless; the improvement skill that reads state.json uses that.
+    if '--force' not in sys.argv and os.path.exists(STATE):
+        import datetime
+        stamped = datetime.date.fromtimestamp(os.path.getmtime(STATE))
+        if stamped == datetime.date.today():
+            return
     cfg = load_config()
     refactor, dup, stale, memcount = measure(cfg)
 
