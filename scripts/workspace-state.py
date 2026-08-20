@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """workspace-state.py — SessionStart hook.
 
+OBJECTIVE — a cold agent never guesses which of several overlapping records to read first.
+
 Points a fresh agent at the workspace's state contract, so it does not have to
 guess which of several overlapping records to read first.
 
@@ -99,8 +101,24 @@ def section(path, headings, limit):
         return []
     lines = raw.splitlines()
     start = None
+    # PREFIX match, not exact. `## Now — where tomorrow starts` IS the Now section, and an
+    # exact-string match reported it absent — so the hook told a fresh session "nothing is
+    # flagged as in flight" while TODO.md's hot path sat directly under that heading. A false
+    # "nothing here" is worse than silence, because it is trusted and stops the reader looking.
+    # Fixed 2026-08-18. Same defect class as four gate false positives found the same day:
+    # each matched a FORM where the rule was about a PROPERTY.
+    def _is(ln, wanted):
+        s = ln.strip().lower()
+        for w in wanted:
+            if s == w:
+                return True
+            # `## now — …` or `## now:` yes; `## nowhere` no.
+            if s.startswith(w) and len(s) > len(w) and not s[len(w)].isalnum():
+                return True
+        return False
+
     for i, ln in enumerate(lines):
-        if ln.strip().lower() in headings:
+        if _is(ln, headings):
             start = i + 1
             break
     if start is None:
