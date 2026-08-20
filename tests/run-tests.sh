@@ -7,7 +7,9 @@
 # Exit 0 = everything passed. Three suites:
 #   1. classification.test.py  pure prompt-classification logic
 #   2. hooks.test.py           every hook run as a subprocess against a temp HOME
-#   3. attention.test.lua      the tab-attention decision logic, run in WezTerm's
+#   3. hyperlinks.test.py      what a clicked file path resolves to — the terminal.lua
+#                              rules and open-in-editor.sh, checked as one chain
+#   4. attention.test.lua      the tab-attention decision logic, run in WezTerm's
 #                              own bundled Lua (there is no `lua` binary here)
 # Plus a load check of the installed WezTerm config, skipped when the config has
 # not been installed yet.
@@ -44,6 +46,7 @@ run_python_suite() {
 
 run_python_suite 'classification (unit)' 'tests/classification.test.py'
 run_python_suite 'hooks (integration)' 'tests/hooks.test.py'
+run_python_suite 'hyperlinks (config+resolver)' 'tests/hyperlinks.test.py'
 
 # ── attention.lua, via WezTerm's bundled Lua ─────────────────────────────────
 note '== attention (lua, via wezterm)'

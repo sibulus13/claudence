@@ -1337,9 +1337,26 @@ else
   -- e.g. /Users/me/repo/foo.ts:12 or ~/repo/foo.ts. Anchored on / or ~/ and
   -- required to carry a file extension, so ordinary prose containing a slash
   -- ("and/or", "TODO: 3/4 done") is not turned into a dead link.
+  --
+  -- The leading (?:^|[\s"'(\[<`]) is load-bearing and was missing. Without it the rule matched
+  -- from ANY slash inside a word, so a repo-relative path printed by an agent --
+  -- "docs/notes/harness/MAP.md" -- became the link "/notes/harness/MAP.md": the first segment
+  -- sat outside the underline (clicking it did nothing) and what was handed over looked absolute
+  -- and did not exist. The path is group 1 so the delimiter is not part of the target.
   table.insert(config.hyperlink_rules, {
-    regex  = [[(?:~|\.{0,2})/(?:[\w.\-+@]+/)*[\w.\-+@]+\.[A-Za-z0-9]+(?::\d+(?::\d+)?)?]],
-    format = '$0',
+    regex     = [[(?:^|[\s"'(\[<`])((?:~|\.{1,2})?/(?:[\w.\-+@]+/)*[\w.\-+@]+\.[A-Za-z0-9]+(?::\d+(?::\d+)?)?)]],
+    format    = '$1',
+    highlight = 1,
+  })
+
+  -- Repo-relative paths WITH a directory -- "docs/TODO.md", "4JIM/PROPOSAL.md:12". These are what
+  -- agent output and this repo's own documents are full of, and no rule matched them whole. The
+  -- extension allowlist keeps prose out, the same trade the bare-name rule below makes; a bare
+  -- extension class here would turn "and/or" and "TODO: 3/4" into links.
+  table.insert(config.hyperlink_rules, {
+    regex     = [[(?:^|[\s"'(\[<`])((?:[\w.\-+@]+/)+[\w.\-+@]+\.(?:md|rb|lua|py|sh|zsh|ts|tsx|js|jsx|json|ya?ml|sql|css|scss|html|toml|rake|gemspec)(?::\d+(?::\d+)?)?)]],
+    format    = '$1',
+    highlight = 1,
   })
 end
 
@@ -1360,7 +1377,7 @@ table.insert(config.hyperlink_rules, {
 -- Route opened links: web/mail use the OS default (browser); anything that looks
 -- like a local file opens in VS Code at its line via open-in-vscode.ps1 (which
 -- also flips markdown into preview mode).
-wezterm.on('open-uri', function(_window, _pane, uri)
+wezterm.on('open-uri', function(_window, pane, uri)
   local is_local = uri:match('^file:') ~= nil
   if IS_WIN then
     is_local = is_local or uri:match('^/?%a:[/\\]') ~= nil
@@ -1383,8 +1400,17 @@ wezterm.on('open-uri', function(_window, _pane, uri)
     })
   else
     target = target:gsub('^~', wezterm.home_dir)
+    -- The PANE's cwd is the only thing that disambiguates a repo-relative link. "docs/TODO.md"
+    -- exists in several checkouts, so resolving it by root order alone opens whichever repo comes
+    -- first in the list rather than the one the line was printed in. background_child_process
+    -- inherits the GUI app's cwd, never the pane's, so it has to be handed over explicitly.
+    local cwd = ''
+    local got, dir = pcall(function() return pane:get_current_working_dir() end)
+    if got and dir then
+      cwd = type(dir) == 'string' and (dir:gsub('^file://[^/]*', '')) or (dir.file_path or '')
+    end
     wezterm.background_child_process({
-      wezterm.home_dir .. '/.claude/scripts/open-in-editor.sh', target,
+      wezterm.home_dir .. '/.claude/scripts/open-in-editor.sh', target, cwd,
     })
   end
   return false  -- handled; don't let WezTerm try to open the raw path
