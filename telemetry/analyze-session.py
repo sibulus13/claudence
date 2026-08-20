@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """analyze-session.py — Stop hook (port of analyze-session.ps1).
 
+OBJECTIVE — turn recurring friction into an allow-rule instead of a habit.
+
 Logs the stop event, scores the session's friction, maintains rolling averages
 and the cumulative tracker, writes a per-session report, and plays the
 completion sound.

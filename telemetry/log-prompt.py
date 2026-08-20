@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """log-prompt.py — UserPromptSubmit hook (port of log-prompt.ps1).
 
+OBJECTIVE — mark when a turn began, so elapsed time and friction are measurable.
+
 Synchronous on purpose: it must finish before Claude responds, so the status bar
 is always current for the turn the user just started.
 

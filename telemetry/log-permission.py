@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """log-permission.py — PermissionRequest hook (port of log-permission.ps1).
 
+OBJECTIVE — record what needed asking, so the allow list can be earned from evidence.
+
 Distinguishes a first-time block from a repeat:
   permission_req   — first time this tool type needed approval this session
   perm_req_repeat  — same tool type blocked again; it should be in the allow list

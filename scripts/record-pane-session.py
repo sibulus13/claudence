@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 """record-pane-session.py — bind a WezTerm pane to its Claude session (port of
+
+OBJECTIVE — a terminal pane can be traced back to the session that owns it.
 record-pane-session.ps1).
 
 terminal.lua uses this to restore the EXACT conversation on restart

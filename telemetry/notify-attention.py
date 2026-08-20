@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """notify-attention.py — cross-workspace "agent needs you" signal (port of notify-attention.ps1).
 
+OBJECTIVE — one signal that the agent needs a person, across every workspace.
+
 Wired into Stop and PermissionRequest. Two jobs:
   1. Drop a per-pane flag file that terminal.lua's tab bar reads, so you can see
      WHICH repo alerted even when its tab belongs to a background workspace.

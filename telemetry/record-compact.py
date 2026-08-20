@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """record-compact.py — PostCompact hook (port of record-compact.ps1).
 
+OBJECTIVE — know that context was lost, so a later gap is explained rather than mysterious.
+
 Captures the compaction summary in the session log so a retrospective can
 reconstruct what happened across a compaction boundary instead of losing the
 first half of the session.

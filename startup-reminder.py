@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """startup-reminder.py — SessionStart hook (port of startup-reminder.ps1).
 
+OBJECTIVE — a session never has to ask how to start this repo.
+
 Surfaces the current repo's dev/startup command when a session opens, detected
 generically so it works across projects. Precedence:
   1. .startup-cmd file (one line) — explicit per-repo override
