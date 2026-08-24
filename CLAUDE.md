@@ -31,9 +31,14 @@ For any **production-grade application**, enforce this phased gate *before* writ
 
 2. **Adversarial review of the complete suite** before any code — agentic fan-out (dimensional reviewers → independent skeptic refutes each finding → synthesis → go/no-go). It must also check **cross-doc consistency**. A weak/non-convincing review → revise the docs and re-review; do not treat "found little" as "approved."
 
-3. **Human approval is a HARD BLOCKER between design and implementation.** Enforcement is dual: this principle (memory/CLAUDE.md, always in context) makes me *propose and require* the gate; the **orchestration/implementation workflow must not advance design→code without recorded human approval**. Memory = awareness; orchestration = enforcement. Never skip the gate for "production" work because it seems obvious.
+3. **Human approval is a HARD BLOCKER between design and implementation.** **Enforcement is awareness only — this line is the whole mechanism.** It was claimed as dual, with orchestration refusing to advance design→code without recorded approval; `skills/orchestrate/SKILL.md` contains no such rule and never did (found 2026-08-24). So: never skip the gate for "production" work because it seems obvious, and do not expect a tool to stop you.
 
 4. **Deterministic gates are designed as foresight, per project.** During *scoping* (not after building), define the deterministic gate per implementation layer: **sanity/unit → regression (golden/snapshot) → integration**. It is a **deploy blocker** to production; every new feature adds its own gate rows; **green-before-complete** (extends the existing test-gate rule). Design the gate proactively to protect the production environment, per project.
+
+**Alongside the tier, state the APPETITE — the time this is worth, fixed, with scope as the
+variable.** The tier answers *how much ceremony*; nothing else answers *how much time*, and an
+unbounded budget is how a two-hour job becomes a framework. Appetite is a ceiling, not an estimate:
+when it runs out, scope is cut and the remainder is backlogged, never the deadline extended.
 
 **Scope — gate strength scales with BLAST RADIUS, not the word "production".** Blast radius = *live users × real/irreversible data or money*. Calibrate to the tier, and **each app declares its tier** in its own CLAUDE.md (`deploymentTier:`) so orchestration can differentiate rather than treating every "prod" app identically:
 
@@ -105,6 +110,17 @@ Write every doc / spec / context **visual-first**: lead with **Mermaid diagrams*
 - Maps: architecture → `flowchart` · runtime/data flow → `sequenceDiagram` · branching/decision → `flowchart`/`stateDiagram` · schemas + relationships → `erDiagram`/`classDiagram`.
 - **≤ 5 elements per row** — lay out for portrait/vertical space; prefer top-down (`flowchart TD`); ≤5 participants per sequence diagram; wrap/stack wide chains.
 - A doc opens with a diagram, not a paragraph. (Promoted from a project rule 2026-06-27. Exemplars are listed in `CLAUDE.local.md`.)
+- **This covers ARTIFACTS too, and there the diagram must be INTERACTIVE where the content is a hierarchy** — `/depth-tree`, whose rows advertise whether they open. Extended 2026-08-24 after a scored readiness page shipped as a wall of text; a static page of tables is not visual-first because it has tables in it.
+- **The terminal is not a render surface — never put a mermaid fence in a reply.** Claude Code's
+  pane shows GitHub-flavoured markdown, and a ```mermaid block arrives as raw text: the reader gets
+  the source of a picture instead of the picture, which is worse than a sentence. Three surfaces do
+  render it, so route to one and **give the path or the URL, never the fence**:
+  | Audience | Surface | How it renders |
+  |---|---|---|
+  | Me, the repo, a future session | the `.md` file itself | GitHub renders mermaid natively; locally VS Code's preview (⇧⌘V) does, via `bierner.markdown-mermaid`, already installed. A clicked terminal path opens there — `scripts/open-in-editor.sh` prefers `code` |
+  | A person who must look at it now | an **Artifact** | renders mermaid natively, from a ```mermaid fence or `<pre class="mermaid">` |
+  | Anyone, in a terminal | **nothing** | inline-image protocols exist in WezTerm but Claude Code's own pane re-renders tool output as text, so they do not survive |
+- **Progressive disclosure is the default, not a nicety.** The reader is a high-level stakeholder: **the top level is the whole answer at their altitude, and every detail is expandable rather than present.** A page that shows depth by default has decided the reader has time to read it, which they do not. **Land closed** (`startDepth: 1`), and let them choose where to go down.
 
 ## End-of-Response Contract
 
@@ -257,17 +273,30 @@ Every non-trivial task has a *cognitive mode*. Match the persona to the mode, an
 
 ## Development Mode — Spec-Driven vs Intent-Driven
 
-Choose the mode based on how stable and correctness-critical the target is:
+**The full graph — nodes, order, and which of them has an enforcer rather than a habit — is
+`~/repo/claudence/docs/SPEC-DRIVEN.md`. Read it before starting work in a new repo.** This section
+is node 1 of it: the reading that decides whether a spec is required at all.
 
-**Spec-Driven (SDD)** — define the contract first, then implement against it.
-- Use for: data pipeline contracts (backtest schema → registry schema), acceptance criteria, strategy class interfaces, financial calculations where wrong output = real money loss
-- How: write a TypedDict / JSON schema / property list before any code; treat the spec as immutable during implementation; add tests that assert the spec
-- Signal to use SDD: "this produces output that feeds something else" or "wrong here means wrong everywhere downstream"
+**Spec-Driven (SDD)** — define the contract first, then implement against it. Copy
+`templates/SPEC.md` to `docs/SPEC.md` **before any implementation code**: scope and non-goals, the
+runtime-validated shape at every boundary, the acceptance criteria as checkable statements, and the
+deterministic gate rows those criteria compile to. The spec is immutable during implementation —
+changing it is a decision, and gets a `DECISIONS.md` row.
+- Use for: anything whose output feeds something else, acceptance criteria, money and auth paths
+- Signal: *"wrong here means wrong everywhere downstream"*
 
-**Intent-Driven (IDD)** — describe the goal in natural language, let implementation details emerge.
-- Use for: research iterations (new strategy hypotheses, parameter grid ideas), exploratory analysis, one-off scripts
-- How: write a one-paragraph intent statement ("I want to see if adding volume confirmation to BB entries improves WR without reducing trade count"); let Claude propose the implementation; iterate on results rather than specs
-- Signal to use IDD: "I don't know what the right answer looks like yet" or "this is throwaway/exploratory code"
+**Intent-Driven (IDD)** — a one-paragraph intent statement, implementation emerges, iterate on
+results rather than specs.
+- Use for: research iterations, exploratory analysis, one-off scripts
+- Signal: *"I don't know what the right answer looks like yet"*
+- **Pre-register it, in one paragraph, before the run.** Not knowing the answer is the reason to
+  write down the question: **the hypothesis, the metric that decides, and what result would refute
+  it** — recorded before any output is seen. Costs a paragraph; it is the only thing standing
+  between exploration and a finding retrofitted to whatever the data happened to show, which is
+  this estate's named failure mode. An intent statement with no falsifier is a wish.
+
+**Say which mode, out loud, at the start.** An unstated mode defaults to whichever is more
+convenient, which is always IDD.
 
 ## Session Start Protocol — the workspace state contract
 

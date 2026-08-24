@@ -161,7 +161,9 @@ Newest first. Reasoning is in the journal — see the §7 note on where it curre
 |---|---|
 | [`../README.md`](../README.md) | What it is and how to install it — serves as `OVERVIEW.md` |
 | [`TODO.md`](TODO.md) | Outstanding work — Now / Next / Backlog. **The only home for task state** |
+| [`SPEC-DRIVEN.md`](SPEC-DRIVEN.md) | **The graph every piece of work runs on** — tier → mode → spec → review → approval → gate → close, and which nodes have an enforcer |
 | [`AGENT-LOOP.md`](AGENT-LOOP.md) | Long-horizon execution, the context policy, blast-radius scoping |
+| [`WORKFLOW-PERSONAS.md`](WORKFLOW-PERSONAS.md) | The persona ladder and which model tier each sits on |
 | [`SETUP.md`](SETUP.md) | Install, and what `doctor.py` verifies |
 | [`MACOS-PORT.md`](MACOS-PORT.md) | What the port changed and what was **not** carried over |
 | [`ARTIFACTS.md`](ARTIFACTS.md) | Published artifacts with URLs |

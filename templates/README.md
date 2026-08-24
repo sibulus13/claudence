@@ -6,6 +6,7 @@ Reusable instruction snippets. When creating a new project's CLAUDE.md, copy rel
 
 | File | Use for |
 |---|---|
+| `SPEC.md` | **Every project doing spec-driven work.** The contract written before the code — scope, boundary shapes, acceptance criteria and the deterministic gate they compile to. Copy to `docs/SPEC.md`. Node 2 of [`docs/SPEC-DRIVEN.md`](../docs/SPEC-DRIVEN.md) |
 | `STATE.md` | **Every project, any stack.** The live state page — phase diagram, functional + non-functional requirements, dependency graph, horizon chart, milestone decisions, progress. Copy to `docs/STATE.md` |
 | `typescript.md` | Any TypeScript project — strict mode rules, type discipline |
 | `pnpm-monorepo.md` | pnpm workspace + Turborepo projects |
@@ -13,9 +14,10 @@ Reusable instruction snippets. When creating a new project's CLAUDE.md, copy rel
 | `hono-api.md` | Hono backend APIs — middleware, auth, webhook patterns |
 | `nextjs.md` | Next.js App Router projects |
 
-The stack templates are **optional** and CLAUDE.md-scoped. `STATE.md` is neither: every project
-needs one, and two pieces of tooling already read it — `scripts/workspace-state.py` injects its
-siblings at session start, and `scripts/open-workspace.sh` opens it in the workspace's right pane.
+The stack templates are **optional** and CLAUDE.md-scoped. `SPEC.md` and `STATE.md` are neither.
+`SPEC.md` is read by `scripts/state-health.py --spec`, which fails any repo declaring
+`deploymentTier: live` without it. `STATE.md` is read by two more —
+`scripts/workspace-state.py` injects its siblings at session start, and `scripts/open-workspace.sh` opens it in the workspace's right pane.
 Check with `scripts/open-workspace.sh --state-doc <project-path>`; `none` means the project is
 invisible to both.
 
@@ -24,10 +26,14 @@ invisible to both.
 1. Create `[project]/CLAUDE.md`
 2. Copy relevant template sections into it
 3. Add project-specific structure, stack, and conventions below
-4. **Copy `STATE.md` to `[project]/docs/STATE.md` and fill it in** — with `TODO.md`
+4. **Declare the tier** — one `deploymentTier: pre-traffic | live` line in the project's
+   `CLAUDE.md`. Nothing below is enforced without it
+5. **Copy `SPEC.md` to `[project]/docs/SPEC.md`** and fill it in **before any implementation
+   code**, if the work is spec-driven — see [`docs/SPEC-DRIVEN.md`](../docs/SPEC-DRIVEN.md)
+6. **Copy `STATE.md` to `[project]/docs/STATE.md` and fill it in** — with `TODO.md`
    (Now / Next / Backlog) alongside it, per the Session Start Protocol in `CLAUDE.md`
-5. Create `[project]/.claude/settings.json` with scoped permissions
-6. Add `.claude/settings.local.json` to `.gitignore`
+7. Create `[project]/.claude/settings.json` with scoped permissions
+8. Add `.claude/settings.local.json` to `.gitignore`
 
 ## Settings Cascade (reminder)
 

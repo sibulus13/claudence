@@ -21,6 +21,8 @@ Three modes, cheapest first, mirroring telemetry/loop-health.py:
   --drift    has the project moved on without the doc? The behaviour-2 check.
   --ids      does every identifier a doc cites actually have a register?
   --docs     is every document linked, and every artifact source resolvable?
+  --spec     does a repo that declared a deployment tier carry the spec suite the
+             tier requires? Opt-in: a repo declaring no tier is not nagged.
 
   ./state-health.py                 all four, for the repo containing cwd
   ./state-health.py --all           every git repo two levels under ~/repo
@@ -53,6 +55,14 @@ LEGEND_NAMES = ('NAMESPACE.md', 'GLOSSARY.md', 'LEGEND.md')
 STATE_NAMES = ('STATE.md', 'context.md', 'workflow_state.md', 'KNOWLEDGE.md')
 TODO_NAMES = ('TODO.md', 'todo.md', 'ROADMAP.md', 'BACKLOG.md')
 FRONT_FIELDS = ('purpose', 'update-trigger', 'last-verified', 'status')
+
+# Node 2 of docs/SPEC-DRIVEN.md. Required only where the project declared the tier
+# that requires it — the check is opt-in by design, because nagging every repo is
+# how a check gets ignored.
+TIER_RE = re.compile(r'^\s*[-*]?\s*(?:\*\*)?deploymentTier(?:\*\*)?\s*[:=]\s*`?([a-z-]+)`?',
+                     re.MULTILINE)
+SPEC_SUITE = ('SPEC.md', 'DESIGN.md', 'DECISIONS.md')
+SPEC_SECTIONS = ('## 3 · Acceptance criteria', '## 4 · Deterministic gate')
 TODO_SECTIONS = ('## Now', '## Next', '## Backlog')
 
 # A state doc lagging the code by more than this many non-doc commits is drifting
@@ -287,6 +297,15 @@ def smoke():
             ok('smoke: launcher resolves the state doc', resolved)
         else:
             bad('smoke: launcher resolves the state doc', 'got %r' % resolved)
+
+        # The spec gate, on the same fixture: a declared tier must be honoured, and
+        # an undeclared one must stay silent. Both directions, or the check is decorative.
+        with open(os.path.join(box, 'CLAUDE.md'), 'w', encoding='utf-8') as fh:
+            fh.write('# fixture\n\ndeploymentTier: live\n')
+        names = ' '.join(n for _, n, *_ in spec_findings(box))
+        (ok if 'without SPEC.md' in names else bad)('smoke: spec gate catches a live repo with no spec', names[:120])
+        os.remove(os.path.join(box, 'CLAUDE.md'))
+        (ok if not spec_findings(box) else bad)('smoke: spec gate silent without a declared tier')
 
         # A repo with nothing must stay silent, or the harness nags everywhere.
         empty = tempfile.mkdtemp(prefix='state-health-empty-')
@@ -552,6 +571,58 @@ def docs(roots):
 
 # ── main ─────────────────────────────────────────────────────────────────────
 
+# ── spec ─────────────────────────────────────────────────────────────────────
+
+def spec_findings(root):
+    """Pure: what the spec suite check says about one repo. Returns (level, name, detail).
+
+    Split from the reporter so the smoke test can assert it on a fixture without
+    polluting the global tallies.
+    """
+    label = os.path.basename(root)
+    tier_src = read(os.path.join(root, 'CLAUDE.md'))
+    match = TIER_RE.search(tier_src)
+    if not match:
+        return []                       # opted out — silence, not a nag
+    tier = match.group(1)
+    if tier != 'live':
+        return [('ok', '%s: tier %s' % (label, tier), 'build + test gate only')]
+
+    out = []
+    for name in SPEC_SUITE:
+        rel = find(root, (name,))
+        if not rel:
+            out.append(('bad', '%s: tier live without %s' % (label, name),
+                        'copy templates/SPEC.md' if name == 'SPEC.md' else 'required by the tier'))
+            continue
+        if name != 'SPEC.md':
+            out.append(('ok', '%s: %s' % (label, rel)))
+            continue
+        text = read(os.path.join(root, rel))
+        missing = [f for f in FRONT_FIELDS if f not in front_matter(text)]
+        if missing:
+            out.append(('bad', '%s: %s front matter' % (label, rel), 'missing %s' % missing))
+        absent = [s.split('· ')[-1] for s in SPEC_SECTIONS if s not in text]
+        if absent:
+            out.append(('bad', '%s: %s has no %s' % (label, rel, ' or '.join(absent)),
+                        'a criterion with no gate row is an aspiration'))
+        elif not missing:
+            out.append(('ok', '%s: %s carries criteria and gate rows' % (label, rel)))
+    return out
+
+
+def spec(roots):
+    """Did a repo declare a tier it does not honour?
+
+    The failure this exists for: CLAUDE.md claimed the design->code approval gate was
+    enforced by orchestration, and the orchestrate skill contained no such word. A
+    declared gate nobody reads is worse than no gate, because it is trusted.
+    """
+    for root in roots:
+        for level, name, *detail in spec_findings(root):
+            {'ok': ok, 'bad': bad, 'warn': warn}[level](name, detail[0] if detail else '')
+
+
 def main():
     args = set(sys.argv[1:])
     if args & {'-h', '--help'}:
@@ -570,7 +641,7 @@ def main():
             return 1
         roots = [root]
 
-    run_all = not (args & {'--sanity', '--smoke', '--drift', '--ids', '--docs'})
+    run_all = not (args & {'--sanity', '--smoke', '--drift', '--ids', '--docs', '--spec'})
     if run_all or '--sanity' in args:
         sanity(roots)
     if run_all or '--smoke' in args:
@@ -581,6 +652,8 @@ def main():
         identifiers(roots)
     if run_all or '--docs' in args:
         docs(roots)
+    if run_all or '--spec' in args:
+        spec(roots)
 
     for line in PASS:
         sys.stdout.write('  ok   %s\n' % line)
