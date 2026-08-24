@@ -533,7 +533,13 @@ end
 
 -- ── Session persistence ───────────────────────────────────────────────────────
 local SESSION_PATH  = wezterm.home_dir .. '/.claude/session.json'
-local SESSION_MAX_H = 12
+-- How old a saved layout may be and still be restored. Was 12 h, which silently
+-- threw the whole layout away across any overnight or weekend gap — close on
+-- Friday evening, reopen Monday, and the tabs (and the Claude sessions inside
+-- them) were simply gone with nothing said. 168 h matches record-pane-session's
+-- ORPHAN_MAX_AGE_DAYS = 7: past a week the pane -> session bindings have been
+-- reaped anyway, so a restore could only fall back to --continue's guess.
+local SESSION_MAX_H = 168
 -- Command used to re-launch a detected Claude session on restore. --permission-mode
 -- auto starts it in Auto mode (the classifier-driven mode, distinct from acceptEdits)
 -- so restored agents don't sit in the normal ask-everything mode. Stored verbatim in
@@ -723,7 +729,15 @@ local function load_session()
   local raw = f:read('*a'); f:close()
   local ok, data = pcall(wezterm.json_parse, raw)
   if not ok or type(data) ~= 'table' then return empty end
-  if (os.time() - (data.savedAt or 0)) / 3600 > SESSION_MAX_H then return empty end
+  local age_h = (os.time() - (data.savedAt or 0)) / 3600
+  if age_h > SESSION_MAX_H then
+    -- Say so rather than opening a bare window and letting it read as "nothing was
+    -- ever saved" — the same no-silent-truncation rule the 3+-pane case follows.
+    wezterm.log_info(string.format(
+      'nexus: saved layout is %.0f h old (max %d) — %d tab(s) not restored',
+      age_h, SESSION_MAX_H, #(data.tabs or {})))
+    return empty
+  end
   return { tabs = data.tabs or {}, activeTab = data.activeTab or '' }
 end
 

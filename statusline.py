@@ -18,8 +18,10 @@ Layout (retro needed): !retro  6 Prompts  ...
   Xm / Xh Ym    elapsed (dim)
   | / - \\      spinner — Claude is currently running (yellow)
 
-Then its own row: ▸ the current topic ×N turns. The label is Claude Code's own task
-title (read back from WezTerm), falling back to log-prompt.py's tracked theme.
+Then up to three topic rows, newest first: ▸ the current topic ×N turns, then the
+two it followed (· , recessed). Labels come from log-prompt.py's tracked themes;
+the current one prefers Claude Code's own task title while that title still names
+the same subject.
 """
 
 import json
@@ -42,6 +44,7 @@ DIM = E + '[2m'
 GREY = E + '[38;5;240m'      # extra-recessed tone for a stale task row
 MAGENTA = E + '[35m'
 THEME_WIDTH = 62   # the theme owns its own row, so it only has to fit one line
+THEME_ROWS = 3     # the current topic plus the two it followed — log-prompt keeps 3
 BLUE = E + '[34m'
 
 TREND_THRESHOLD = 0.10       # 10 percentage points before a rate is called worse/better
@@ -197,26 +200,50 @@ def pane_title():
                                   if str(p.get('pane_id')) == pane), ''))
 
 
-def theme_row(state):
-    """The topic the session is currently on.
+def topic_words(text):
+    """Subject words of a label. Mirrors log-prompt.py's own shift check, so the
+    two agree about when a title and a theme are talking about the same thing."""
+    return {w for w in ''.join(c if c.isalnum() else ' ' for c in str(text).lower()).split()
+            if len(w) > 2}
 
-    Label comes from the pane title when there is one; otherwise the theme
-    log-prompt.py tracked (pushed on an override or a Jaccard shift below
-    THEME_SHIFT_JACCARD). The turn count stays tracked either way, so a
-    long-running topic is visibly long-running even as its title is rewritten.
+
+def theme_rows(state):
+    """The current topic and the two before it, newest first.
+
+    Two sources disagree about the current topic. Claude Code's pane title reads
+    better than the extractive tracked label ("Fix tab behaviour on macOS" vs
+    "fix: tab behavior macOS imported"), but Claude Code only rewrites it when it
+    chooses to — a pane titled from the session's first prompt keeps that title
+    for hours, which is exactly why this row looked frozen while the session had
+    moved on twice. So the title is trusted only while it still shares a subject
+    word with the tracked theme; past that the tracked label wins, because a
+    clumsy label about the right topic beats a fluent one about last hour's.
+
+    The prior rows are the tracked history verbatim — they are what makes a
+    topic change visible even when the pane title never moves.
     """
     if not state:
-        return ''      # no session, no topic — don't invent one from the pane title
+        return []      # no session, no topic — don't invent one from the pane title
     themes = [t for t in (state.get('themes') or []) if isinstance(t, dict)]
-    label = pane_title() or (str(themes[0].get('label') or '').strip() if themes else '')
-    if not label:
-        return ''
-    label = ' '.join(label.split())
-    if len(label) > THEME_WIDTH:
-        label = label[:THEME_WIDTH - 1].rstrip() + '\u2026'
-    turns = int(themes[0].get('turns') or 0) if themes else 0
-    suffix = ('%s \u00d7%d%s' % (DIM, turns, RESET)) if turns > 1 else ''
-    return '%s\u25b8%s %s%s' % (DIM, RESET, label, suffix)
+    rows = []
+    for index, theme in enumerate(themes[:THEME_ROWS]):
+        label = ' '.join(str(theme.get('label') or '').split())
+        if index == 0:
+            title = pane_title()
+            if title and (not label or topic_words(title) & topic_words(label)):
+                label = title
+        if not label:
+            continue
+        if len(label) > THEME_WIDTH:
+            label = label[:THEME_WIDTH - 1].rstrip() + '\u2026'
+        turns = int(theme.get('turns') or 0)
+        suffix = ('%s \u00d7%d%s' % (DIM, turns, RESET)) if turns > 1 else ''
+        if index == 0:
+            rows.append('%s\u25b8%s %s%s' % (DIM, RESET, label, suffix))
+        else:
+            # Recessed: history, not state. Same tone the stale helm task row uses.
+            rows.append('%s\u00b7 %s%s%s' % (GREY, label, RESET, suffix))
+    return rows
 
 
 def meta_row(payload):
@@ -356,9 +383,8 @@ def main():
 
     # The theme is prose of variable length; the row above is fixed-width metrics.
     # Mixing them pushed the line past 80 columns and truncated both. Own row.
-    theme = theme_row(state)
-    if theme:
-        sys.stdout.write(theme + '\n')
+    for row in theme_rows(state):
+        sys.stdout.write(row + '\n')
 
     for row in helm_rows(payload):
         sys.stdout.write(row + '\n')

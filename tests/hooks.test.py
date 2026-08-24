@@ -465,6 +465,42 @@ try:
     check_true('statusline: helm current task row', 'Porting the hooks' in out, out)
     check_true('statusline: helm blocker rows', 'no lua binary' in out and 'no pwsh' in out, out)
     check_true('statusline: helm next-planned row', 'Wire WezTerm' in out, out)
+
+    # ── the topic rows: three themes deep, and a pane title that has fallen behind
+    # must not win. This is the pair of regressions the row had: only the newest
+    # theme was ever rendered, and its label came from a pane title Claude Code
+    # had written once and never rewritten, so the row froze on the first topic.
+    strip = lambda s: re.sub(r'\x1b\[[0-9;]*m', '', s)
+    themes = {'themes': [{'label': 'change: technical feasibility roadmap', 'turns': 2},
+                         {'label': 'stop 3000', 'turns': 1},
+                         {'label': 'open local prod linked app', 'turns': 1},
+                         {'label': 'ancient topic', 'turns': 1}]}
+    real_pane_title = statusline.pane_title
+    try:
+        statusline.pane_title = lambda: ''
+        rows = [strip(r) for r in statusline.theme_rows(themes)]
+        check('statusline: three topics deep, no more', len(rows), 3)
+        check_true('statusline: newest topic leads', rows[0].startswith('▸'), rows)
+        check_true('statusline: prior topics follow, recessed',
+                   rows[1].startswith('·') and 'stop 3000' in rows[1], rows)
+        check_true('statusline: the fourth topic is dropped',
+                   'ancient topic' not in '\n'.join(rows), rows)
+        check_true('statusline: turns counted per topic, not just the newest',
+                   rows[0].endswith('×2') and '×' not in rows[1], rows)
+
+        statusline.pane_title = lambda: 'e-tech'
+        rows = [strip(r) for r in statusline.theme_rows(themes)]
+        check_true('statusline: a pane title on another subject loses to the theme',
+                   'feasibility' in rows[0] and 'e-tech' not in rows[0], rows)
+
+        statusline.pane_title = lambda: 'Technical feasibility of the roadmap'
+        rows = [strip(r) for r in statusline.theme_rows(themes)]
+        check_true('statusline: a pane title on the same subject still wins',
+                   rows[0].startswith('▸ Technical feasibility'), rows)
+
+        check('statusline: no session, no invented topic', statusline.theme_rows({}), [])
+    finally:
+        statusline.pane_title = real_pane_title
 finally:
     box.close()
 
