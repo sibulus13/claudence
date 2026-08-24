@@ -31,6 +31,7 @@ LINKS=(
   terminal.lua
   attention.lua
   linkrules.lua
+  restore.lua
   keymap.txt
   statusline.py
   startup-reminder.py

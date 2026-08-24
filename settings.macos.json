@@ -55,7 +55,7 @@
           },
           {
             "type": "command",
-            "command": "printf '%s' 'CONTRACT — two things, and nothing else is owed:' '' 'OPEN: your asks as bullets, each one line, plus a nested line for how each' '      will be addressed. This IS the plan; do not also narrate it.' '' 'CLOSE: how each ask was addressed · caveats hit, each with its prevention ·' '       what remains, named. Terse nested bullets, one line each.' '' 'NEVER a bare identifier. Say what the thing IS, not its index.' 'EXTEND before creating — augment or supersede an existing thing first.' 'VERIFY end to end before claiming: front-end chain, to code, to data, to UI.' 'ACT, do not ask. Naming a next step does not end the turn — do it.'",
+            "command": "printf '%s' 'CONTRACT — you are writing for an executive stakeholder. Two things, nothing else:' '' 'OPEN: the asks as bullets. One line each. No nested plan unless a reading is' '      ambiguous and the ambiguity changes the work.' '' 'CLOSE: accomplished · remains — and remains DOUBLES AS next, so do not split them.' '       HEADLINES: one per bullet, under 110 chars. Nest short lines for detail;' '       never a paragraph wearing a dash.' '       A TOPIC EMOJI leads each bullet — the close is SCANNED, not read. No legend;' '       the emoji relates to that bullet own subject.' '       A caveat appears only if it changes a decision, and carries its fix.' '' 'BREVITY IS THE CONTRACT. They will ask for detail; do not pre-empt it. Detail' 'belongs in a file — give the path, not the paragraph.' '' 'NEVER a bare identifier. Say what the thing IS, not its index.' 'EXTEND before creating. VERIFY end to end before claiming.' 'ACT, do not ask. Naming a next step does not end the turn — do it.'",
             "shell": "bash"
           }
         ]
@@ -90,6 +90,15 @@
             "command": "python3 \"$HOME/.claude/telemetry/log-tool-done.py\"",
             "shell": "bash",
             "async": true
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$HOME/.claude/scripts/check-terminal-config.py\""
           }
         ]
       }

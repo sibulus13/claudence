@@ -11,6 +11,9 @@
 #                              rules and open-in-editor.sh, checked as one chain
 #   4. attention.test.lua      the tab-attention decision logic, run in WezTerm's
 #                              own bundled Lua (there is no `lua` binary here)
+#   5. restore.test.lua        which tabs and which commands come back after a
+#                              restart — the path that failed silently for a
+#                              weekend because nothing checked it
 # Plus a load check of the installed WezTerm config, skipped when the config has
 # not been installed yet.
 set -uo pipefail
@@ -48,51 +51,36 @@ run_python_suite 'classification (unit)' 'tests/classification.test.py'
 run_python_suite 'hooks (integration)' 'tests/hooks.test.py'
 run_python_suite 'hyperlinks (config+resolver)' 'tests/hyperlinks.test.py'
 
-# ── linkrules.lua, via WezTerm's bundled Lua ─────────────────────────────────
-# The click-routing predicate. Lua patterns are NOT regex and emulating them from python is how
-# a check passes while the runtime fails, so this runs in the same interpreter the config does.
-note '== link routing (lua, via wezterm)'
-LINK_OUT="$REPO/tests/.last-link-results.txt"
-if ! command -v wezterm >/dev/null 2>&1; then
-  record 'link routing (lua)' 1 'wezterm not on PATH'
-else
-  rm -f "$LINK_OUT"
-  wezterm --config-file "$REPO/tests/linkrules.test.lua" show-keys >/dev/null 2>&1
-  if [ ! -f "$LINK_OUT" ]; then
-    record 'link routing (lua)' 1 'no results written — the test file failed to load'
-  else
-    note "$(tail -1 "$LINK_OUT")"
-    [ "$QUIET" = 1 ] || grep '^FAIL' "$LINK_OUT" || true
-    if grep -q '^FAIL' "$LINK_OUT"; then
-      record 'link routing (lua)' 1 "$(tail -1 "$LINK_OUT")"
-    else
-      record 'link routing (lua)' 0 "$(tail -1 "$LINK_OUT")"
-    fi
+# ── Lua suites, via WezTerm's bundled Lua ────────────────────────────────────
+# Lua patterns are NOT regex and emulating them from python is how a check passes
+# while the runtime fails, so these run in the same interpreter the config does.
+# show-keys is just a cheap subcommand that forces the config to load; each suite
+# writes its results to a file because WezTerm owns stdout here.
+run_lua_suite() {
+  local label="$1" file="$2" out="$REPO/tests/$3"
+  note "== $label"
+  if ! command -v wezterm >/dev/null 2>&1; then
+    record "$label" 1 'wezterm not on PATH'
+    return
   fi
-fi
+  rm -f "$out"
+  wezterm --config-file "$REPO/tests/$file" show-keys >/dev/null 2>&1
+  if [ ! -f "$out" ]; then
+    record "$label" 1 'no results written — the test file failed to load'
+    return
+  fi
+  note "$(tail -1 "$out")"
+  [ "$QUIET" = 1 ] || grep '^FAIL' "$out" || true
+  if grep -q '^FAIL' "$out"; then
+    record "$label" 1 "$(tail -1 "$out" | tr -d '-' | xargs)"
+  else
+    record "$label" 0 "$(tail -1 "$out" | tr -d '-' | xargs)"
+  fi
+}
 
-# ── attention.lua, via WezTerm's bundled Lua ─────────────────────────────────
-note '== attention (lua, via wezterm)'
-LUA_OUT="$REPO/tests/.last-results.txt"
-if ! command -v wezterm >/dev/null 2>&1; then
-  record 'attention (lua)' 1 'wezterm not on PATH'
-else
-  rm -f "$LUA_OUT"
-  # show-keys is just a cheap subcommand that forces the config to load; the test
-  # file writes its results to disk because WezTerm owns stdout here.
-  wezterm --config-file "$REPO/tests/attention.test.lua" show-keys >/dev/null 2>&1
-  if [ ! -f "$LUA_OUT" ]; then
-    record 'attention (lua)' 1 'no results written — the test file failed to load'
-  else
-    note "$(tail -1 "$LUA_OUT")"
-    [ "$QUIET" = 1 ] || grep '^FAIL' "$LUA_OUT" || true
-    if grep -q '^FAIL' "$LUA_OUT"; then
-      record 'attention (lua)' 1 "$(tail -1 "$LUA_OUT" | tr -d '-' | xargs)"
-    else
-      record 'attention (lua)' 0 "$(tail -1 "$LUA_OUT" | tr -d '-' | xargs)"
-    fi
-  fi
-fi
+run_lua_suite 'link routing (lua)'   'linkrules.test.lua' '.last-link-results.txt'
+run_lua_suite 'attention (lua)'      'attention.test.lua' '.last-results.txt'
+run_lua_suite 'session restore (lua)' 'restore.test.lua'  '.last-restore-results.txt'
 
 # ── terminal.lua load check ──────────────────────────────────────────────────
 # terminal.lua resolves attention.lua from ~/.claude, so this only means anything

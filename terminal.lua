@@ -13,6 +13,7 @@ local SHELL  = os.getenv('SHELL') or '/bin/zsh'
 -- the tested logic IS the runtime logic.
 local A = dofile(wezterm.home_dir .. '/.claude/attention.lua')
 local L = dofile(wezterm.home_dir .. '/.claude/linkrules.lua')
+local R = dofile(wezterm.home_dir .. '/.claude/restore.lua')
 
 -- Auto-reload on file save — no Ctrl+Shift+R needed after edits.
 -- WezTerm watches the resolved symlink target, so saving terminal.lua
@@ -26,6 +27,7 @@ if wezterm.add_to_config_reload_watch_list then
   -- notification logic alone wouldn't trigger a reload (stale-config trap).
   wezterm.add_to_config_reload_watch_list(wezterm.home_dir .. '/.claude/attention.lua')
   wezterm.add_to_config_reload_watch_list(wezterm.home_dir .. '/.claude/linkrules.lua')
+  wezterm.add_to_config_reload_watch_list(wezterm.home_dir .. '/.claude/restore.lua')
 end
 
 -- ── Appearance ────────────────────────────────────────────────────────────────
@@ -533,24 +535,10 @@ end
 
 -- ── Session persistence ───────────────────────────────────────────────────────
 local SESSION_PATH  = wezterm.home_dir .. '/.claude/session.json'
--- How old a saved layout may be and still be restored. Was 12 h, which silently
--- threw the whole layout away across any overnight or weekend gap — close on
--- Friday evening, reopen Monday, and the tabs (and the Claude sessions inside
--- them) were simply gone with nothing said. 168 h matches record-pane-session's
--- ORPHAN_MAX_AGE_DAYS = 7: past a week the pane -> session bindings have been
--- reaped anyway, so a restore could only fall back to --continue's guess.
-local SESSION_MAX_H = 168
--- Command used to re-launch a detected Claude session on restore. --permission-mode
--- auto starts it in Auto mode (the classifier-driven mode, distinct from acceptEdits)
--- so restored agents don't sit in the normal ask-everything mode. Stored verbatim in
--- repos.json by save_session; any older 'claude --continue' value is rewritten to this
--- on the next save (so repos.json already holds the auto form by the next restart).
--- Fallback restore command when the pane's exact session id is unknown:
--- --continue resumes the cwd's MOST RECENT conversation (wrong when a repo has
--- several — see pane_session_id below for the precise path). --permission-mode
--- auto starts it in the classifier-driven Auto mode so restored agents don't
--- sit in ask-everything mode.
-local CLAUDE_RESTORE_CMD = 'claude --continue --permission-mode auto'
+-- Every decision below — the freshness cap, which tabs count, which foreground
+-- process is worth relaunching, how a command is quoted — lives in restore.lua so
+-- tests/restore.test.lua can assert it. This file keeps only the io and the
+-- wezterm API calls.
 
 -- The exact Claude session id bound to a pane, or nil. record-pane-session.ps1
 -- (SessionStart hook) writes pane-sessions/pane-<WEZTERM_PANE>.json while the
@@ -567,89 +555,23 @@ local function pane_session_id(pane)
   raw = raw:gsub('^\239\187\191', '')                 -- strip UTF-8 BOM if present
   local ok2, data = pcall(wezterm.json_parse, raw)
   if not ok2 or type(data) ~= 'table' then return nil end
-  local sid = data.session
-  -- Only trust a UUID-shaped id (guards against a malformed file injecting shell
-  -- text — the id is interpolated into the launch command).
-  if type(sid) == 'string' and sid:match('^[%w%-]+$') then return sid end
-  return nil
-end
-
--- Programs worth re-launching on restore. Claude is matched by name (its
--- own --continue recipe below); everything here is a long-running dev process
--- whose exact invocation we reconstruct from argv. Keyed by the executable's
--- leaf name, lower-cased, sans .exe. The interactive SHELLS (pwsh/powershell/
--- cmd/bash) are deliberately absent — an idle prompt must NOT be captured as a
--- command, or restore would relaunch a shell inside a shell. Extend freely.
-local RESUMABLE = {
-  node = true, python = true, python3 = true, bun = true, deno = true,
-  pnpm = true, npm = true, yarn = true, vite = true, next = true,
-  vim = true, nvim = true, nano = true, jupyter = true, ssh = true,
-  cargo = true, go = true, docker = true, ['docker-compose'] = true,
-}
-
--- Quote a single argv token for the shell that will re-run it (only when it
--- contains whitespace, to keep the common case readable). PowerShell doubles an
--- embedded single quote; a POSIX shell has to close the quote, escape it, and
--- reopen.
-local function quote_arg(a)
-  if not a:find('%s') then return a end
-  if IS_WIN then return "'" .. a:gsub("'", "''") .. "'" end
-  return "'" .. a:gsub("'", "'\\''") .. "'"
+  return R.valid_session_id(data.session)
 end
 
 -- The command to relaunch in a pane on restore, or nil if the pane holds an
--- idle shell / a transient command not worth resuming. Claude keeps its proven
--- name-based detection (its foreground name contains "claude" throughout the
--- session, even while shelling out mid-tool); other whitelisted programs are
--- reconstructed verbatim from argv. Wrapped in pcall so an unsupported build or
--- a dead pane degrades to "no command" instead of breaking the whole config.
+-- idle shell / a transient command not worth resuming. Wrapped in pcall so an
+-- unsupported build or a dead pane degrades to "no command" instead of breaking
+-- the whole config; the decision itself is R.resume_cmd.
 local function pane_resume_cmd(pane)
-  local name = (pane:get_foreground_process_name() or ''):lower()
-  if name:find('claude') then
-    -- Prefer the pane's exact session (claude --resume <id>); fall back to the
-    -- most-recent guess only when no binding was captured (older session, hook
-    -- not yet fired, or restore reaped the file).
-    local sid = pane_session_id(pane)
-    if sid then return 'claude --resume ' .. sid .. ' --permission-mode auto' end
-    return CLAUDE_RESTORE_CMD
-  end
+  local name = pane:get_foreground_process_name() or ''
+  local sid  = name:lower():find('claude') and pane_session_id(pane) or nil
   local ok, info = pcall(function() return pane:get_foreground_process_info() end)
-  if not ok or type(info) ~= 'table' then return nil end
-  local leaf = ((info.executable or info.name or ''):gsub('\\', '/')
-                 :match('[^/]+$') or ''):lower():gsub('%.exe$', '')
-  if not RESUMABLE[leaf] then return nil end
-  local argv = info.argv
-  if type(argv) ~= 'table' or #argv == 0 then return nil end
-  local parts = {}
-  for _, a in ipairs(argv) do parts[#parts + 1] = quote_arg(a) end
-  return table.concat(parts, ' ')
+  info = (ok and type(info) == 'table') and info or {}
+  return R.resume_cmd(name, sid, info.executable or info.name, info.argv, IS_WIN)
 end
 
--- Build the PowerShell spawn args for a restored pane: cd into the repo, then
--- run the saved command with -NoExit so the pane drops to an interactive shell
--- once the command exits (a dev server that crashes leaves a usable prompt, not
--- a dead pane). Returns nil for an empty command → caller spawns a plain shell.
--- Shared by both panes so quoting is handled uniformly by PowerShell (the old
--- right-pane path split on whitespace, which broke any quoted argument).
 local function pane_launch_args(cmd, cwd)
-  if not cmd or cmd == '' then return nil end
-  if IS_WIN then
-    local safe = cwd:gsub("'", "''")
-    return {
-      'powershell.exe', '-NoProfile', '-NoLogo', '-NoExit', '-Command',
-      "Set-Location '" .. safe .. "'; " .. cmd,
-    }
-  end
-  -- The POSIX equivalent of -NoExit: run the saved command, then hand the pane
-  -- to an interactive login shell so a dev server that crashes leaves a usable
-  -- prompt instead of a dead pane. `exec` replaces the wrapper, so no extra
-  -- shell layer lingers in the process tree. Braces keep a compound command
-  -- (`a && b`) from binding only its first clause to the `;`.
-  local safe = cwd:gsub("'", "'\\''")
-  return {
-    SHELL, '-lc',
-    "cd '" .. safe .. "' && { " .. cmd .. "; }; exec " .. SHELL .. " -l",
-  }
+  return R.launch_args(cmd, cwd, SHELL, IS_WIN)
 end
 
 save_session = function(window)
@@ -659,7 +581,7 @@ save_session = function(window)
 
   for _, tab in ipairs(window:mux_window():tabs()) do
     local title = tab:get_title()
-    if not title:find('/') then goto continue end  -- skip Nexus/shell-named tabs
+    if not R.is_repo_tab(title) then goto continue end  -- skip Nexus/shell-named tabs
     parts[#parts + 1] = '"' .. title:gsub('"', '\\"') .. '"'
 
     -- panes_with_info gives per-pane geometry (cells) + the MuxPane handle.
@@ -729,13 +651,13 @@ local function load_session()
   local raw = f:read('*a'); f:close()
   local ok, data = pcall(wezterm.json_parse, raw)
   if not ok or type(data) ~= 'table' then return empty end
-  local age_h = (os.time() - (data.savedAt or 0)) / 3600
-  if age_h > SESSION_MAX_H then
+  local fresh, age_h = R.layout_is_fresh(data.savedAt, os.time())
+  if not fresh then
     -- Say so rather than opening a bare window and letting it read as "nothing was
     -- ever saved" — the same no-silent-truncation rule the 3+-pane case follows.
     wezterm.log_info(string.format(
       'nexus: saved layout is %.0f h old (max %d) — %d tab(s) not restored',
-      age_h, SESSION_MAX_H, #(data.tabs or {})))
+      age_h, R.MAX_H, #(data.tabs or {})))
     return empty
   end
   return { tabs = data.tabs or {}, activeTab = data.activeTab or '' }
@@ -916,7 +838,7 @@ wezterm.on('gui-startup', function(cmd)
   local session       = load_session()
   local active_tab_ref = nil
   for _, title in ipairs(session.tabs) do
-    if not title:match('^~/') then
+    if R.is_repo_tab(title) then
       local tab = make_tab(window, title, REPO_DIR .. '/' .. title)
       if tab and title == session.activeTab then
         active_tab_ref = tab
