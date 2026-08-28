@@ -81,6 +81,21 @@ Verify with actual measurements, on a page you can interact with:
 5. **Check real horizontal overflow too** (a different, real thing from #4):
    `document.body.scrollWidth <= window.innerWidth`.
 
+6. **Check every inline SVG `<text>` has a `fill`, inherited or explicit — SVG's implicit
+   default is opaque black, not `currentColor`.** A `<text>` with no `fill` (and no ancestor
+   `<g>` setting one) silently renders correctly in a light theme, where black is close enough
+   to the ink token to go unnoticed, then paints literally invisible black-on-near-black the
+   moment the page is viewed in dark theme. This is a distinct bug from #4/#5 — it's a color
+   defect, not a geometry one — and a plain read-through won't catch it because the light-theme
+   render looks fine. Grep every `<text` and confirm each either sets `fill=` itself or sits
+   inside a `<g fill="...">`:
+   ```sh
+   grep -n '<text' deck.html | grep -v 'fill='
+   ```
+   Any hit that isn't provably inside a fill-setting `<g>` is a real bug — give it an explicit
+   `fill="var(--ink)"` (or whichever token the label's weight calls for), never rely on the
+   SVG default.
+
 ## Content discipline, learned the hard way
 
 - **A model or a figure that changes must be hunted down everywhere else it's cited.** A cost
