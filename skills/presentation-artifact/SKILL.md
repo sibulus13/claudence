@@ -144,6 +144,19 @@ Verify with actual measurements, on a page you can interact with:
    each beat (scroll to it, then `computer` screenshot) and actually look before publishing —
    a wall of small text passes every mechanical check and still fails the room.
 
+11. **Run the design-token gate before every publish — deterministically, not by re-reading the
+   CSS by eye.** Step 10 describes the failure; this is the mechanical check that catches it
+   going forward instead of relying on a human noticing. `check-design-tokens.py`, in this same
+   skill directory, fails the moment any `font-size` in the deck isn't a `var(--text-*)` token
+   and isn't on its explicit, reasoned allow-list:
+   ```sh
+   python3 check-design-tokens.py deck.html
+   ```
+   A real off-scale value fails the gate; a genuine, deliberate exception (a display heading, an
+   icon size, UI chrome) gets added to `ALLOWLIST` in the script **with a one-line reason** —
+   never by loosening the check itself. Content inside a collapsed `<details>` is exempt by
+   design (reference tier, read once, up close) — everything else must resolve to a token.
+
 ## Content discipline, learned the hard way
 
 - **A model or a figure that changes must be hunted down everywhere else it's cited.** A cost
