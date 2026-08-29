@@ -48,9 +48,15 @@ Verify with actual measurements, on a page you can interact with:
 2. **Scrolling is broken inside the artifact viewer** in this environment — mouse wheel,
    keys, `scrollIntoView`, and `window.scrollTo` all silently no-op there. To inspect a tall,
    `100vh`-paced page without scrolling, make a **temporary debug copy**:
-   `sed 's/min-height: 100vh/min-height: auto/g' deck.html > _debug.html`, serve and open
-   that instead — sections shrink to their natural content height, so the whole page fits in
-   view without needing scroll. Delete `_debug.html` before finishing; never publish it.
+   `{ echo '<!DOCTYPE html><html><head>'; sed 's/min-height: 100vh/min-height: auto/g' deck.html; echo '</body></html>'; } > _debug.html`
+   — the `<!DOCTYPE html>` matters: a bare fragment (what the artifact source actually is)
+   renders in **quirks mode**, where `document.body` — not the window — becomes the scroll
+   container, so `window.scrollTo`/`scrollY` silently no-ops there too (`document.compatMode`
+   reads `BackCompat`). Confirm `document.compatMode === 'CSS1Compat'` before trusting any
+   scroll call on the debug copy. Serve and open it instead of the artifact URL — sections
+   shrink to their natural content height, so the whole page fits in view without needing
+   scroll, and with a real doctype, mouse-wheel scroll (`computer` tool's `scroll` action) and
+   `window.scrollTo` both work normally. Delete `_debug.html` before finishing; never publish it.
 
 3. **Measure every beat's real height against the real viewport**, on the debug copy:
    ```js
@@ -95,6 +101,18 @@ Verify with actual measurements, on a page you can interact with:
    Any hit that isn't provably inside a fill-setting `<g>` is a real bug — give it an explicit
    `fill="var(--ink)"` (or whichever token the label's weight calls for), never rely on the
    SVG default.
+
+7. **Fitting and not-overflowing is not the same claim as looking good — take a real
+   screenshot and read it, every time, not just the numeric checks above.** Across one session,
+   repeated height-budget pressure led to shrinking font sizes (0.78rem uppercase labels,
+   0.85rem body text) turn over turn to make new content fit a fixed `100vh` box. Every
+   measurement check passed (height fit, no overflow, fill set) while the actual rendered page
+   turned into a dense, small-type report — exactly what a beat-paced deck is supposed to not
+   be. The fix is architectural, not a smaller font: **cut or consolidate content before you
+   shrink text below ~0.95rem for anything a reader is meant to actually read** (a
+   caption/footnote can go smaller; primary content should not). Screenshot the debug copy at
+   each beat (scroll to it, then `computer` screenshot) and actually look before publishing —
+   a wall of small text passes every mechanical check and still fails the room.
 
 ## Content discipline, learned the hard way
 
