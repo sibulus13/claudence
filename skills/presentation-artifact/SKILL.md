@@ -102,7 +102,37 @@ Verify with actual measurements, on a page you can interact with:
    `fill="var(--ink)"` (or whichever token the label's weight calls for), never rely on the
    SVG default.
 
-7. **Fitting and not-overflowing is not the same claim as looking good — take a real
+7. **Check whitespace UTILIZATION, not just overflow — a diagram sized small under space
+   pressure stays small after the pressure is gone.** Cutting prose elsewhere frees real width
+   and height; if a diagram's `max-width` was tuned once during a crunch, it silently keeps
+   using a fraction of the space forever unless someone re-checks it. After any content cut,
+   re-measure how much of the beat's actual available width the diagrams use, not just whether
+   the beat fits vertically — a beat sitting at 400px of an 873px budget with a diagram capped at
+   340px next to acres of empty space is passing every overflow check while looking broken.
+
+8. **Check coupled-element counts whenever a repeated element changes — this is a distinct bug
+   class from overflow.** A hand-authored SVG with N labels needs N of every element paired to
+   them (a connector line per label, a gridline per label). Editing the labels (adding a 4th)
+   without re-counting the connector lines (still 3) produces a diagram that renders with no
+   error, no overflow, and no fill defect — just a line silently pointing at the wrong thing.
+   After any edit that adds or removes a repeated SVG element, count its paired elements too:
+   ```sh
+   grep -c '<text' section-of-svg   # vs.
+   grep -c '<line' section-of-svg   # do these match the intended 1:1 pairing?
+   ```
+   Don't trust the diff alone — re-read the whole `<svg>` block, since the paired element may be
+   many lines away from the one actually edited.
+
+9. **A rotated `<text>` element breaks the automated overflow check — verify it by screenshot,
+   not by the geometry check.** `getBBox()` on an SVG `<text>` with a `transform="rotate(...)"`
+   returns the PRE-rotation bounding box, so the overflow-check formula in step 4 reports
+   nonsensical (often deeply negative) numbers for any rotated label — a false positive, not a
+   real bug, but it can't be told apart from a real one by the numbers alone. Any diagram using
+   `transform="rotate"` on text (a rotated axis label is the common case) needs a screenshot
+   check specifically for that element; don't let the false positive get "fixed" by guessing,
+   and don't let it get ignored as "probably fine" either — look at it.
+
+10. **Fitting and not-overflowing is not the same claim as looking good — take a real
    screenshot and read it, every time, not just the numeric checks above.** Across one session,
    repeated height-budget pressure led to shrinking font sizes (0.78rem uppercase labels,
    0.85rem body text) turn over turn to make new content fit a fixed `100vh` box. Every
