@@ -54,3 +54,14 @@ Deferred deliberately. Each records why, so it is not re-litigated.
   `glow` or `bat` lands in PATH for another reason; the launcher already notes the upgrade path.
 - **Auto-generating `## Now` from telemetry** — tempting and wrong. The value of `Now` is that a
   human asserted it; a generated one would be trusted without being true.
+- **`statusline.py` emits a variable, unbounded line count (1 line typically, up to ~10 with
+  theme history + helm breadcrumbs both populated) instead of a fixed small height.** Found
+  2026-08-31: a background Workflow's live progress display rendered below the visible terminal
+  frame, and this session's own statusline was measured emitting 4 real lines at the time (metrics
+  row + 3 theme-history rows). Claude Code's terminal chrome likely reserves space for the status
+  line based on an assumed height; a script that quietly grows past 1 line eats into space other
+  UI (workflow progress, possibly Remote Control's own reserved row when RC is disabled) assumed
+  was free. Owner's workaround for now: make the terminal window bigger rather than fix the
+  script. Real fix, deferred: cap `THEME_ROWS`/helm-row output to a small fixed count (1-2 lines
+  total, never variable), removing the height-budget mismatch at the source rather than relying on
+  window size. Revisit when this recurs or before the next terminal-chrome-sensitive feature ships.
