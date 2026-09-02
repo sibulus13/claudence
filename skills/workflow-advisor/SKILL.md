@@ -70,7 +70,7 @@ unclear even to the domain expert? These are four different findings with four d
 collapsing them into one "this step is manual" line loses the information that decides what to do
 about it.
 
-## 5 · Time/value saved — estimate honestly, frame to the real objective
+## 5 · Time/value saved — estimate honestly, frame to the real objective, then make it cyclical
 
 **Never present an invented number as measured fact.** Label every estimate `⚠️ UNCONFIRMED —
 placeholder, pending real timing data` and say so again next to the actual figures, not just once
@@ -79,22 +79,68 @@ per-task time, frame the estimate around CAPACITY — how much more volume becom
 naive minutes-saved-per-task, which understates the real value when the bottleneck is a person's
 own review pace rather than task duration.
 
-## 6 · Recommend alternatives, with honest trade-offs, in plain language
+**Always add a cyclical (weekly, or monthly if the cadence is longer) aggregate on top of the
+per-step estimate — this is a standing requirement, not optional polish.** A per-task number
+doesn't tell a reviewer what a month actually looks like. Build it as a **parametrized model, not
+fixed numbers**: name each input as its own row (volume per cycle, minutes saved per unit for each
+lever), state its default as a labeled assumption, give the formula that combines them, then show
+the computed total at the defaults. The reviewer or the domain expert should be able to change one
+number and get a different, honest total — never a total they can only accept or reject whole.
+
+## 6 · Recommend alternatives — research first, then compare, then order
+
+**Before recommending, research what actually exists** — this is a required step, not
+background colour:
+1. **Check what's already available first**: already-installed/authenticated connectors or
+   integrations, an existing subscription that already covers this, a native feature of a tool
+   already in use. Free or near-free beats anything requiring a new purchase.
+2. **Then research what could be adopted**: real products, with real (dated, sourced) pricing —
+   never an invented number. Note when pricing is quote-based or a lead rather than a locked
+   figure.
+3. **Map every candidate to the specific named pain point (from step 4) it closes** — a tool that
+   would replace the whole pipeline is a different kind of recommendation than one that closes a
+   single gap, and the comparison table must make that difference visible, not just list options.
 
 - No jargon. A comparison table beats prose for this.
 - **State what each option costs the person, not just what it saves.** "Removes the review step"
-  is a cost (quality risk) as often as it's a win.
+  is a cost (quality risk) as often as it's a win. A subscription's dollar cost is not the only
+  cost — note implementation effort, a new vendor to manage, or unconfirmed technical feasibility.
 - **Recommend a build order, reasoned from the stated objective** — not just a list of options.
   Free removals of mechanical friction (no quality trade-off) generally come before anything that
   trades a deliberate control away, so the domain expert can judge the remaining bottleneck with
   the easy wins already banked.
 
-## 7 · Output format — default to a document, publish only if asked
+## 7 · Output format — default to a published Artifact for a non-technical audience
 
-Default: a markdown document the person can keep, hand to an engineer, or revisit. **Offer a
-published Artifact only when the person wants something shareable or interactive** — check
-whether it passes the SHARED-and-VISUAL bar before publishing (see the `artifact-design` skill);
-a wall of text does not become an artifact just because it has a diagram in it.
+**A plain markdown file is not a safe default here.** The whole point of this skill is a
+non-technical domain expert; most non-technical readers have no Mermaid-rendering markdown
+viewer, so a diagram that renders perfectly in this repo renders as raw fence syntax for the
+person it was written for. **Default to publishing an Artifact** (see the `artifact-design`
+skill) whenever the intended reader is the domain expert themselves or anyone they'd hand this
+to — reserve a markdown-only output for a technical audience (an engineer, a repo) who will read
+it in a renderer that already handles Mermaid. **Always also keep the markdown version in the
+repo** — it's the durable, diffable record and the source the Artifact's content is drawn from;
+the Artifact is the reading copy, not a replacement for it.
+
+## 8 · Artifact architecture — reuse the existing template, don't reach for a framework
+
+**`template.html` in this skill's own folder is the reusable base — copy it, fill in its `CONFIG`
+and `DATA` objects with this workflow's real content, and publish that.** It follows the same
+zero-dependency, hue-driven-token pattern as `skills/depth-tree/template.html`: one file, no
+build step, data and presentation cleanly separated by construction (nothing above its `<script>`
+tag needs to change for a new workflow). Mermaid diagrams render natively in the Artifact host —
+write plain Mermaid syntax into the `mermaid` field, do not load a Mermaid library.
+
+**On React, Tailwind, and shadcn — decided 2026-09-02, after a real frustration report** (editing
+a previously-published Artifact was slow because its data was interleaved into its markup and
+styling, making an edit hard to locate):
+
+| | Decision | Why |
+|---|---|---|
+| **shadcn/ui** | **Refused, categorically.** | It's a copy-paste source-component system that assumes a real project with a build pipeline (TypeScript compile, path aliases, bundled Radix primitives). The Artifact sandbox is static HTML plus a small CDN allowlist with no bundler — shadcn cannot run there at all, not just "isn't worth it" |
+| **React (CDN UMD build)** | **Conditional, not default.** Use only when a workflow genuinely needs multi-view state that plain event listeners can't hold cleanly | This skill's own content — a few Mermaid diagrams, cards, a table, and a handful of number inputs recomputing a total — is well within vanilla JS. Reaching for React here would be solving a problem this content doesn't have |
+| **Tailwind (Play CDN)** | **Not needed here.** | The token-based CSS custom-property system already in `template.html` gives theme-aware styling with zero extra load; Tailwind adds a class-authoring convenience this template doesn't need |
+| **The actual fix for the original frustration** | **Structural separation, already solved by the template pattern** — `CONFIG`/`DATA` at the bottom, rendering engine above, exactly like `depth-tree` | The slow-edit problem was never "we need a framework" — it was "the data lived inside the styling." A template with the two cleanly separated fixes that without adding a dependency |
 
 ## What this skill does not do
 
@@ -102,4 +148,6 @@ a wall of text does not become an artifact just because it has a diagram in it.
   the fix is separate, follow-on work.
 - **Does not assume full automation is the answer.** Some manual steps are deliberate controls.
 - **Does not fabricate numbers.** An unconfirmed estimate stays labeled unconfirmed everywhere it
-  appears, not just where it's first introduced.
+  appears, not just where it's first introduced — including every input in the cyclical model.
+- **Does not reach for React/shadcn by default.** See § 8 — the template pattern is the default
+  and a framework is the exception, not the other way around.

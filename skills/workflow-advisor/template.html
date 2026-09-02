@@ -1,0 +1,467 @@
+<title>REPLACE — Workflow Canvas</title>
+
+<!-- ============================================================
+     WORKFLOW CANVAS TEMPLATE  ·  v1.0
+     A dependency-free before/after workflow report: states as
+     Mermaid flows, pain points as cards, tool research as a table,
+     and a LIVE adjustable capacity calculator.
+
+     To reuse: edit CONFIG and DATA at the bottom of this file.
+     Nothing above the <script> needs to change unless you are
+     deliberately re-designing. Colour is hue-driven, same pattern
+     as skills/depth-tree/template.html — one hue number derives
+     both themes. Mermaid renders natively in the Artifact host;
+     do not load a library for it.
+     ============================================================ -->
+
+<style>
+  :root {
+    --accent-h: 222;                        /* <-- the one hue to change */
+
+    --ground:  hsl(var(--accent-h) 20% 96%);
+    --surface: hsl(var(--accent-h) 34% 100%);
+    --surface-2: hsl(var(--accent-h) 24% 94%);
+    --ink:   hsl(var(--accent-h) 34% 13%);
+    --ink-2: hsl(var(--accent-h) 20% 32%);
+    --ink-3: hsl(var(--accent-h) 13% 48%);
+    --rule:  hsl(var(--accent-h) 20% 86%);
+    --rule-2:hsl(var(--accent-h) 18% 74%);
+    --accent:      hsl(var(--accent-h) 78% 42%);
+    --accent-soft: hsl(var(--accent-h) 60% 92%);
+    --shadow: 0 1px 2px hsl(var(--accent-h) 30% 15% / .05),
+              0 8px 24px hsl(var(--accent-h) 30% 15% / .06);
+
+    --good-h: 152; --warn-h: 42; --bad-h: 352; --info-h: 272;
+    --pill-fg: 28%; --pill-bg: 94%; --pill-bd: 70%;
+
+    --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:  hsl(var(--accent-h) 28% 7%);
+      --surface: hsl(var(--accent-h) 24% 11%);
+      --surface-2: hsl(var(--accent-h) 22% 15%);
+      --ink:   hsl(var(--accent-h) 20% 92%);
+      --ink-2: hsl(var(--accent-h) 14% 70%);
+      --ink-3: hsl(var(--accent-h) 12% 54%);
+      --rule:  hsl(var(--accent-h) 22% 20%);
+      --rule-2:hsl(var(--accent-h) 20% 29%);
+      --accent:      hsl(var(--accent-h) 70% 62%);
+      --accent-soft: hsl(var(--accent-h) 45% 18%);
+      --shadow: 0 1px 2px #0006, 0 10px 28px #0005;
+      --pill-fg: 82%; --pill-bg: 15%; --pill-bd: 34%;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:hsl(var(--accent-h) 28% 7%); --surface:hsl(var(--accent-h) 24% 11%);
+    --surface-2:hsl(var(--accent-h) 22% 15%);
+    --ink:hsl(var(--accent-h) 20% 92%); --ink-2:hsl(var(--accent-h) 14% 70%);
+    --ink-3:hsl(var(--accent-h) 12% 54%);
+    --rule:hsl(var(--accent-h) 22% 20%); --rule-2:hsl(var(--accent-h) 20% 29%);
+    --accent:hsl(var(--accent-h) 70% 62%); --accent-soft:hsl(var(--accent-h) 45% 18%);
+    --shadow:0 1px 2px #0006, 0 10px 28px #0005;
+    --pill-fg:82%; --pill-bg:15%; --pill-bd:34%;
+  }
+  :root[data-theme="light"] {
+    --ground:hsl(var(--accent-h) 20% 96%); --surface:hsl(var(--accent-h) 34% 100%);
+    --surface-2:hsl(var(--accent-h) 24% 94%);
+    --ink:hsl(var(--accent-h) 34% 13%); --ink-2:hsl(var(--accent-h) 20% 32%);
+    --ink-3:hsl(var(--accent-h) 13% 48%);
+    --rule:hsl(var(--accent-h) 20% 86%); --rule-2:hsl(var(--accent-h) 18% 74%);
+    --accent:hsl(var(--accent-h) 78% 42%); --accent-soft:hsl(var(--accent-h) 60% 92%);
+    --pill-fg:28%; --pill-bg:94%; --pill-bd:70%;
+  }
+
+  * { box-sizing:border-box; }
+  body {
+    margin:0; background:var(--ground); color:var(--ink);
+    font-family:var(--font-sans); font-size:16px; line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap { max-width:980px; margin:0 auto; padding:0 26px 110px; }
+  @media (max-width:640px){ .wrap{ padding:0 14px 80px; } }
+
+  header.masthead { padding:46px 0 8px; }
+  .eyebrow {
+    font-family:var(--font-mono); font-size:11px; letter-spacing:.16em;
+    text-transform:uppercase; color:var(--ink-3); margin:0 0 12px;
+  }
+  h1 {
+    font-family:var(--font-mono); font-size:clamp(26px,3.6vw,36px); font-weight:700;
+    line-height:1.16; letter-spacing:-.015em; margin:0 0 16px; text-wrap:balance;
+  }
+  .standfirst { font-size:16.5px; color:var(--ink-2); max-width:70ch; margin:0 0 22px; }
+  .standfirst strong { color:var(--ink); font-weight:600; }
+
+  .metric-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; margin:0 0 40px; }
+  .metric { background:var(--surface); border:1px solid var(--rule); border-radius:8px; padding:15px 17px; box-shadow:var(--shadow); }
+  .metric h3 { font-family:var(--font-mono); font-size:10.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-3); margin:0 0 8px; font-weight:700; }
+  .metric p { margin:0; font-size:14.5px; color:var(--ink); line-height:1.5; }
+
+  h2 {
+    font-family:var(--font-mono); font-size:clamp(18px,2.2vw,22px); font-weight:700;
+    margin:52px 0 14px; letter-spacing:-.01em; text-wrap:balance;
+  }
+  h2 .n { color:var(--ink-3); font-weight:500; margin-right:8px; }
+  section > p.lede { font-size:15px; color:var(--ink-2); max-width:76ch; margin:0 0 20px; }
+
+  /* ---- state tabs ---- */
+  .statetabs { display:flex; gap:6px; margin-bottom:16px; flex-wrap:wrap; }
+  .statetab {
+    font-family:var(--font-mono); font-size:12.5px; padding:6px 13px;
+    background:var(--surface-2); color:var(--ink-2); border:1px solid var(--rule-2);
+    border-radius:20px; cursor:pointer;
+  }
+  .statetab[aria-pressed="true"] { background:var(--accent); color:var(--surface); border-color:var(--accent); }
+  .statepane { display:none; }
+  .statepane.active { display:block; }
+  .floor {
+    background:var(--surface-2); border:1px dashed var(--rule-2); border-radius:8px;
+    padding:16px 18px; font-size:14.5px; color:var(--ink-2);
+  }
+  .diagram { background:var(--surface); border:1px solid var(--rule); border-radius:8px; padding:18px; overflow-x:auto; box-shadow:var(--shadow); }
+  .diagram pre.mermaid { margin:0; }
+
+  table.steps { width:100%; border-collapse:collapse; margin-top:16px; font-size:13.5px; }
+  table.steps th { text-align:left; font-family:var(--font-mono); font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-3); padding:8px 10px; border-bottom:1px solid var(--rule-2); }
+  table.steps td { padding:9px 10px; border-bottom:1px solid var(--rule); vertical-align:top; }
+  table.steps tr:last-child td { border-bottom:0; }
+
+  .pill { font-family:var(--font-mono); font-size:9.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; padding:2px 7px; border-radius:3px; white-space:nowrap; display:inline-block; color:hsl(var(--ph) 55% var(--pill-fg)); background:hsl(var(--ph) 50% var(--pill-bg)); border:1px solid hsl(var(--ph) 40% var(--pill-bd)); }
+
+  /* ---- pain point cards ---- */
+  .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:14px; }
+  .card { background:var(--surface); border:1px solid var(--rule); border-radius:8px; padding:15px 17px; box-shadow:var(--shadow); display:flex; flex-direction:column; gap:8px; }
+  .card .cardhead { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .card h4 { margin:0; font-size:14.5px; font-weight:650; }
+  .card p { margin:0; font-size:13px; color:var(--ink-2); line-height:1.5; }
+  .card .fix { font-size:12.5px; color:var(--ink-3); border-top:1px solid var(--rule); padding-top:8px; margin-top:2px; }
+  .card .fix b { color:var(--ink-2); font-weight:600; }
+
+  /* ---- tool table ---- */
+  .toolwrap { overflow-x:auto; }
+  table.tools { width:100%; border-collapse:collapse; font-size:13.5px; min-width:640px; }
+  table.tools th { text-align:left; font-family:var(--font-mono); font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-3); padding:10px; border-bottom:1px solid var(--rule-2); background:var(--surface-2); }
+  table.tools td { padding:11px 10px; border-bottom:1px solid var(--rule); vertical-align:top; }
+  table.tools tr:last-child td { border-bottom:0; }
+  table.tools .src { font-family:var(--font-mono); font-size:11px; color:var(--ink-3); }
+
+  /* ---- calculator ---- */
+  .calc { background:var(--surface); border:1px solid var(--rule); border-radius:8px; padding:22px 24px; box-shadow:var(--shadow); }
+  .calc-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px; margin-bottom:20px; }
+  .field label { display:block; font-family:var(--font-mono); font-size:11px; letter-spacing:.05em; color:var(--ink-3); margin-bottom:6px; }
+  .field input {
+    width:100%; font-family:var(--font-sans); font-variant-numeric:tabular-nums; font-size:15px;
+    padding:8px 10px; background:var(--surface-2); color:var(--ink);
+    border:1px solid var(--rule-2); border-radius:5px;
+  }
+  .field input:focus { outline:2px solid var(--accent); outline-offset:1px; }
+  .field .unit { font-size:11.5px; color:var(--ink-3); margin-top:4px; }
+  .calc-out { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:14px; border-top:1px solid var(--rule); padding-top:18px; }
+  .out { text-align:left; }
+  .out .num { font-family:var(--font-mono); font-variant-numeric:tabular-nums; font-size:28px; font-weight:700; color:var(--accent); line-height:1.1; }
+  .out .lbl { font-size:12.5px; color:var(--ink-2); margin-top:4px; }
+  .unconfirmed { font-family:var(--font-mono); font-size:10.5px; letter-spacing:.05em; text-transform:uppercase; color:hsl(var(--warn-h) 55% 45%); margin-top:16px; }
+  :root:not([data-theme="light"]) .unconfirmed { color:hsl(var(--warn-h) 70% 65%); }
+  :root[data-theme="dark"] .unconfirmed { color:hsl(var(--warn-h) 70% 65%); }
+
+  .order { background:var(--accent-soft); border-radius:8px; padding:16px 18px; font-size:14px; color:var(--ink); }
+  .order b { font-family:var(--font-mono); }
+
+  a { color:var(--accent); }
+  code { font-family:var(--font-mono); font-size:12.5px; background:var(--surface-2); padding:1px 5px; border-radius:3px; color:var(--ink-2); }
+</style>
+
+<div class="wrap">
+  <header class="masthead">
+    <p class="eyebrow" id="c-eyebrow"></p>
+    <h1 id="c-title"></h1>
+    <p class="standfirst" id="c-standfirst"></p>
+  </header>
+
+  <div class="metric-row">
+    <div class="metric"><h3>Objective</h3><p id="c-objective"></p></div>
+    <div class="metric"><h3>Value metric</h3><p id="c-metric"></p></div>
+  </div>
+
+  <section id="sec-states">
+    <h2><span class="n">01</span>The states</h2>
+    <p class="lede" id="c-states-lede"></p>
+    <div class="statetabs" id="statetabs"></div>
+    <div id="statepanes"></div>
+  </section>
+
+  <section id="sec-pain">
+    <h2><span class="n">02</span>Named pain points</h2>
+    <p class="lede">Each one has a different cause and a different fix — collapsing them into "this step is manual" loses that.</p>
+    <div class="cards" id="paincards"></div>
+  </section>
+
+  <section id="sec-tools">
+    <h2><span class="n">03</span>Tools researched</h2>
+    <p class="lede" id="c-tools-lede"></p>
+    <div class="toolwrap">
+      <table class="tools" id="tooltable"></table>
+    </div>
+  </section>
+
+  <section id="sec-calc">
+    <h2><span class="n">04</span>Capacity saved — adjust the assumptions</h2>
+    <p class="lede">Every number below is a placeholder you can change. The totals recompute as you type.</p>
+    <div class="calc">
+      <div class="calc-grid" id="calc-inputs"></div>
+      <div class="calc-out" id="calc-outputs"></div>
+      <p class="unconfirmed" id="calc-flag"></p>
+    </div>
+  </section>
+
+  <section id="sec-order">
+    <h2><span class="n">05</span>Recommended order</h2>
+    <div class="order" id="c-order"></div>
+  </section>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ==============================================================
+     ①  CONFIG — page chrome and copy. Edit freely.
+     ============================================================== */
+  var CONFIG = {
+    eyebrow: "REPLACE · workflow analysis",
+    title: "REPLACE — whose workflow, what it produces",
+    standfirst: "REPLACE. One paragraph: what this page shows and who it's for.",
+    objective: "REPLACE — one sentence: the outcome this workflow exists to produce.",
+    valueMetric: "REPLACE — what success looks like to the person who owns this (volume / speed / quality / a numbers game).",
+    statesLede: "Fully manual is the floor every estimate is measured against; it gets a one-line description, not a diagram.",
+    toolsLede: "What's already available (including anything already connected) versus what would need adopting, mapped to the gap each one closes.",
+    recommendedOrder: "REPLACE — the reasoned build order, in one or two sentences."
+  };
+
+  /* ==============================================================
+     ②  DATA — the entire report. Change this and nothing else.
+     ============================================================== */
+  var DATA = {
+    manualFloor: "REPLACE — what it would take with zero tooling at all, in one or two sentences.",
+
+    states: [
+      {
+        id: "current",
+        label: "Current",
+        mermaid: "flowchart TD\n  A[REPLACE step] --> B[REPLACE step]",
+        steps: [
+          // { step: "REPLACE", status: "automated|manual|gate|unclear", note: "REPLACE" }
+        ]
+      },
+      {
+        id: "future",
+        label: "Potential futures",
+        mermaid: null,
+        levers: [
+          // { name: "REPLACE lever", closes: "REPLACE gap", tradeoff: "REPLACE" }
+        ]
+      }
+    ],
+
+    painPoints: [
+      // { title: "REPLACE step name", cause: "missing|unreliable|gate|unclear", note: "REPLACE what's happening", fix: "REPLACE the fix this implies" }
+    ],
+
+    tools: [
+      // { name: "REPLACE", addresses: "REPLACE lever", cost: "REPLACE", tradeoff: "REPLACE", status: "available|adopt|reject", source: "REPLACE, YYYY-MM-DD" }
+    ],
+
+    /* Calculator: each assumption becomes a live number input.
+       formula(v) receives {id: value} for every assumption and
+       must return {weeklyMinutes: number, monthlyMinutes: number}. */
+    calculator: {
+      assumptions: [
+        // { id: "prospectsPerWeek", label: "Prospects per week", default: 20, unit: "prospects" }
+      ],
+      formula: function (v) { return { weeklyMinutes: 0, monthlyMinutes: 0 }; },
+      flag: "⚠️ UNCONFIRMED — every default above is a placeholder pending real timing data."
+    }
+  };
+
+  var CAUSE_H = { missing: 272, unreliable: 352, gate: 42, unclear: 200 };
+  var CAUSE_LABEL = { missing: "No integration built", unreliable: "Connection exists, unreliable", gate: "Deliberate checkpoint", unclear: "Not yet understood" };
+  var STATUS_H = { available: 152, adopt: 42, reject: 352 };
+  var STATUS_LABEL = { available: "Already available", adopt: "Worth adopting", reject: "Not recommended" };
+  var STEP_H = { automated: 152, manual: 352, gate: 42, unclear: 200 };
+  var STEP_LABEL = { automated: "Automated", manual: "Manual", gate: "Manual — gate", unclear: "Unclear" };
+
+  /* ==============================================================
+     ③  ENGINE — no edits needed below this line.
+     ============================================================== */
+  function el(tag, cls, html) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (html != null) e.innerHTML = html;
+    return e;
+  }
+  function pill(hueMap, labelMap, key) {
+    var h = hueMap[key] != null ? hueMap[key] : 200;
+    var p = el("span", "pill", labelMap[key] || key);
+    p.style.setProperty("--ph", String(h));
+    return p;
+  }
+
+  document.getElementById("c-eyebrow").innerHTML = CONFIG.eyebrow;
+  document.getElementById("c-title").innerHTML = CONFIG.title;
+  document.getElementById("c-standfirst").innerHTML = CONFIG.standfirst;
+  document.getElementById("c-objective").innerHTML = CONFIG.objective;
+  document.getElementById("c-metric").innerHTML = CONFIG.valueMetric;
+  document.getElementById("c-states-lede").innerHTML = CONFIG.statesLede;
+  document.getElementById("c-tools-lede").innerHTML = CONFIG.toolsLede;
+  document.getElementById("c-order").innerHTML = CONFIG.recommendedOrder;
+
+  /* ---- states ---- */
+  var tabBox = document.getElementById("statetabs");
+  var paneBox = document.getElementById("statepanes");
+
+  var floorPane = el("div", "statepane active");
+  floorPane.appendChild(el("div", "floor", "<strong>Fully manual (the floor):</strong> " + DATA.manualFloor));
+  var floorTab = el("button", "statetab", "Fully manual");
+  floorTab.setAttribute("aria-pressed", "true");
+  tabBox.appendChild(floorTab);
+  paneBox.appendChild(floorPane);
+
+  var allTabs = [[floorTab, floorPane]];
+
+  DATA.states.forEach(function (s) {
+    var pane = el("div", "statepane");
+    if (s.mermaid) {
+      var dia = el("div", "diagram");
+      var pre = document.createElement("pre");
+      pre.className = "mermaid";
+      pre.textContent = s.mermaid;
+      dia.appendChild(pre);
+      pane.appendChild(dia);
+    }
+    if (s.steps && s.steps.length) {
+      var tbl = el("table", "steps",
+        "<thead><tr><th>Step</th><th>Status</th><th>Note</th></tr></thead>");
+      var tbody = document.createElement("tbody");
+      s.steps.forEach(function (st) {
+        var tr = document.createElement("tr");
+        tr.appendChild(el("td", null, st.step));
+        var td2 = el("td");
+        td2.appendChild(pill(STEP_H, STEP_LABEL, st.status));
+        tr.appendChild(td2);
+        tr.appendChild(el("td", null, st.note || ""));
+        tbody.appendChild(tr);
+      });
+      tbl.appendChild(tbody);
+      pane.appendChild(tbl);
+    }
+    if (s.levers && s.levers.length) {
+      var t2 = el("table", "steps",
+        "<thead><tr><th>Lever</th><th>Closes</th><th>Trade-off</th></tr></thead>");
+      var tb2 = document.createElement("tbody");
+      s.levers.forEach(function (lv) {
+        var tr = document.createElement("tr");
+        tr.appendChild(el("td", null, "<b>" + lv.name + "</b>"));
+        tr.appendChild(el("td", null, lv.closes));
+        tr.appendChild(el("td", null, lv.tradeoff));
+        tb2.appendChild(tr);
+      });
+      t2.appendChild(tb2);
+      pane.appendChild(t2);
+    }
+    paneBox.appendChild(pane);
+    var tab = el("button", "statetab", s.label);
+    tab.setAttribute("aria-pressed", "false");
+    tabBox.appendChild(tab);
+    allTabs.push([tab, pane]);
+  });
+
+  allTabs.forEach(function (pair) {
+    pair[0].addEventListener("click", function () {
+      allTabs.forEach(function (p) {
+        p[0].setAttribute("aria-pressed", String(p === pair));
+        p[1].classList.toggle("active", p === pair);
+      });
+    });
+  });
+
+  /* ---- pain points ---- */
+  var painBox = document.getElementById("paincards");
+  DATA.painPoints.forEach(function (p) {
+    var card = el("div", "card");
+    var head = el("div", "cardhead");
+    head.appendChild(el("h4", null, p.title));
+    head.appendChild(pill(CAUSE_H, CAUSE_LABEL, p.cause));
+    card.appendChild(head);
+    card.appendChild(el("p", null, p.note));
+    card.appendChild(el("div", "fix", "<b>Fix implied:</b> " + p.fix));
+    painBox.appendChild(card);
+  });
+  if (!DATA.painPoints.length) document.getElementById("sec-pain").hidden = true;
+
+  /* ---- tools ---- */
+  var toolTbl = document.getElementById("tooltable");
+  var thead = el("thead", null,
+    "<tr><th>Tool</th><th>Addresses</th><th>Cost</th><th>Trade-off</th><th>Status</th><th>Source</th></tr>");
+  toolTbl.appendChild(thead);
+  var tbody = document.createElement("tbody");
+  DATA.tools.forEach(function (t) {
+    var tr = document.createElement("tr");
+    tr.appendChild(el("td", null, "<b>" + t.name + "</b>"));
+    tr.appendChild(el("td", null, t.addresses));
+    tr.appendChild(el("td", null, t.cost));
+    tr.appendChild(el("td", null, t.tradeoff));
+    var td = el("td"); td.appendChild(pill(STATUS_H, STATUS_LABEL, t.status)); tr.appendChild(td);
+    tr.appendChild(el("td", "src", t.source));
+    tbody.appendChild(tr);
+  });
+  toolTbl.appendChild(tbody);
+  if (!DATA.tools.length) document.getElementById("sec-tools").hidden = true;
+
+  /* ---- calculator ---- */
+  var inputBox = document.getElementById("calc-inputs");
+  var outputBox = document.getElementById("calc-outputs");
+  document.getElementById("calc-flag").textContent = DATA.calculator.flag || "";
+
+  var inputs = {};
+  DATA.calculator.assumptions.forEach(function (a) {
+    var field = el("div", "field");
+    field.appendChild(el("label", null, a.label));
+    var input = document.createElement("input");
+    input.type = "number";
+    input.min = "0";
+    input.step = "any";
+    input.value = a.default;
+    input.addEventListener("input", recompute);
+    field.appendChild(input);
+    field.appendChild(el("div", "unit", a.unit || ""));
+    inputBox.appendChild(field);
+    inputs[a.id] = input;
+  });
+  if (!DATA.calculator.assumptions.length) document.getElementById("sec-calc").hidden = true;
+
+  function fmt(n) {
+    return Math.round(n).toLocaleString();
+  }
+  function recompute() {
+    var v = {};
+    Object.keys(inputs).forEach(function (k) { v[k] = parseFloat(inputs[k].value) || 0; });
+    var r = DATA.calculator.formula(v) || {};
+    var weekly = r.weeklyMinutes || 0, monthly = r.monthlyMinutes || 0;
+    outputBox.innerHTML = "";
+    [
+      [fmt(weekly) + " min", "Saved per week"],
+      [fmt(weekly / 60) + " hrs", "= per week, in hours"],
+      [fmt(monthly / 60) + " hrs", "Saved per month"]
+    ].forEach(function (row) {
+      var out = el("div", "out");
+      out.appendChild(el("div", "num", row[0]));
+      out.appendChild(el("div", "lbl", row[1]));
+      outputBox.appendChild(out);
+    });
+  }
+  recompute();
+})();
+</script>
