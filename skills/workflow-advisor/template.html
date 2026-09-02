@@ -1,17 +1,26 @@
 <title>REPLACE — Workflow Canvas</title>
 
 <!-- ============================================================
-     WORKFLOW CANVAS TEMPLATE  ·  v1.0
-     A dependency-free before/after workflow report: states as
-     Mermaid flows, pain points as cards, tool research as a table,
-     and a LIVE adjustable capacity calculator.
+     WORKFLOW CANVAS TEMPLATE  ·  v1.1
+     A dependency-free before/after workflow report: states as a
+     hand-built flow diagram, pain points as cards, tool research
+     as a table, and a LIVE adjustable capacity calculator with a
+     Simple/Detailed-by-stage toggle.
 
      To reuse: edit CONFIG and DATA at the bottom of this file.
      Nothing above the <script> needs to change unless you are
      deliberately re-designing. Colour is hue-driven, same pattern
      as skills/depth-tree/template.html — one hue number derives
-     both themes. Mermaid renders natively in the Artifact host;
-     do not load a library for it.
+     both themes.
+
+     DO NOT use Mermaid here. v1.0 built flow diagrams as
+     dynamically-inserted <pre class="mermaid"> elements — the
+     Artifact host's mermaid conversion is a publish-time pass over
+     the static source HTML, so anything a page's own <script>
+     builds at runtime is invisible to it and never renders. The
+     flow diagram below is plain CSS-positioned cards instead —
+     reliable, and it reuses the same status-hue tokens as the
+     pain-point cards and the detail table.
      ============================================================ -->
 
 <style>
@@ -75,6 +84,7 @@
   }
 
   * { box-sizing:border-box; }
+  [hidden] { display:none !important; }
   body {
     margin:0; background:var(--ground); color:var(--ink);
     font-family:var(--font-sans); font-size:16px; line-height:1.6;
@@ -121,8 +131,24 @@
     background:var(--surface-2); border:1px dashed var(--rule-2); border-radius:8px;
     padding:16px 18px; font-size:14.5px; color:var(--ink-2);
   }
-  .diagram { background:var(--surface); border:1px solid var(--rule); border-radius:8px; padding:18px; overflow-x:auto; box-shadow:var(--shadow); }
-  .diagram pre.mermaid { margin:0; }
+
+  /* ---- hand-built flow diagram ----
+     No external renderer: a flowchart is just status-tinted cards in a
+     column with a connector between them. Reliable beats clever — a
+     dynamically-inserted <pre class="mermaid"> is invisible to the
+     Artifact host's publish-time mermaid pass, since that pass runs over
+     the static source HTML, not the live DOM a client script builds. */
+  .flow { display:flex; flex-direction:column; align-items:stretch; gap:0; max-width:560px; margin:0 auto 8px; }
+  .flownode {
+    background:var(--surface); border:1px solid var(--rule); border-left:4px solid hsl(var(--th) 55% 45%);
+    border-radius:7px; padding:12px 15px; box-shadow:var(--shadow);
+    display:flex; align-items:baseline; justify-content:space-between; gap:10px; flex-wrap:wrap;
+  }
+  .flownode .flabel { font-size:14px; font-weight:560; color:var(--ink); }
+  .flowconnector {
+    align-self:center; font-family:var(--font-mono); font-size:15px; color:var(--ink-3);
+    line-height:1; padding:3px 0; user-select:none;
+  }
 
   table.steps { width:100%; border-collapse:collapse; margin-top:16px; font-size:13.5px; }
   table.steps th { text-align:left; font-family:var(--font-mono); font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-3); padding:8px 10px; border-bottom:1px solid var(--rule-2); }
@@ -163,12 +189,23 @@
   .out { text-align:left; }
   .out .num { font-family:var(--font-mono); font-variant-numeric:tabular-nums; font-size:28px; font-weight:700; color:var(--accent); line-height:1.1; }
   .out .lbl { font-size:12.5px; color:var(--ink-2); margin-top:4px; }
+  .stagebreak { display:flex; flex-direction:column; gap:10px; border-top:1px solid var(--rule); padding-top:18px; }
+  .stagerow { display:grid; grid-template-columns:minmax(140px,1fr) minmax(90px,2fr) 90px; align-items:center; gap:10px; font-size:13px; }
+  .stagelbl { color:var(--ink-2); }
+  .stagebarwrap { background:var(--surface-2); border-radius:4px; height:10px; overflow:hidden; }
+  .stagebar { background:var(--accent); height:100%; border-radius:4px; }
+  .stagenum { font-family:var(--font-mono); font-variant-numeric:tabular-nums; text-align:right; color:var(--ink); }
+  .stagetotal { border-top:1px solid var(--rule); padding-top:10px; margin-top:2px; font-weight:650; }
+  .stagetotal .stagelbl { color:var(--ink); }
   .unconfirmed { font-family:var(--font-mono); font-size:10.5px; letter-spacing:.05em; text-transform:uppercase; color:hsl(var(--warn-h) 55% 45%); margin-top:16px; }
   :root:not([data-theme="light"]) .unconfirmed { color:hsl(var(--warn-h) 70% 65%); }
   :root[data-theme="dark"] .unconfirmed { color:hsl(var(--warn-h) 70% 65%); }
 
   .order { background:var(--accent-soft); border-radius:8px; padding:16px 18px; font-size:14px; color:var(--ink); }
   .order b { font-family:var(--font-mono); }
+
+  .notebox { background:var(--surface); border:1px solid var(--rule); border-left:4px solid hsl(var(--info-h) 55% 50%); border-radius:7px; padding:12px 16px; font-size:13.5px; color:var(--ink-2); margin-bottom:16px; }
+  .notebox b { color:var(--ink); }
 
   a { color:var(--accent); }
   code { font-family:var(--font-mono); font-size:12.5px; background:var(--surface-2); padding:1px 5px; border-radius:3px; color:var(--ink-2); }
@@ -189,6 +226,7 @@
   <section id="sec-states">
     <h2><span class="n">01</span>The states</h2>
     <p class="lede" id="c-states-lede"></p>
+    <div id="c-context-notes"></div>
     <div class="statetabs" id="statetabs"></div>
     <div id="statepanes"></div>
   </section>
@@ -209,10 +247,13 @@
 
   <section id="sec-calc">
     <h2><span class="n">04</span>Capacity saved — adjust the assumptions</h2>
-    <p class="lede">Every number below is a placeholder you can change. The totals recompute as you type.</p>
+    <p class="lede">Every number below is a placeholder you can change. The totals recompute as you type. <b>Simple</b> gives a headline total; <b>Detailed</b> breaks it down by stage to show where the time actually goes.</p>
     <div class="calc">
+      <div class="calc-grid" id="calc-shared"></div>
+      <div class="statetabs" id="calcmodetabs"></div>
       <div class="calc-grid" id="calc-inputs"></div>
       <div class="calc-out" id="calc-outputs"></div>
+      <div id="calc-detail"></div>
       <p class="unconfirmed" id="calc-flag"></p>
     </div>
   </section>
@@ -237,6 +278,9 @@
     objective: "REPLACE — one sentence: the outcome this workflow exists to produce.",
     valueMetric: "REPLACE — what success looks like to the person who owns this (volume / speed / quality / a numbers game).",
     statesLede: "Fully manual is the floor every estimate is measured against; it gets a one-line description, not a diagram.",
+    contextNotes: [
+      // "REPLACE — a fact that changes how a lever should be scoped, e.g. a tool's non-obvious second purpose."
+    ],
     toolsLede: "What's already available (including anything already connected) versus what would need adopting, mapped to the gap each one closes.",
     recommendedOrder: "REPLACE — the reasoned build order, in one or two sentences."
   };
@@ -251,7 +295,8 @@
       {
         id: "current",
         label: "Current",
-        mermaid: "flowchart TD\n  A[REPLACE step] --> B[REPLACE step]",
+        /* Each step renders as BOTH a hand-drawn flow box (top) and a
+           detail-table row (below it) — one array, two views. */
         steps: [
           // { step: "REPLACE", status: "automated|manual|gate|unclear", note: "REPLACE" }
         ]
@@ -259,7 +304,6 @@
       {
         id: "future",
         label: "Potential futures",
-        mermaid: null,
         levers: [
           // { name: "REPLACE lever", closes: "REPLACE gap", tradeoff: "REPLACE" }
         ]
@@ -271,17 +315,26 @@
     ],
 
     tools: [
-      // { name: "REPLACE", addresses: "REPLACE lever", cost: "REPLACE", tradeoff: "REPLACE", status: "available|adopt|reject", source: "REPLACE, YYYY-MM-DD" }
+      // { name: "REPLACE", addresses: "REPLACE lever", cost: "REPLACE", tradeoff: "REPLACE", buildable: "REPLACE — could this be a Claude skill/workflow instead of a purchase?", status: "available|adopt|reject", source: "REPLACE, YYYY-MM-DD" }
     ],
 
-    /* Calculator: each assumption becomes a live number input.
-       formula(v) receives {id: value} for every assumption and
-       must return {weeklyMinutes: number, monthlyMinutes: number}. */
+    /* Calculator: prospectsPerWeek is shared by both modes.
+       simple.assumptions sums to one headline total — a quick gut-check.
+       detailed.stages is one row per pipeline stage, each its own
+       minutes-per-prospect input — reveals where the time actually goes.
+       Toggle between them; both read the same prospectsPerWeek input. */
     calculator: {
-      assumptions: [
-        // { id: "prospectsPerWeek", label: "Prospects per week", default: 20, unit: "prospects" }
-      ],
-      formula: function (v) { return { weeklyMinutes: 0, monthlyMinutes: 0 }; },
+      prospectsPerWeek: { label: "Prospects processed per week", default: 20 },
+      simple: {
+        assumptions: [
+          // { id: "leverA", label: "REPLACE", default: 0, unit: "minutes saved per prospect" }
+        ]
+      },
+      detailed: {
+        stages: [
+          // { id: "REPLACE", label: "REPLACE stage name", default: 0 }
+        ]
+      },
       flag: "⚠️ UNCONFIRMED — every default above is a placeholder pending real timing data."
     }
   };
@@ -315,6 +368,8 @@
   document.getElementById("c-objective").innerHTML = CONFIG.objective;
   document.getElementById("c-metric").innerHTML = CONFIG.valueMetric;
   document.getElementById("c-states-lede").innerHTML = CONFIG.statesLede;
+  var notesBox = document.getElementById("c-context-notes");
+  (CONFIG.contextNotes || []).forEach(function (n) { notesBox.appendChild(el("div", "notebox", n)); });
   document.getElementById("c-tools-lede").innerHTML = CONFIG.toolsLede;
   document.getElementById("c-order").innerHTML = CONFIG.recommendedOrder;
 
@@ -333,13 +388,17 @@
 
   DATA.states.forEach(function (s) {
     var pane = el("div", "statepane");
-    if (s.mermaid) {
-      var dia = el("div", "diagram");
-      var pre = document.createElement("pre");
-      pre.className = "mermaid";
-      pre.textContent = s.mermaid;
-      dia.appendChild(pre);
-      pane.appendChild(dia);
+    if (s.steps && s.steps.length) {
+      var flow = el("div", "flow");
+      s.steps.forEach(function (st, i) {
+        var node = el("div", "flownode");
+        node.style.setProperty("--th", String(STEP_H[st.status] != null ? STEP_H[st.status] : 200));
+        node.appendChild(el("span", "flabel", st.step));
+        node.appendChild(pill(STEP_H, STEP_LABEL, st.status));
+        flow.appendChild(node);
+        if (i < s.steps.length - 1) flow.appendChild(el("div", "flowconnector", "↓"));
+      });
+      pane.appendChild(flow);
     }
     if (s.steps && s.steps.length) {
       var tbl = el("table", "steps",
@@ -404,7 +463,7 @@
   /* ---- tools ---- */
   var toolTbl = document.getElementById("tooltable");
   var thead = el("thead", null,
-    "<tr><th>Tool</th><th>Addresses</th><th>Cost</th><th>Trade-off</th><th>Status</th><th>Source</th></tr>");
+    "<tr><th>Tool</th><th>Addresses</th><th>Cost</th><th>Trade-off</th><th>Build instead?</th><th>Status</th><th>Source</th></tr>");
   toolTbl.appendChild(thead);
   var tbody = document.createElement("tbody");
   DATA.tools.forEach(function (t) {
@@ -413,6 +472,7 @@
     tr.appendChild(el("td", null, t.addresses));
     tr.appendChild(el("td", null, t.cost));
     tr.appendChild(el("td", null, t.tradeoff));
+    tr.appendChild(el("td", null, t.buildable || "—"));
     var td = el("td"); td.appendChild(pill(STATUS_H, STATUS_LABEL, t.status)); tr.appendChild(td);
     tr.appendChild(el("td", "src", t.source));
     tbody.appendChild(tr);
@@ -420,48 +480,124 @@
   toolTbl.appendChild(tbody);
   if (!DATA.tools.length) document.getElementById("sec-tools").hidden = true;
 
-  /* ---- calculator ---- */
+  /* ---- calculator: shared prospects/week + a Simple/Detailed toggle ---- */
+  var sharedBox = document.getElementById("calc-shared");
+  var modeTabBox = document.getElementById("calcmodetabs");
   var inputBox = document.getElementById("calc-inputs");
   var outputBox = document.getElementById("calc-outputs");
+  var detailBox = document.getElementById("calc-detail");
   document.getElementById("calc-flag").textContent = DATA.calculator.flag || "";
 
-  var inputs = {};
-  DATA.calculator.assumptions.forEach(function (a) {
-    var field = el("div", "field");
-    field.appendChild(el("label", null, a.label));
-    var input = document.createElement("input");
-    input.type = "number";
-    input.min = "0";
-    input.step = "any";
-    input.value = a.default;
-    input.addEventListener("input", recompute);
-    field.appendChild(input);
-    field.appendChild(el("div", "unit", a.unit || ""));
-    inputBox.appendChild(field);
-    inputs[a.id] = input;
-  });
-  if (!DATA.calculator.assumptions.length) document.getElementById("sec-calc").hidden = true;
+  var hasCalc = DATA.calculator.simple.assumptions.length || DATA.calculator.detailed.stages.length;
+  if (!hasCalc) {
+    document.getElementById("sec-calc").hidden = true;
+  } else {
+    var ppwField = el("div", "field");
+    ppwField.appendChild(el("label", null, DATA.calculator.prospectsPerWeek.label));
+    var ppwInput = document.createElement("input");
+    ppwInput.type = "number"; ppwInput.min = "0"; ppwInput.step = "any";
+    ppwInput.value = DATA.calculator.prospectsPerWeek.default;
+    ppwInput.addEventListener("input", function () { recompute(); });
+    ppwField.appendChild(ppwInput);
+    sharedBox.appendChild(ppwField);
 
-  function fmt(n) {
-    return Math.round(n).toLocaleString();
-  }
-  function recompute() {
-    var v = {};
-    Object.keys(inputs).forEach(function (k) { v[k] = parseFloat(inputs[k].value) || 0; });
-    var r = DATA.calculator.formula(v) || {};
-    var weekly = r.weeklyMinutes || 0, monthly = r.monthlyMinutes || 0;
-    outputBox.innerHTML = "";
-    [
-      [fmt(weekly) + " min", "Saved per week"],
-      [fmt(weekly / 60) + " hrs", "= per week, in hours"],
-      [fmt(monthly / 60) + " hrs", "Saved per month"]
-    ].forEach(function (row) {
-      var out = el("div", "out");
-      out.appendChild(el("div", "num", row[0]));
-      out.appendChild(el("div", "lbl", row[1]));
-      outputBox.appendChild(out);
+    var simpleTab = el("button", "statetab", "Simple");
+    var detailTab = el("button", "statetab", "Detailed — per stage");
+    simpleTab.setAttribute("aria-pressed", "true");
+    detailTab.setAttribute("aria-pressed", "false");
+    modeTabBox.appendChild(simpleTab);
+    modeTabBox.appendChild(detailTab);
+
+    var simpleInputs = {};
+    DATA.calculator.simple.assumptions.forEach(function (a) {
+      var field = el("div", "field");
+      field.appendChild(el("label", null, a.label));
+      var input = document.createElement("input");
+      input.type = "number"; input.min = "0"; input.step = "any"; input.value = a.default;
+      input.addEventListener("input", function () { recompute(); });
+      field.appendChild(input);
+      field.appendChild(el("div", "unit", a.unit || ""));
+      inputBox.appendChild(field);
+      simpleInputs[a.id] = input;
     });
+
+    var stageInputs = {};
+    var detailInputsWrap = el("div", "calc-grid");
+    DATA.calculator.detailed.stages.forEach(function (s) {
+      var field = el("div", "field");
+      field.appendChild(el("label", null, s.label));
+      var input = document.createElement("input");
+      input.type = "number"; input.min = "0"; input.step = "any"; input.value = s.default;
+      input.addEventListener("input", function () { recompute(); });
+      field.appendChild(input);
+      field.appendChild(el("div", "unit", "minutes per prospect"));
+      detailInputsWrap.appendChild(field);
+      stageInputs[s.id] = input;
+    });
+    var breakdown = el("div", "stagebreak");
+    detailBox.appendChild(detailInputsWrap);
+    detailBox.appendChild(breakdown);
+    detailBox.hidden = true;
+
+    function fmt(n) { return Math.round(n).toLocaleString(); }
+
+    function setMode(m) {
+      simpleTab.setAttribute("aria-pressed", String(m === "simple"));
+      detailTab.setAttribute("aria-pressed", String(m === "detailed"));
+      inputBox.hidden = m !== "simple";
+      outputBox.hidden = m !== "simple";
+      detailBox.hidden = m !== "detailed";
+      recompute();
+    }
+    simpleTab.addEventListener("click", function () { setMode("simple"); });
+    detailTab.addEventListener("click", function () { setMode("detailed"); });
+
+    function recompute() {
+      var ppw = parseFloat(ppwInput.value) || 0;
+      if (!inputBox.hidden) {
+        // simple mode
+        var total = 0;
+        Object.keys(simpleInputs).forEach(function (k) { total += parseFloat(simpleInputs[k].value) || 0; });
+        var weekly = ppw * total, monthly = weekly * 4.33;
+        outputBox.innerHTML = "";
+        [
+          [fmt(weekly) + " min", "Saved per week"],
+          [fmt(weekly / 60) + " hrs", "= per week, in hours"],
+          [fmt(monthly / 60) + " hrs", "Saved per month"]
+        ].forEach(function (row) {
+          var out = el("div", "out");
+          out.appendChild(el("div", "num", row[0]));
+          out.appendChild(el("div", "lbl", row[1]));
+          outputBox.appendChild(out);
+        });
+      }
+      if (!detailBox.hidden) {
+        var rows = DATA.calculator.detailed.stages.map(function (s) {
+          return { label: s.label, weekly: (parseFloat(stageInputs[s.id].value) || 0) * ppw };
+        });
+        var grand = rows.reduce(function (a, r) { return a + r.weekly; }, 0);
+        var max = Math.max.apply(null, rows.map(function (r) { return r.weekly; }).concat([1]));
+        breakdown.innerHTML = "";
+        rows.forEach(function (r) {
+          var row = el("div", "stagerow");
+          row.appendChild(el("div", "stagelbl", r.label));
+          var barwrap = el("div", "stagebarwrap");
+          var bar = el("div", "stagebar");
+          bar.style.width = (max ? (r.weekly / max * 100) : 0) + "%";
+          barwrap.appendChild(bar);
+          row.appendChild(barwrap);
+          row.appendChild(el("div", "stagenum", fmt(r.weekly) + " min/wk"));
+          breakdown.appendChild(row);
+        });
+        var totalRow = el("div", "stagerow stagetotal");
+        totalRow.appendChild(el("div", "stagelbl", "Total, per week"));
+        totalRow.appendChild(el("div", "stagebarwrap"));
+        totalRow.appendChild(el("div", "stagenum", fmt(grand) + " min/wk (" + fmt(grand / 60) + " hrs)"));
+        breakdown.appendChild(totalRow);
+      }
+    }
+
+    setMode("simple");
   }
-  recompute();
 })();
 </script>

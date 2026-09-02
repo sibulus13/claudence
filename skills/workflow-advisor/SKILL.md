@@ -39,6 +39,12 @@ someone else gave you, rather than the person's own direct account.** If you're 
 notes taken by someone other than the domain expert, treat them as a lead to verify with the
 person directly, not as ground truth — the same discipline as sourcing any other claim.
 
+**Ask whether any tool in the current pipeline has a second purpose beyond the one being
+discussed.** Found 2026-09-02: a "just a cron job" data source turned out to also be the team's
+shared leaderboard for gamification. A lever that would silently remove or bypass a tool's visible
+front-end can look like a clean automation win while actually deleting something the team values —
+name the tool's full role before proposing to route around it.
+
 ## 2 · Reconstruct three states, not one
 
 - **Fully-manual baseline** — what it would take with zero tooling at all. This is the reference
@@ -57,10 +63,18 @@ person directly, not as ground truth — the same discipline as sourcing any oth
 
 ## 3 · Flowchart each state
 
-Mermaid `flowchart TD`, manual steps visually distinguished (bold label, a `⚠️`/`❌` marker, or a
-separate shape) from automated ones. Keep rows short — a diagram that needs horizontal scrolling
-to read has failed its own purpose for a non-technical reader. An unclear step gets its own node,
-marked `❓`, rather than being smoothed over or omitted.
+**In the markdown copy**, Mermaid `flowchart TD` — manual steps visually distinguished (bold
+label, a `⚠️`/`❌` marker, or a separate shape) from automated ones. Keep rows short — a diagram
+that needs horizontal scrolling to read has failed its own purpose for a non-technical reader. An
+unclear step gets its own node, marked `❓`, rather than being smoothed over or omitted.
+
+**In the Artifact, never build the flow as Mermaid text inserted by the page's own JavaScript.**
+Found 2026-09-02: the Artifact host's Mermaid conversion is a publish-time pass over the static
+source HTML — a `<pre class="mermaid">` element the page's own `<script>` creates at runtime via
+`document.createElement`/`appendChild` is invisible to that pass and never renders, so the diagram
+silently doesn't show up at all. `template.html`'s flow diagram is hand-built instead (status-tinted
+cards + a connector, driven from the same `steps[]` array that feeds the detail table) — reliable,
+and it needs no library. Reuse that renderer; do not reintroduce Mermaid inside an Artifact's script.
 
 ## 4 · Name pain points, tied to WHERE the manual/automated boundary sits
 
@@ -87,19 +101,38 @@ lever), state its default as a labeled assumption, give the formula that combine
 the computed total at the defaults. The reviewer or the domain expert should be able to change one
 number and get a different, honest total — never a total they can only accept or reject whole.
 
+**Give it two modes, not one — a headline total AND a per-stage breakdown.** A single aggregate
+number tells the reviewer THAT time is being lost; it doesn't tell them WHERE. Found 2026-09-02:
+"where the actual pain point is happening" needs one input per pipeline stage (from the same
+`steps[]` used for the flow diagram), each multiplied by the shared volume-per-cycle input, so the
+biggest bar is visible at a glance — not just a lever-level sum. Build both a **Simple** mode (one
+input per lever, one total — a fast gut-check) and a **Detailed** mode (one input per stage, a
+proportional bar per row) behind a toggle, sharing the same volume input. `template.html`'s
+calculator already implements this shape; fill in `calculator.simple` and `calculator.detailed`
+rather than inventing a new structure.
+
 ## 6 · Recommend alternatives — research first, then compare, then order
 
 **Before recommending, research what actually exists** — this is a required step, not
 background colour:
-1. **Check what's already available first**: already-installed/authenticated connectors or
+1. **Check whether it's buildable as a Claude skill or workflow FIRST, before pricing anything
+   out.** This is the standing default ordering, added 2026-09-02: if the task is bounded (a
+   single connection, a single transformation, something an already-connected MCP tool could do
+   on a schedule) a reusable skill/workflow is usually cheaper than a subscription and gives the
+   domain expert something they own outright. Only fall back to a purchased tool when the task
+   needs infrastructure a skill can't reasonably provide — a persistent server, a complex OAuth
+   flow, heavy data volume, or a UI the domain expert needs day-to-day that isn't a chat interface.
+2. **Check what's already available next**: already-installed/authenticated connectors or
    integrations, an existing subscription that already covers this, a native feature of a tool
    already in use. Free or near-free beats anything requiring a new purchase.
-2. **Then research what could be adopted**: real products, with real (dated, sourced) pricing —
+3. **Then research what could be adopted**: real products, with real (dated, sourced) pricing —
    never an invented number. Note when pricing is quote-based or a lead rather than a locked
    figure.
-3. **Map every candidate to the specific named pain point (from step 4) it closes** — a tool that
-   would replace the whole pipeline is a different kind of recommendation than one that closes a
-   single gap, and the comparison table must make that difference visible, not just list options.
+4. **Map every candidate to the specific named pain point (from step 4) it closes, and record
+   whether it's buildable** — a tool that would replace the whole pipeline is a different kind of
+   recommendation than one that closes a single gap, and a purchased platform that also happens to
+   be buildable in-house cheaper is worth flagging even when the vendor still gets listed. The
+   comparison table needs a `buildable` column, not just cost/trade-off/status.
 
 - No jargon. A comparison table beats prose for this.
 - **State what each option costs the person, not just what it saves.** "Removes the review step"
@@ -142,6 +175,33 @@ styling, making an edit hard to locate):
 | **Tailwind (Play CDN)** | **Not needed here.** | The token-based CSS custom-property system already in `template.html` gives theme-aware styling with zero extra load; Tailwind adds a class-authoring convenience this template doesn't need |
 | **The actual fix for the original frustration** | **Structural separation, already solved by the template pattern** — `CONFIG`/`DATA` at the bottom, rendering engine above, exactly like `depth-tree` | The slow-edit problem was never "we need a framework" — it was "the data lived inside the styling." A template with the two cleanly separated fixes that without adding a dependency |
 
+## 9 · Packaging and measuring, once a workflow proves out
+
+**Researched 2026-09-02 against current Anthropic documentation — verify again before relying on
+this, since platform capabilities change.**
+
+**Org-wide distribution is possible, but never automatic.** If a workflow built for one person
+should become a standard, shared capability:
+- Any tier: a private plugin marketplace (a `marketplace.json` git repo) or a direct GitHub-repo
+  reference — each team member still adds it once to their own `.claude/settings.json`.
+- Team/Enterprise only: **managed settings** push a skill/plugin to every seat with no per-user
+  step — this is the actual "standardized package" mechanism, not a copy-paste.
+- **Published claude.ai Artifacts do NOT auto-share to an org, at any tier.** Team/Enterprise adds
+  "everyone in org" as a possible recipient in the share menu, but every artifact still needs a
+  human to open that menu and choose it — there is no bulk API and no default-visible setting. Say
+  this plainly rather than implying a toggle exists.
+
+**Usage telemetry exists at the adoption level, not the effectiveness level — say what's missing,
+don't imply more than what's there.** An Enterprise-tier Analytics API reports per-skill adoption
+(sessions, user counts, ~1-day lag) and per-user activity (sessions, cost) — Team gets a coarser
+usage/cost dashboard, no skill-level breakdown. **Neither tier exposes conversation content or a
+repeated-task signal** (e.g. detecting that a user re-opened work on a similarly-named task,
+which would suggest the first attempt didn't fully land) — that gap is real, not a configuration
+you're missing. Local `~/.claude/telemetry/` is per-user only and never visible to an org. When a
+domain expert or their manager asks for this, report the adoption-count capability honestly and
+name the effectiveness-tracking gap rather than proposing a workaround that reads conversation
+transcripts — no such access exists at any tier.
+
 ## What this skill does not do
 
 - **Does not implement the automation.** This produces the map and the recommendation; building
@@ -151,3 +211,5 @@ styling, making an edit hard to locate):
   appears, not just where it's first introduced — including every input in the cyclical model.
 - **Does not reach for React/shadcn by default.** See § 8 — the template pattern is the default
   and a framework is the exception, not the other way around.
+- **Does not claim org-wide artifact sharing or conversation-history-based effectiveness tracking
+  exist.** See § 9 — both are real gaps in the current platform, not this skill's oversight.
