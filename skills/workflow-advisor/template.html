@@ -1,11 +1,17 @@
 <title>REPLACE — Workflow Canvas</title>
+<meta charset="utf-8">
 
 <!-- ============================================================
-     WORKFLOW CANVAS TEMPLATE  ·  v1.1
-     A dependency-free before/after workflow report: states as a
-     hand-built flow diagram, pain points as cards, tool research
-     as a table, and a LIVE adjustable capacity calculator with a
-     Simple/Detailed-by-stage toggle.
+     WORKFLOW CANVAS TEMPLATE  ·  v1.2
+     A dependency-free consultancy-style workflow report: ONE
+     current→future pipeline (a step either passes through
+     unchanged, or the diagram shows inline what replaces it —
+     single-step swap or multi-step consolidation), pain-point
+     cards, tool research led by a max-2 "Top picks" hero over a
+     Build/Middle/Buy landscape, a max-2 recommended-order sequence,
+     and a LIVE adjustable capacity calculator with a
+     Simple/Detailed-by-stage toggle. Every status/tier/maturity
+     label carries an emoji glyph for at-a-glance scanning.
 
      To reuse: edit CONFIG and DATA at the bottom of this file.
      Nothing above the <script> needs to change unless you are
@@ -21,6 +27,10 @@
      flow diagram below is plain CSS-positioned cards instead —
      reliable, and it reuses the same status-hue tokens as the
      pain-point cards and the detail table.
+
+     v1.2 also dropped the old two-tab Current/Potential-futures
+     split and the "Fully manual" tab — see the pipeline[] comment
+     below for why a single linear flow replaced them.
      ============================================================ -->
 
 <style>
@@ -127,18 +137,23 @@
   .statetab[aria-pressed="true"] { background:var(--accent); color:var(--surface); border-color:var(--accent); }
   .statepane { display:none; }
   .statepane.active { display:block; }
-  .floor {
-    background:var(--surface-2); border:1px dashed var(--rule-2); border-radius:8px;
-    padding:16px 18px; font-size:14.5px; color:var(--ink-2);
-  }
 
   /* ---- hand-built flow diagram ----
      No external renderer: a flowchart is just status-tinted cards in a
      column with a connector between them. Reliable beats clever — a
      dynamically-inserted <pre class="mermaid"> is invisible to the
      Artifact host's publish-time mermaid pass, since that pass runs over
-     the static source HTML, not the live DOM a client script builds. */
-  .flow { display:flex; flex-direction:column; align-items:stretch; gap:0; max-width:560px; margin:0 auto 8px; }
+     the static source HTML, not the live DOM a client script builds.
+
+     ONE flow, current extending into future — not two side-by-side
+     panels. A node is either unchanged, or shows what replaces it
+     inline (struck-through source pill(s) → bold replacement card).
+     Chosen over a two-column current/future grid because aligning
+     variable-height cards across two columns is exactly the class of
+     drift bug that has already hit a different Artifact in this
+     account (position-synced sections drifting on variable content
+     height) — a single linear flow has no alignment to keep in sync. */
+  .flow { display:flex; flex-direction:column; align-items:stretch; gap:0; max-width:620px; margin:0 auto 8px; }
   .flownode {
     background:var(--surface); border:1px solid var(--rule); border-left:4px solid hsl(var(--th) 55% 45%);
     border-radius:7px; padding:12px 15px; box-shadow:var(--shadow);
@@ -149,22 +164,44 @@
     align-self:center; font-family:var(--font-mono); font-size:15px; color:var(--ink-3);
     line-height:1; padding:3px 0; user-select:none;
   }
-
-  table.steps { width:100%; border-collapse:collapse; margin-top:16px; font-size:13.5px; }
-  table.steps th { text-align:left; font-family:var(--font-mono); font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-3); padding:8px 10px; border-bottom:1px solid var(--rule-2); }
-  table.steps td { padding:9px 10px; border-bottom:1px solid var(--rule); vertical-align:top; }
-  table.steps tr:last-child td { border-bottom:0; }
+  .flowchange { display:flex; flex-direction:column; gap:0; }
+  .flowfrom {
+    background:var(--surface-2); border:1px dashed var(--rule-2); border-radius:6px;
+    padding:6px 12px; margin:0 0 2px 22px; font-size:12.5px; color:var(--ink-3);
+    text-decoration:line-through; display:flex; align-items:center; gap:8px;
+  }
+  .flowfrom .pill { text-decoration:none; }
+  .flowmerge { font-family:var(--font-mono); font-size:12px; color:var(--ink-3); margin:0 0 2px 22px; }
+  .flowinto {
+    background:var(--surface); border:1px solid var(--accent); border-left:4px solid var(--accent);
+    border-radius:7px; padding:12px 15px; box-shadow:var(--shadow);
+  }
+  .flowinto .flabel { font-size:14px; font-weight:650; color:var(--ink); display:block; margin-bottom:4px; }
+  .flowinto .flownote { font-size:12.5px; color:var(--ink-2); line-height:1.5; }
+  .flowinto .flowbadges { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+  .floorcaption { font-size:12.5px; color:var(--ink-3); text-align:center; margin:2px auto 22px; max-width:560px; }
 
   .pill { font-family:var(--font-mono); font-size:9.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; padding:2px 7px; border-radius:3px; white-space:nowrap; display:inline-block; color:hsl(var(--ph) 55% var(--pill-fg)); background:hsl(var(--ph) 50% var(--pill-bg)); border:1px solid hsl(var(--ph) 40% var(--pill-bd)); }
 
   /* ---- pain point cards ---- */
   .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:14px; }
   .card { background:var(--surface); border:1px solid var(--rule); border-radius:8px; padding:15px 17px; box-shadow:var(--shadow); display:flex; flex-direction:column; gap:8px; }
-  .card .cardhead { display:flex; align-items:center; justify-content:space-between; gap:8px; }
-  .card h4 { margin:0; font-size:14.5px; font-weight:650; }
+  .card .cardhead { display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; }
+  .card h4 { margin:0; font-size:14.5px; font-weight:650; flex:1 1 160px; }
   .card p { margin:0; font-size:13px; color:var(--ink-2); line-height:1.5; }
   .card .fix { font-size:12.5px; color:var(--ink-3); border-top:1px solid var(--rule); padding-top:8px; margin-top:2px; }
   .card .fix b { color:var(--ink-2); font-weight:600; }
+
+  /* ---- top picks: the 1-2 tools actually recommended, ahead of the
+     tier landscape. Distinct from tier — this is the decision, tier
+     cards below are "here's the rest of the landscape." ---- */
+  .toppicks { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:14px; margin-bottom:22px; }
+  .toppick { background:var(--surface); border:2px solid var(--accent); border-radius:9px; padding:17px 19px; box-shadow:var(--shadow); display:flex; flex-direction:column; gap:8px; }
+  .toppick .star { font-size:11px; font-family:var(--font-mono); letter-spacing:.08em; text-transform:uppercase; color:var(--accent); font-weight:700; }
+  .toppick h4 { margin:0; font-size:16px; font-weight:700; }
+  .toppick p { margin:0; font-size:13px; color:var(--ink-2); line-height:1.5; }
+  .toppick .badges { display:flex; gap:6px; flex-wrap:wrap; }
+  .landscapelbl { font-family:var(--font-mono); font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-3); margin:0 0 10px; }
 
   /* ---- tool table ---- */
   /* ---- tier cards: the stakeholder-altitude view, shown before the
@@ -211,8 +248,12 @@
   :root:not([data-theme="light"]) .unconfirmed { color:hsl(var(--warn-h) 70% 65%); }
   :root[data-theme="dark"] .unconfirmed { color:hsl(var(--warn-h) 70% 65%); }
 
-  .order { background:var(--accent-soft); border-radius:8px; padding:16px 18px; font-size:14px; color:var(--ink); }
-  .order b { font-family:var(--font-mono); }
+  .ordersteps { display:flex; align-items:stretch; gap:8px; flex-wrap:wrap; }
+  .orderstep { background:var(--surface); border:1px solid var(--rule); border-radius:8px; padding:12px 14px; box-shadow:var(--shadow); flex:1 1 200px; display:flex; flex-direction:column; gap:6px; }
+  .orderstep .onum { font-family:var(--font-mono); font-size:11px; color:var(--ink-3); }
+  .orderstep h5 { margin:0; font-size:13.5px; font-weight:650; }
+  .orderstep p { margin:0; font-size:12.5px; color:var(--ink-2); line-height:1.45; }
+  .orderarrow { align-self:center; font-family:var(--font-mono); font-size:18px; color:var(--ink-3); flex:0 0 auto; }
 
   .notebox { background:var(--surface); border:1px solid var(--rule); border-left:4px solid hsl(var(--info-h) 55% 50%); border-radius:7px; padding:12px 16px; font-size:13.5px; color:var(--ink-2); margin-bottom:16px; }
   .notebox b { color:var(--ink); }
@@ -234,11 +275,11 @@
   </div>
 
   <section id="sec-states">
-    <h2><span class="n">01</span>The states</h2>
+    <h2><span class="n">01</span>Current → future</h2>
     <p class="lede" id="c-states-lede"></p>
     <div id="c-context-notes"></div>
-    <div class="statetabs" id="statetabs"></div>
-    <div id="statepanes"></div>
+    <div class="floorcaption" id="floorcaption"></div>
+    <div class="flow" id="pipelineflow"></div>
   </section>
 
   <section id="sec-pain">
@@ -250,6 +291,8 @@
   <section id="sec-tools">
     <h2><span class="n">03</span>Tools researched</h2>
     <p class="lede" id="c-tools-lede"></p>
+    <div class="toppicks" id="toppicks"></div>
+    <p class="landscapelbl" id="landscapelbl"></p>
     <div class="tiercards" id="tiercards"></div>
     <button class="btn showfull" id="showfulltable" type="button" aria-expanded="false">Show full comparison ▾</button>
     <div class="toolwrap" id="toolwrap" hidden>
@@ -272,7 +315,8 @@
 
   <section id="sec-order">
     <h2><span class="n">05</span>Recommended order</h2>
-    <div class="order" id="c-order"></div>
+    <p class="lede" id="c-order-lede"></p>
+    <div class="ordersteps" id="ordersteps"></div>
   </section>
 </div>
 
@@ -294,37 +338,33 @@
       // "REPLACE — a fact that changes how a lever should be scoped, e.g. a tool's non-obvious second purpose."
     ],
     toolsLede: "What's already available (including anything already connected) versus what would need adopting, mapped to the gap each one closes.",
+    landscapeLabel: "🗺️ Other options considered",
     tierVerdicts: {
       build: "REPLACE — one-line verdict: when a Claude skill/workflow is the right call, and why it's the first thing to try.",
       middle: "REPLACE — one-line verdict: existing or lightweight connectors that need enabling or a small subscription, short of a full platform.",
       buy: "REPLACE — one-line verdict: full third-party platforms, and why they're heavier than this gap needs (or worth it, if they are)."
     },
-    recommendedOrder: "REPLACE — the reasoned build order, in one or two sentences."
+    orderLede: "REPLACE — one short sentence framing why this order, not a paragraph. Detail lives on each step card below."
   };
 
   /* ==============================================================
      ②  DATA — the entire report. Change this and nothing else.
      ============================================================== */
   var DATA = {
-    manualFloor: "REPLACE — what it would take with zero tooling at all, in one or two sentences.",
+    manualFloor: "REPLACE — what it would take with zero tooling at all, in one sentence. Shown as a small reference caption, not a state to click through.",
 
-    states: [
-      {
-        id: "current",
-        label: "Current",
-        /* Each step renders as BOTH a hand-drawn flow box (top) and a
-           detail-table row (below it) — one array, two views. */
-        steps: [
-          // { step: "REPLACE", status: "automated|manual|gate|unclear", note: "REPLACE" }
-        ]
-      },
-      {
-        id: "future",
-        label: "Potential futures",
-        levers: [
-          // { name: "REPLACE lever", closes: "REPLACE gap", tradeoff: "REPLACE" }
-        ]
-      }
+    /* ONE ordered pipeline, current steps extending into their future
+       replacement inline — not two separate current/future panels.
+       Each entry is one of:
+         { kind: "unchanged", step, status, note }
+         { kind: "replaced",     from: {step,status}, into: {tool, maturity, note} }   — 1 step -> 1 tool
+         { kind: "consolidated", from: [{step,status}, ...], into: {tool, maturity, note} } — N steps -> 1 tool
+       maturity: "now" (feasible today) | "aspirational" (depends on something
+       not yet true — a beta, an unconfirmed integration). Never omit it on
+       an `into` — that is exactly the idealized-vs-realistic distinction
+       a reviewer needs to tell a real recommendation from a bet. */
+    pipeline: [
+      // { kind: "unchanged", step: "REPLACE", status: "automated|manual|gate|unclear", note: "REPLACE" }
     ],
 
     painPoints: [
@@ -333,9 +373,24 @@
 
     /* tier: "build" (a Claude skill/workflow) | "middle" (an existing or
        lightweight connector, short of a full platform) | "buy" (a full
-       third-party platform). Drives the tier-card summary above the table. */
+       third-party platform). Drives the tier-card summary above the table.
+       maturity: "now" (feasible today, nothing left to depend on) |
+       "aspirational" (real, but depends on a beta/unconfirmed integration/
+       something outside this account's control).
+       recommended: true on AT MOST TWO tools total across the whole list —
+       these render as the "Top picks" hero above the tier landscape. Every
+       other tool is real research, not a recommendation; don't mark more
+       than two or the hero stops meaning anything. */
     tools: [
-      // { name: "REPLACE", addresses: "REPLACE lever", cost: "REPLACE", tradeoff: "REPLACE", buildable: "REPLACE — could this be a Claude skill/workflow instead of a purchase?", tier: "build|middle|buy", status: "available|adopt|reject", source: "REPLACE, YYYY-MM-DD" }
+      // { name: "REPLACE", addresses: "REPLACE lever", cost: "REPLACE", tradeoff: "REPLACE", buildable: "REPLACE — could this be a Claude skill/workflow instead of a purchase?", tier: "build|middle|buy", maturity: "now|aspirational", recommended: false, status: "available|adopt|reject", source: "REPLACE, YYYY-MM-DD" }
+    ],
+
+    /* The build order, as a short visual sequence — not a paragraph.
+       One card per lever; keep `reason` to one sentence, the "why" lives
+       in the tool/lever detail above. tier/maturity may be null for a
+       lever that isn't a tool pick (e.g. "loosen a human gate"). */
+    order: [
+      // { n: 1, lever: "REPLACE", label: "REPLACE short label", tier: "build|middle|buy|null", maturity: "now|aspirational|null", reason: "REPLACE, one sentence" }
     ],
 
     /* Calculator: prospectsPerWeek is shared by both modes.
@@ -368,14 +423,16 @@
   };
 
   var CAUSE_H = { missing: 272, unreliable: 352, gate: 42, unclear: 200 };
-  var CAUSE_LABEL = { missing: "No integration built", unreliable: "Connection exists, unreliable", gate: "Deliberate checkpoint", unclear: "Not yet understood" };
+  var CAUSE_LABEL = { missing: "⚙️ No integration built", unreliable: "🔌 Connection exists, unreliable", gate: "🚦 Deliberate checkpoint", unclear: "❓ Not yet understood" };
   var STATUS_H = { available: 152, adopt: 42, reject: 352 };
-  var STATUS_LABEL = { available: "Already available", adopt: "Worth adopting", reject: "Not recommended" };
+  var STATUS_LABEL = { available: "✅ Already available", adopt: "👍 Worth adopting", reject: "🚫 Not recommended" };
   var TIER_H = { build: 152, middle: 42, buy: 352 };
-  var TIER_LABEL = { build: "Build", middle: "Middle ground", buy: "Buy" };
+  var TIER_LABEL = { build: "🧩 Build", middle: "🔗 Middle ground", buy: "🛒 Buy" };
   var TIER_ORDER = ["build", "middle", "buy"];
   var STEP_H = { automated: 152, manual: 352, gate: 42, unclear: 200 };
-  var STEP_LABEL = { automated: "Automated", manual: "Manual", gate: "Manual — gate", unclear: "Unclear" };
+  var STEP_LABEL = { automated: "✅ Automated", manual: "✋ Manual", gate: "🚦 Manual — gate", unclear: "❓ Unclear" };
+  var MATURITY_H = { now: 152, aspirational: 272 };
+  var MATURITY_LABEL = { now: "✅ Feasible now", aspirational: "🔮 Aspirational — beta/unconfirmed" };
 
   /* ==============================================================
      ③  ENGINE — no edits needed below this line.
@@ -402,80 +459,42 @@
   var notesBox = document.getElementById("c-context-notes");
   (CONFIG.contextNotes || []).forEach(function (n) { notesBox.appendChild(el("div", "notebox", n)); });
   document.getElementById("c-tools-lede").innerHTML = CONFIG.toolsLede;
-  document.getElementById("c-order").innerHTML = CONFIG.recommendedOrder;
+  document.getElementById("landscapelbl").textContent = CONFIG.landscapeLabel || "";
+  document.getElementById("c-order-lede").innerHTML = CONFIG.orderLede || "";
 
-  /* ---- states ---- */
-  var tabBox = document.getElementById("statetabs");
-  var paneBox = document.getElementById("statepanes");
-
-  var floorPane = el("div", "statepane active");
-  floorPane.appendChild(el("div", "floor", "<strong>Fully manual (the floor):</strong> " + DATA.manualFloor));
-  var floorTab = el("button", "statetab", "Fully manual");
-  floorTab.setAttribute("aria-pressed", "true");
-  tabBox.appendChild(floorTab);
-  paneBox.appendChild(floorPane);
-
-  var allTabs = [[floorTab, floorPane]];
-
-  DATA.states.forEach(function (s) {
-    var pane = el("div", "statepane");
-    if (s.steps && s.steps.length) {
-      var flow = el("div", "flow");
-      s.steps.forEach(function (st, i) {
-        var node = el("div", "flownode");
-        node.style.setProperty("--th", String(STEP_H[st.status] != null ? STEP_H[st.status] : 200));
-        node.appendChild(el("span", "flabel", st.step));
-        node.appendChild(pill(STEP_H, STEP_LABEL, st.status));
-        flow.appendChild(node);
-        if (i < s.steps.length - 1) flow.appendChild(el("div", "flowconnector", "↓"));
-      });
-      pane.appendChild(flow);
+  /* ---- pipeline: one flow, current extending into future ---- */
+  document.getElementById("floorcaption").innerHTML = "Reference — fully manual, no tooling at all: " + DATA.manualFloor;
+  var flowBox = document.getElementById("pipelineflow");
+  function fromPill(f) {
+    var row = el("div", "flowfrom");
+    row.appendChild(el("span", null, f.step));
+    row.appendChild(pill(STEP_H, STEP_LABEL, f.status));
+    return row;
+  }
+  DATA.pipeline.forEach(function (node, i) {
+    if (node.kind === "unchanged") {
+      var box = el("div", "flownode");
+      box.style.setProperty("--th", String(STEP_H[node.status] != null ? STEP_H[node.status] : 200));
+      box.appendChild(el("span", "flabel", node.step));
+      box.appendChild(pill(STEP_H, STEP_LABEL, node.status));
+      flowBox.appendChild(box);
+    } else {
+      var wrap = el("div", "flowchange");
+      var sources = node.kind === "consolidated" ? node.from : [node.from];
+      sources.forEach(function (f) { wrap.appendChild(fromPill(f)); });
+      wrap.appendChild(el("div", "flowmerge", sources.length > 1 ? "⤷ " + sources.length + " steps become" : "⤷ becomes"));
+      var into = el("div", "flowinto");
+      into.appendChild(el("span", "flabel", node.into.tool));
+      into.appendChild(el("div", "flownote", node.into.note || ""));
+      var badges = el("div", "flowbadges");
+      badges.appendChild(pill(MATURITY_H, MATURITY_LABEL, node.into.maturity));
+      into.appendChild(badges);
+      wrap.appendChild(into);
+      flowBox.appendChild(wrap);
     }
-    if (s.steps && s.steps.length) {
-      var tbl = el("table", "steps",
-        "<thead><tr><th>Step</th><th>Status</th><th>Note</th></tr></thead>");
-      var tbody = document.createElement("tbody");
-      s.steps.forEach(function (st) {
-        var tr = document.createElement("tr");
-        tr.appendChild(el("td", null, st.step));
-        var td2 = el("td");
-        td2.appendChild(pill(STEP_H, STEP_LABEL, st.status));
-        tr.appendChild(td2);
-        tr.appendChild(el("td", null, st.note || ""));
-        tbody.appendChild(tr);
-      });
-      tbl.appendChild(tbody);
-      pane.appendChild(tbl);
-    }
-    if (s.levers && s.levers.length) {
-      var t2 = el("table", "steps",
-        "<thead><tr><th>Lever</th><th>Closes</th><th>Trade-off</th></tr></thead>");
-      var tb2 = document.createElement("tbody");
-      s.levers.forEach(function (lv) {
-        var tr = document.createElement("tr");
-        tr.appendChild(el("td", null, "<b>" + lv.name + "</b>"));
-        tr.appendChild(el("td", null, lv.closes));
-        tr.appendChild(el("td", null, lv.tradeoff));
-        tb2.appendChild(tr);
-      });
-      t2.appendChild(tb2);
-      pane.appendChild(t2);
-    }
-    paneBox.appendChild(pane);
-    var tab = el("button", "statetab", s.label);
-    tab.setAttribute("aria-pressed", "false");
-    tabBox.appendChild(tab);
-    allTabs.push([tab, pane]);
+    if (i < DATA.pipeline.length - 1) flowBox.appendChild(el("div", "flowconnector", "↓"));
   });
-
-  allTabs.forEach(function (pair) {
-    pair[0].addEventListener("click", function () {
-      allTabs.forEach(function (p) {
-        p[0].setAttribute("aria-pressed", String(p === pair));
-        p[1].classList.toggle("active", p === pair);
-      });
-    });
-  });
+  if (!DATA.pipeline.length) document.getElementById("sec-states").hidden = true;
 
   /* ---- pain points ---- */
   var painBox = document.getElementById("paincards");
@@ -491,7 +510,25 @@
   });
   if (!DATA.painPoints.length) document.getElementById("sec-pain").hidden = true;
 
-  /* ---- tools: tier cards (stakeholder view) + a full table behind a toggle ---- */
+  /* ---- tools: top picks (the actual recommendation, max 2) first,
+     then the tier landscape (stakeholder view), then the full table
+     behind a toggle ---- */
+  var topPickBox = document.getElementById("toppicks");
+  var topPicks = DATA.tools.filter(function (t) { return t.recommended; });
+  topPicks.forEach(function (t) {
+    var card = el("div", "toppick");
+    card.appendChild(el("div", "star", "★ Recommended"));
+    card.appendChild(el("h4", null, t.name));
+    card.appendChild(el("p", null, t.tradeoff));
+    var badges = el("div", "badges");
+    badges.appendChild(pill(TIER_H, TIER_LABEL, t.tier));
+    badges.appendChild(pill(MATURITY_H, MATURITY_LABEL, t.maturity));
+    card.appendChild(badges);
+    card.appendChild(el("p", null, "<b>Cost:</b> " + t.cost));
+    topPickBox.appendChild(card);
+  });
+  if (!topPicks.length) { topPickBox.hidden = true; document.getElementById("landscapelbl").hidden = true; }
+
   var tierCardBox = document.getElementById("tiercards");
   TIER_ORDER.forEach(function (tier) {
     var inTier = DATA.tools.filter(function (t) { return t.tier === tier; });
@@ -510,17 +547,18 @@
 
   var toolTbl = document.getElementById("tooltable");
   var thead = el("thead", null,
-    "<tr><th>Tool</th><th>Addresses</th><th>Cost</th><th>Trade-off</th><th>Build instead?</th><th>Tier</th><th>Status</th><th>Source</th></tr>");
+    "<tr><th>Tool</th><th>Addresses</th><th>Cost</th><th>Trade-off</th><th>Build instead?</th><th>Tier</th><th>Maturity</th><th>Status</th><th>Source</th></tr>");
   toolTbl.appendChild(thead);
   var tbody = document.createElement("tbody");
   DATA.tools.forEach(function (t) {
     var tr = document.createElement("tr");
-    tr.appendChild(el("td", null, "<b>" + t.name + "</b>"));
+    tr.appendChild(el("td", null, (t.recommended ? "★ " : "") + "<b>" + t.name + "</b>"));
     tr.appendChild(el("td", null, t.addresses));
     tr.appendChild(el("td", null, t.cost));
     tr.appendChild(el("td", null, t.tradeoff));
     tr.appendChild(el("td", null, t.buildable || "—"));
     var tierTd = el("td"); tierTd.appendChild(pill(TIER_H, TIER_LABEL, t.tier)); tr.appendChild(tierTd);
+    var matTd = el("td"); matTd.appendChild(pill(MATURITY_H, MATURITY_LABEL, t.maturity)); tr.appendChild(matTd);
     var td = el("td"); td.appendChild(pill(STATUS_H, STATUS_LABEL, t.status)); tr.appendChild(td);
     tr.appendChild(el("td", "src", t.source));
     tbody.appendChild(tr);
@@ -536,6 +574,22 @@
     showFullBtn.setAttribute("aria-expanded", String(open));
     showFullBtn.textContent = open ? "Hide full comparison ▴" : "Show full comparison ▾";
   });
+
+  /* ---- recommended order: a short visual sequence, not a paragraph ---- */
+  var orderBox = document.getElementById("ordersteps");
+  (DATA.order || []).forEach(function (o, i) {
+    var card = el("div", "orderstep");
+    card.appendChild(el("div", "onum", "STEP " + o.n));
+    card.appendChild(el("h5", null, "Lever " + o.lever + " — " + o.label));
+    var badges = el("div", "badges");
+    if (o.tier) badges.appendChild(pill(TIER_H, TIER_LABEL, o.tier));
+    if (o.maturity) badges.appendChild(pill(MATURITY_H, MATURITY_LABEL, o.maturity));
+    if (o.tier || o.maturity) card.appendChild(badges);
+    card.appendChild(el("p", null, o.reason));
+    orderBox.appendChild(card);
+    if (i < DATA.order.length - 1) orderBox.appendChild(el("div", "orderarrow", "→"));
+  });
+  if (!(DATA.order || []).length) document.getElementById("sec-order").hidden = true;
 
   /* ---- calculator: shared prospects/week + a Simple/Detailed toggle ---- */
   var sharedBox = document.getElementById("calc-shared");

@@ -39,42 +39,67 @@ someone else gave you, rather than the person's own direct account.** If you're 
 notes taken by someone other than the domain expert, treat them as a lead to verify with the
 person directly, not as ground truth — the same discipline as sourcing any other claim.
 
+**Before treating a relayed account as settled, check for the source conversation's own notes or
+transcript.** If the workflow traces back to a named meeting (a Slack thread, a Notion page, a
+synced call transcript), search for it and cross-reference every claim against it, rather than
+building solely on what was paraphrased secondhand. Found 2026-09-02: Notion's dedicated Meeting
+Notes data source (where a Gemini-synced transcript lives) requires a **Notion** Business plan or
+higher — a workspace on a lower Notion tier will refuse that specific query tool outright. That is
+a real gap, not a search miss: **say so plainly** rather than imply a transcript was checked and
+found consistent. Fall back to general workspace/semantic search for the meeting's own title and
+attendees; a personal daily-log entry written around the same conversation is a legitimate
+secondary source, but it is still one person's notes, not a transcript — label it as such. When
+the source notes mention something outside the current workflow's scope (a different person's
+process, an unrelated observation), **flag it rather than fold it in** — note it for a later,
+separate elicitation pass instead of stretching this document to cover it.
+
 **Ask whether any tool in the current pipeline has a second purpose beyond the one being
 discussed.** Found 2026-09-02: a "just a cron job" data source turned out to also be the team's
 shared leaderboard for gamification. A lever that would silently remove or bypass a tool's visible
 front-end can look like a clean automation win while actually deleting something the team values —
 name the tool's full role before proposing to route around it.
 
-## 2 · Reconstruct three states, not one
+## 2 · Reconstruct current → future as ONE pipeline, not separate states
 
-- **Fully-manual baseline** — what it would take with zero tooling at all. This is the reference
-  point every time-saved estimate is measured against; it does not need its own diagram, just a
-  one-line description of the floor.
-- **Current state** — what's actually happening today, including every manual handoff, copy-paste,
-  and "sits until reviewed" hold. **Name manual steps as manual even when they're a deliberate
-  quality gate, not just when they're an accident of missing tooling** — a human review step that
-  exists on purpose is a different kind of finding than a step that's manual because nobody built
-  the integration.
-- **Potential future state(s)** — one or more independent LEVERS, each naming what specific gap it
-  closes and its trade-off. **Never present a single "fully automated" target as the obvious
-  answer.** A step that's manual by deliberate choice (quality control, personalization, legal
-  review) trades capacity for something real — automating it away is a decision for the domain
-  expert to make, not a default you apply.
+**Restructured 2026-09-02, consultancy-style** — a reviewer reads current-state and proposed-state
+side by side, not as three things to click through. Reconstruct:
 
-## 3 · Flowchart each state
+- **Fully-manual baseline** — what it would take with zero tooling at all. Reference point every
+  time-saved estimate is measured against; it never gets its own walkthrough, just a one-line
+  caption ("Reference — fully manual: ...").
+- **The current pipeline, in actual sequence** — every manual handoff, copy-paste, and "sits until
+  reviewed" hold, in the order they happen. **Name manual steps as manual even when they're a
+  deliberate quality gate, not just when they're an accident of missing tooling** — a human review
+  step that exists on purpose is a different finding than a step that's manual because nobody
+  built the integration.
+- **For each step a lever touches, what replaces it — attached to that step, not a separate
+  section.** A step either passes through unchanged, or the diagram shows inline what replaces it:
+  a single swap (one step → one tool) or a consolidation (several steps → one tool). **Never
+  present a single "fully automated" target as the obvious answer** — a step manual by deliberate
+  choice (quality control, personalization, legal review) trades capacity for something real, and
+  automating it away is the domain expert's decision, not a default you apply.
 
-**In the markdown copy**, Mermaid `flowchart TD` — manual steps visually distinguished (bold
-label, a `⚠️`/`❌` marker, or a separate shape) from automated ones. Keep rows short — a diagram
-that needs horizontal scrolling to read has failed its own purpose for a non-technical reader. An
-unclear step gets its own node, marked `❓`, rather than being smoothed over or omitted.
+## 3 · One flow, current extending into future
 
-**In the Artifact, never build the flow as Mermaid text inserted by the page's own JavaScript.**
-Found 2026-09-02: the Artifact host's Mermaid conversion is a publish-time pass over the static
-source HTML — a `<pre class="mermaid">` element the page's own `<script>` creates at runtime via
-`document.createElement`/`appendChild` is invisible to that pass and never renders, so the diagram
-silently doesn't show up at all. `template.html`'s flow diagram is hand-built instead (status-tinted
-cards + a connector, driven from the same `steps[]` array that feeds the detail table) — reliable,
-and it needs no library. Reuse that renderer; do not reintroduce Mermaid inside an Artifact's script.
+**In the markdown copy**, a single ordered table or list — one row per pipeline step, in sequence,
+with a "Becomes (if a lever applies)" column naming what replaces it inline. Keep it scannable — a
+table that needs horizontal scrolling has failed its own purpose for a non-technical reader. An
+unclear step gets its own row, marked `❓`, rather than being smoothed over or omitted.
+
+**In the Artifact, one linear flow — never two side-by-side current/future panels, and never
+Mermaid.** Two reasons, both found the hard way:
+- A two-column current/future grid needs pixel-alignment between variable-height cards, which is
+  exactly the class of drift bug that has already hit a different Artifact in this account
+  (position-synced sections drifting on variable content height). A single linear flow has no
+  alignment to keep in sync.
+- Found 2026-09-02: the Artifact host's Mermaid conversion is a publish-time pass over the static
+  source HTML — a `<pre class="mermaid">` element the page's own `<script>` creates at runtime via
+  `document.createElement`/`appendChild` is invisible to that pass and never renders.
+
+`template.html`'s flow is hand-built from a single `pipeline[]` array — each entry is `unchanged`,
+`replaced` (one step → one tool), or `consolidated` (several steps → one tool), driven by the same
+status-hue tokens as the pain-point cards. Reuse that renderer; fill in `pipeline[]`, do not invent
+a new shape and do not reintroduce Mermaid inside an Artifact's script.
 
 ## 4 · Name pain points, tied to WHERE the manual/automated boundary sits
 
@@ -104,7 +129,7 @@ number and get a different, honest total — never a total they can only accept 
 **Give it two modes, not one — a headline total AND a per-stage breakdown.** A single aggregate
 number tells the reviewer THAT time is being lost; it doesn't tell them WHERE. Found 2026-09-02:
 "where the actual pain point is happening" needs one input per pipeline stage (from the same
-`steps[]` used for the flow diagram), each multiplied by the shared volume-per-cycle input, so the
+`pipeline[]` used for the flow), each multiplied by the shared volume-per-cycle input, so the
 biggest bar is visible at a glance — not just a lever-level sum. Build both a **Simple** mode (one
 input per lever, one total — a fast gut-check) and a **Detailed** mode (one input per stage, a
 proportional bar per row) behind a toggle, sharing the same volume input. `template.html`'s
@@ -120,6 +145,13 @@ ask **"if volume doubled, would this actually take about twice as long?"** — a
 usually doesn't. `template.html`'s calculator requires `perProspect: true|false` on every
 assumption and stage for exactly this reason; `false` means the value is already a per-week total
 and must NOT be multiplied by the volume input.
+
+**Prefer a sourced volume default over a round-number guess.** Found 2026-09-02: the source
+conversation's own notes ("Replit runs once a week, finds 10 signals") gave a real basis for the
+prospects-per-week input, replacing an earlier unsourced round number that had been carrying the
+whole calculator. A sourced estimate is still unconfirmed and still gets the same warning label —
+but it is a materially better placeholder than an arbitrary one, and § 1's meeting-notes check is
+exactly where this kind of number turns up.
 
 ## 6 · Recommend alternatives — research first, then compare, then order
 
@@ -151,22 +183,35 @@ background colour:
    - **Buy** — a full third-party platform. Reserve for when the gap is genuinely platform-sized,
      not just because a vendor sells one — a platform that would also replace parts already working
      fine is a cost, not a convenience.
+5. **Tag every candidate `maturity: now | aspirational`, independent of its tier** — added
+   2026-09-02. Tier answers "what kind of thing is this"; maturity answers "does it depend on
+   something not yet true" (a beta, an unconfirmed integration, access not yet granted). A Build
+   candidate can be aspirational (feasibility unconfirmed) and a Middle-ground candidate can be
+   feasible now (an established fallback product) — the two axes are genuinely independent, and
+   conflating them is how an idealized bet gets presented with the same confidence as a working
+   option.
+6. **Recommend at MOST TWO "top picks" total, chosen for consolidation impact — not one per
+   tier.** Added 2026-09-02: a flat list where every tier reads equally viable leaves the reader to
+   guess which one is actually the recommendation. Pick the tool(s) that close the most/biggest
+   named gaps, mark them `recommended: true`, and render them as a hero above the tier landscape —
+   everything else is "the landscape this was chosen from," not a second-tier recommendation.
+   Marking a third tool demotes the hero back into a flat list; don't.
 
 - No jargon. A comparison table beats prose for this.
 - **State what each option costs the person, not just what it saves.** "Removes the review step"
   is a cost (quality risk) as often as it's a win. A subscription's dollar cost is not the only
   cost — note implementation effort, a new vendor to manage, or unconfirmed technical feasibility.
-- **Recommend a build order, reasoned from the stated objective** — not just a list of options.
-  Free removals of mechanical friction (no quality trade-off) generally come before anything that
-  trades a deliberate control away, so the domain expert can judge the remaining bottleneck with
-  the easy wins already banked.
-- **Land the tool section closed, like everything else in this skill's output.** A stakeholder
-  altitude view — one card per tier, its verdict in one line, its candidates listed — comes first;
-  the full cost/trade-off/source table sits behind a "Show full comparison" toggle. Progressive
+- **Recommend a build order, reasoned from the stated objective, as a short numbered sequence —
+  not a paragraph.** Free removals of mechanical friction (no quality trade-off) generally come
+  before anything that trades a deliberate control away. One card per step (`n`, `lever`, `label`,
+  `reason` — one sentence), not prose the reader has to parse for the actual sequence.
+- **Land the tool section closed, like everything else in this skill's output.** Top picks first,
+  then the tier landscape (one card per tier, its verdict in one line, its candidates listed), then
+  the full cost/trade-off/maturity/source table behind a "Show full comparison" toggle. Progressive
   disclosure applies to tool research exactly as it does to the flow diagram: the top level is the
-  whole answer at decision altitude, detail is opt-in. `template.html`'s `tiercards` + `tools`
-  table implement this; fill in `tier` per tool and `CONFIG.tierVerdicts` rather than flattening
-  everything back into one table.
+  whole answer at decision altitude, detail is opt-in. `template.html`'s `toppicks` + `tiercards` +
+  `tools` table implement this; fill in `tier`, `maturity`, and `recommended` per tool and
+  `CONFIG.tierVerdicts` rather than flattening everything back into one table.
 
 ## 7 · Output format — default to a published Artifact for a non-technical audience
 
@@ -187,10 +232,10 @@ and `DATA` objects with this workflow's real content, and publish that.** It fol
 zero-dependency, hue-driven-token pattern as `skills/depth-tree/template.html`: one file, no
 build step, data and presentation cleanly separated by construction (nothing above its `<script>`
 tag needs to change for a new workflow). **There is no `mermaid` field and no Mermaid dependency
-at all** — see § 3: the flow diagram is hand-built from `steps[]`, because a dynamically-inserted
-`<pre class="mermaid">` never rendered in practice. (Corrected 2026-09-02 — an earlier version of
-this section still said to write Mermaid syntax here, left over from before that bug was found;
-caught auditing this file for internal consistency, not by a fresh report.)
+at all** — see § 3: the flow is a single `pipeline[]` array (unchanged/replaced/consolidated
+nodes), because a dynamically-inserted `<pre class="mermaid">` never rendered in practice.
+(v1.2, 2026-09-02, also dropped the earlier two-tab current/future split and the "Fully manual"
+tab in favor of the one-pipeline model — see § 2–3.)
 
 **On React, Tailwind, and shadcn — decided 2026-09-02, after a real frustration report** (editing
 a previously-published Artifact was slow because its data was interleaved into its markup and
@@ -199,7 +244,7 @@ styling, making an edit hard to locate):
 | | Decision | Why |
 |---|---|---|
 | **shadcn/ui** | **Refused, categorically.** | It's a copy-paste source-component system that assumes a real project with a build pipeline (TypeScript compile, path aliases, bundled Radix primitives). The Artifact sandbox is static HTML plus a small CDN allowlist with no bundler — shadcn cannot run there at all, not just "isn't worth it" |
-| **React (CDN UMD build)** | **Conditional, not default.** Use only when a workflow genuinely needs multi-view state that plain event listeners can't hold cleanly | This skill's own content — a few Mermaid diagrams, cards, a table, and a handful of number inputs recomputing a total — is well within vanilla JS. Reaching for React here would be solving a problem this content doesn't have |
+| **React (CDN UMD build)** | **Conditional, not default.** Use only when a workflow genuinely needs multi-view state that plain event listeners can't hold cleanly | This skill's own content — a linear flow, cards, a table, and a handful of number inputs recomputing a total — is well within vanilla JS. Reaching for React here would be solving a problem this content doesn't have |
 | **Tailwind (Play CDN)** | **Not needed here.** | The token-based CSS custom-property system already in `template.html` gives theme-aware styling with zero extra load; Tailwind adds a class-authoring convenience this template doesn't need |
 | **The actual fix for the original frustration** | **Structural separation, already solved by the template pattern** — `CONFIG`/`DATA` at the bottom, rendering engine above, exactly like `depth-tree` | The slow-edit problem was never "we need a framework" — it was "the data lived inside the styling." A template with the two cleanly separated fixes that without adding a dependency |
 
@@ -241,3 +286,8 @@ transcripts — no such access exists at any tier.
   and a framework is the exception, not the other way around.
 - **Does not claim org-wide artifact sharing or conversation-history-based effectiveness tracking
   exist.** See § 9 — both are real gaps in the current platform, not this skill's oversight.
+- **Does not treat a relayed account as verified without checking for the source conversation's own
+  notes or transcript.** See § 1 — and does not claim a transcript was checked when the tool to
+  read one was unavailable; it says so.
+- **Does not recommend more than two top picks.** See § 6 point 6 — a third "recommended" tool
+  turns the hero back into the flat list it was built to replace.
