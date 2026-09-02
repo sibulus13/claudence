@@ -318,6 +318,21 @@
     <p class="lede" id="c-order-lede"></p>
     <div class="ordersteps" id="ordersteps"></div>
   </section>
+
+  <section id="sec-triage">
+    <h2><span class="n">06</span>What happens next</h2>
+    <p class="lede">Never left unstated — each lever gets one of three verdicts, so this document hands off instead of just sitting there.</p>
+    <div class="cards" id="triagecards"></div>
+  </section>
+
+  <section id="sec-refs">
+    <h2><span class="n">07</span>Assumptions &amp; sources</h2>
+    <p class="lede">What's primary-sourced, what's a vendor claim, and what's still idealized — so a reader can tell a fact from a placeholder at a glance.</p>
+    <button class="btn showfull" id="showrefs" type="button" aria-expanded="false">Show sources ▾</button>
+    <div class="toolwrap" id="refswrap" hidden>
+      <table class="tools" id="reftable"></table>
+    </div>
+  </section>
 </div>
 
 <script>
@@ -393,6 +408,27 @@
       // { n: 1, lever: "REPLACE", label: "REPLACE short label", tier: "build|middle|buy|null", maturity: "now|aspirational|null", reason: "REPLACE, one sentence" }
     ],
 
+    /* Never leave this empty — every lever gets exactly one verdict.
+       verdict: "self" (they can act on this alone) | "consult" (a real
+       engineering judgment call is pending, name the open question) |
+       "share" (a technical stakeholder is already identified — say who)
+       | "deferred" (not a live decision yet, e.g. waiting on other
+       levers' volume). */
+    triage: [
+      // { lever: "REPLACE", verdict: "self|consult|share|deferred", who: "REPLACE — required for share, omit otherwise", reason: "REPLACE, one or two sentences: what this verdict means concretely" }
+    ],
+
+    /* Every load-bearing claim traces to one row here. type:
+       "primary" (a transcript/document read in full) | "secondary" (a
+       relayed note, weaker than primary) | "vendor" (a claim from the
+       tool's own marketing, not independently verified) | "verified"
+       (checked directly against this account/product) | "idealized"
+       (no real data yet — a placeholder or an open question). url is
+       optional (omit for a verified/idealized row with no document). */
+    references: [
+      // { claim: "REPLACE — what this source backs up", source: "REPLACE — document/person/session name", url: "REPLACE or omit", type: "primary|secondary|vendor|verified|idealized" }
+    ],
+
     /* Calculator: prospectsPerWeek is shared by both modes.
        EVERY assumption/stage declares perProspect: true|false — found
        2026-09-02 (adversarial review) that a fixed per-week cost (e.g. one
@@ -433,6 +469,10 @@
   var STEP_LABEL = { automated: "✅ Automated", manual: "✋ Manual", gate: "🚦 Manual — gate", unclear: "❓ Unclear" };
   var MATURITY_H = { now: 152, aspirational: 272 };
   var MATURITY_LABEL = { now: "✅ Feasible now", aspirational: "🔮 Aspirational — beta/unconfirmed" };
+  var VERDICT_H = { self: 152, consult: 42, share: 272, deferred: 200 };
+  var VERDICT_LABEL = { self: "✅ Self-investigate", consult: "🔬 Book a technical consultation", share: "📤 Share as pre-loaded context", deferred: "⏸️ Deferred, no verdict yet" };
+  var REF_H = { primary: 152, verified: 152, secondary: 42, vendor: 42, idealized: 352 };
+  var REF_LABEL = { primary: "📄 Primary source", verified: "✅ Verified directly", secondary: "🗣️ Secondary (relayed)", vendor: "🏷️ Vendor-sourced", idealized: "💭 Idealized — not yet checked" };
 
   /* ==============================================================
      ③  ENGINE — no edits needed below this line.
@@ -590,6 +630,42 @@
     if (i < DATA.order.length - 1) orderBox.appendChild(el("div", "orderarrow", "→"));
   });
   if (!(DATA.order || []).length) document.getElementById("sec-order").hidden = true;
+
+  /* ---- triage: every lever gets exactly one verdict, never left unstated ---- */
+  var triageBox = document.getElementById("triagecards");
+  (DATA.triage || []).forEach(function (t) {
+    var card = el("div", "card");
+    var head = el("div", "cardhead");
+    head.appendChild(el("h4", null, "Lever " + t.lever));
+    head.appendChild(pill(VERDICT_H, VERDICT_LABEL, t.verdict));
+    card.appendChild(head);
+    if (t.who) card.appendChild(el("p", null, "<b>Who:</b> " + t.who));
+    card.appendChild(el("p", null, t.reason || ""));
+    triageBox.appendChild(card);
+  });
+  if (!(DATA.triage || []).length) document.getElementById("sec-triage").hidden = true;
+
+  /* ---- assumptions & sources: folded, like the full tool table ---- */
+  var refTbl = document.getElementById("reftable");
+  refTbl.appendChild(el("thead", null, "<tr><th>Claim</th><th>Source</th><th>Type</th></tr>"));
+  var refBody = document.createElement("tbody");
+  (DATA.references || []).forEach(function (r) {
+    var tr = document.createElement("tr");
+    tr.appendChild(el("td", null, r.claim));
+    tr.appendChild(el("td", null, r.url ? "<a href=\"" + r.url + "\" target=\"_blank\" rel=\"noopener\">" + r.source + "</a>" : r.source));
+    var td = el("td"); td.appendChild(pill(REF_H, REF_LABEL, r.type)); tr.appendChild(td);
+    refBody.appendChild(tr);
+  });
+  refTbl.appendChild(refBody);
+  if (!(DATA.references || []).length) document.getElementById("sec-refs").hidden = true;
+  var showRefsBtn = document.getElementById("showrefs");
+  var refsWrapBox = document.getElementById("refswrap");
+  showRefsBtn.addEventListener("click", function () {
+    var open = refsWrapBox.hidden;
+    refsWrapBox.hidden = !open;
+    showRefsBtn.setAttribute("aria-expanded", String(open));
+    showRefsBtn.textContent = open ? "Hide sources ▴" : "Show sources ▾";
+  });
 
   /* ---- calculator: shared prospects/week + a Simple/Detailed toggle ---- */
   var sharedBox = document.getElementById("calc-shared");

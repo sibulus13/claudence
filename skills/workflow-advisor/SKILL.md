@@ -15,43 +15,71 @@ built from secondhand notes, got the automation boundaries wrong (attributed a b
 wrong tool). The second pass, from the person's own direct account, corrected it substantially.
 That gap is the reason this skill exists: elicit directly, don't reconstruct from a summary.
 
-## 1 · Elicit — ask, don't assume
+## 1 · Open as a consultation session — gather context before analyzing anything
 
-Ask for, in this order:
+**Frame the opening explicitly as a consultation, not a form.** The goal of this phase is to
+leave with enough to build both diagrams (current and proposed) and a real efficiency metric —
+not to rush to recommendations. Ask for, in this order:
 
 1. **The objective** — what is this workflow FOR, in one sentence. Not "what does it do" but
    "what outcome does doing it well produce."
-2. **The value metric** — what does success actually look like to THIS person? Push past a
+2. **The value metric(s)** — what does success actually look like to THIS person? Push past a
    generic answer. Volume? Speed? Quality/accuracy? Cost? A "numbers game" (more attempts at a
    given success rate beats fewer, higher-effort attempts) is a genuinely different optimization
-   target than "get each one exactly right" — ask which one fits before recommending anything,
-   because the right lever to pull depends on it.
-3. **The step-by-step walkthrough** — "what do you do first, then what, then what" — not a
-   summary. Get concrete enough to know, per step, whether it's fully automated, fully manual, or
-   tool-assisted-but-still-requires-a-person.
-4. **Explicitly ask which parts are already automated vs. hand-done**, per step. **If a step's
+   target than "get each one exactly right." **Ask for a metric at each pipeline stage if the
+   person can name one, or at minimum one end-to-end metric** — this is what makes the eventual
+   recommendation verifiable later, not just plausible now: without a metric plugged in somewhere,
+   there's no way to check afterward whether a lever actually helped.
+3. **Current time and resource cost** — how long each stage takes today, and what it costs
+   (a person's time, a subscription, a vendor). This is the raw material for the capacity
+   calculator (§5) — get it as concretely as the person can give it, and label anything they can't
+   pin down as unconfirmed rather than guessing on their behalf.
+4. **The exact current workflow, step by step** — "what do you do first, then what, then what" —
+   not a summary. Get concrete enough to know, per step, whether it's fully automated, fully
+   manual, or tool-assisted-but-still-requires-a-person. This is the raw material for the current
+   half of the pipeline diagram (§2–3).
+5. **Explicitly ask which parts are already automated vs. hand-done**, per step. **If a step's
    status is unclear even to them, write it down as unclear — do not guess or invent a plausible
    mechanism.** An honestly-flagged gap is more useful than a confident wrong answer, and it tells
    you exactly what to ask about next.
+6. **Ask for existing references or knowledge bases to plug into** — prior meeting notes,
+   transcripts, internal docs, a knowledge base, anything already written about this workflow.
+   Don't wait for the person to volunteer this; ask directly, then go verify it yourself (below)
+   rather than taking their recollection of a document as the document.
 
 **Do not accept a first-pass answer as final if anything sounds like a paraphrase of a summary
 someone else gave you, rather than the person's own direct account.** If you're working from
 notes taken by someone other than the domain expert, treat them as a lead to verify with the
 person directly, not as ground truth — the same discipline as sourcing any other claim.
 
-**Before treating a relayed account as settled, check for the source conversation's own notes or
-transcript.** If the workflow traces back to a named meeting (a Slack thread, a Notion page, a
-synced call transcript), search for it and cross-reference every claim against it, rather than
-building solely on what was paraphrased secondhand. Found 2026-09-02: Notion's dedicated Meeting
-Notes data source (where a Gemini-synced transcript lives) requires a **Notion** Business plan or
-higher — a workspace on a lower Notion tier will refuse that specific query tool outright. That is
-a real gap, not a search miss: **say so plainly** rather than imply a transcript was checked and
-found consistent. Fall back to general workspace/semantic search for the meeting's own title and
-attendees; a personal daily-log entry written around the same conversation is a legitimate
-secondary source, but it is still one person's notes, not a transcript — label it as such. When
-the source notes mention something outside the current workflow's scope (a different person's
-process, an unrelated observation), **flag it rather than fold it in** — note it for a later,
-separate elicitation pass instead of stretching this document to cover it.
+**Before treating a relayed account as settled, go find and read the source conversation's own
+notes or transcript — don't wait to be handed a link.** If the workflow traces back to a named
+meeting, search for it and cross-reference every claim against it, rather than building solely on
+what was paraphrased secondhand.
+
+**Where a Gemini-generated meeting transcript actually lives, corrected 2026-09-02 after checking
+the wrong place first**: at this org, a Gemini transcript is a **Google Doc, one per meeting,
+linked from that meeting's own Calendar event** — it is NOT reliably reachable through Notion's
+Meeting Notes feature (that tool separately requires a Notion Business-plan workspace, which this
+one doesn't have, and even where it's available it may not index a Drive-native doc). Search
+**Google Drive first** for the meeting's own title (`search_files`, `fullText contains` or
+`title contains` the meeting name) — the doc contains both a Gemini-generated Notes/Summary
+section and a full timestamped Transcript section in one file. Only fall back to Notion's general
+workspace/semantic search, or a personal daily-log entry written around the same conversation, if
+Drive search comes up empty — and label whichever source you actually used: a full transcript is
+primary-source strength, a paraphrased note is secondary and should be flagged as such, not
+presented with the same confidence.
+
+**A primary-source transcript is worth re-reading even after a document already exists** — it
+routinely contains material corrections a relayed summary smoothed over (a step attributed to the
+wrong cause, an open question that was actually answered mid-meeting, a stated team priority that
+contradicts the document's own recommended order). Read the whole thing, not just the parts that
+seem relevant on a first pass — the "not a huge workflow challenge" aside that reorders two levers
+did not appear in this skill's own summary section, only in the raw transcript.
+
+**When the source notes mention something outside the current workflow's scope** (a different
+person's process, an unrelated observation), **flag it rather than fold it in** — note it for a
+later, separate elicitation pass instead of stretching this document to cover it.
 
 **Ask whether any tool in the current pipeline has a second purpose beyond the one being
 discussed.** Found 2026-09-02: a "just a cron job" data source turned out to also be the team's
@@ -275,6 +303,42 @@ domain expert or their manager asks for this, report the adoption-count capabili
 name the effectiveness-tracking gap rather than proposing a workaround that reads conversation
 transcripts — no such access exists at any tier.
 
+## 10 · Close with a triage verdict — what happens to this next
+
+**Added 2026-09-02, on request — the deliverable isn't finished at the recommendation; it needs a
+stated next move.** End every use of this skill with an explicit verdict on what the domain expert
+should do with what was just produced. Pick exactly one, and say why:
+
+| Verdict | When it applies | What it means concretely |
+|---|---|---|
+| **✅ Self-investigate** | Every open lever is 🧩 Build-tier and ✅ feasible-now, or the only remaining step is confirming a number/access the domain expert can check themselves | They can act on this document alone — try the feasibility check, request the beta access, adjust the calculator. No engineering judgment call is pending |
+| **🔬 Book a technical consultation** | A lever's feasibility genuinely depends on engineering judgment (does an API expose what's needed, is a schema constraint negotiable, is a workaround safe) that the domain expert cannot resolve by reading or asking around | Name the specific open question the consultation should resolve — not "discuss the workflow," but the exact unresolved technical fact (see `/blocker-meeting` if this repo has it, for the prep-pack discipline) |
+| **📤 Share as pre-loaded context with a named technical stakeholder** | Someone is already identified or assigned to work the gap (an engineer already in the source meeting's action items, a named owner) | Say who, and what in this document they need before their own work starts — this document becomes their briefing, not a thing they discover mid-task |
+
+**These aren't mutually exclusive across levers within one document** — one lever can be
+self-investigate while another needs a consultation. State the verdict per lever if they diverge,
+not one blanket verdict for the whole workflow. **Never leave it unstated**: a recommendation with
+no next-action verdict reads as finished when it's actually still waiting on someone.
+
+## 11 · Backlink every claim — an assumptions & sources table, not a trust-me document
+
+**Added 2026-09-02, same day a primary-source transcript overturned several claims this document
+had been carrying at secondhand strength.** Every substantive claim traces to a labeled source, in
+one table, folded behind a toggle like the full tool comparison:
+
+- **`type` per row**: `primary` (a transcript/document read in full) · `secondary` (a relayed
+  note — weaker, say so) · `vendor` (the tool's own marketing, not independently verified) ·
+  `verified` (checked directly against this account/product) · `idealized` (no real data yet —
+  a placeholder or an open question, not an assumption to trust).
+- **Backlink where a URL exists.** A citation with no link is a claim nobody downstream can
+  re-check; the point of primary-sourcing is that it's re-checkable.
+- **List every `idealized` item explicitly, don't bury it in a hedge paragraph.** A reader scanning
+  the table should immediately see which numbers are real and which are placeholders — this is the
+  same principle as labeling `⚠️ UNCONFIRMED` (§5), generalized to every kind of claim, not just
+  time estimates.
+- `template.html`'s `references[]` + the folded `sec-refs` table implement this; fill it in rather
+  than leaving citations only in prose.
+
 ## What this skill does not do
 
 - **Does not implement the automation.** This produces the map and the recommendation; building
@@ -291,3 +355,7 @@ transcripts — no such access exists at any tier.
   read one was unavailable; it says so.
 - **Does not recommend more than two top picks.** See § 6 point 6 — a third "recommended" tool
   turns the hero back into the flat list it was built to replace.
+- **Does not end without a triage verdict.** See § 10 — self-investigate, book a technical
+  consultation, or share as pre-loaded context with a named stakeholder; never left unstated.
+- **Does not cite a claim without a labeled source.** See § 11 — every claim is `primary`,
+  `secondary`, `vendor`, `verified`, or `idealized`, backlinked where a URL exists.
