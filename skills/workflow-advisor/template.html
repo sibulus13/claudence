@@ -339,20 +339,28 @@
     ],
 
     /* Calculator: prospectsPerWeek is shared by both modes.
+       EVERY assumption/stage declares perProspect: true|false — found
+       2026-09-02 (adversarial review) that a fixed per-week cost (e.g. one
+       batch copy-paste of the whole list, done once regardless of volume)
+       had been silently multiplied by prospects/week as if it scaled,
+       overstating that lever's weekly total by ~20x. true = value is
+       minutes per prospect, multiplied by prospectsPerWeek. false = value
+       is already a minutes-per-week total; it does NOT get multiplied —
+       use this for anything done once per cycle regardless of volume.
        simple.assumptions sums to one headline total — a quick gut-check.
-       detailed.stages is one row per pipeline stage, each its own
-       minutes-per-prospect input — reveals where the time actually goes.
-       Toggle between them; both read the same prospectsPerWeek input. */
+       detailed.stages is one row per pipeline stage — reveals where the
+       time actually goes. Toggle between them; both read the same
+       prospectsPerWeek input. */
     calculator: {
       prospectsPerWeek: { label: "Prospects processed per week", default: 20 },
       simple: {
         assumptions: [
-          // { id: "leverA", label: "REPLACE", default: 0, unit: "minutes saved per prospect" }
+          // { id: "leverA", label: "REPLACE", default: 0, unit: "REPLACE", perProspect: true }
         ]
       },
       detailed: {
         stages: [
-          // { id: "REPLACE", label: "REPLACE stage name", default: 0 }
+          // { id: "REPLACE", label: "REPLACE stage name", default: 0, perProspect: true }
         ]
       },
       flag: "⚠️ UNCONFIRMED — every default above is a placeholder pending real timing data."
@@ -579,7 +587,7 @@
       input.type = "number"; input.min = "0"; input.step = "any"; input.value = s.default;
       input.addEventListener("input", function () { recompute(); });
       field.appendChild(input);
-      field.appendChild(el("div", "unit", "minutes per prospect"));
+      field.appendChild(el("div", "unit", s.perProspect ? "minutes per prospect" : "minutes per week (fixed — doesn't scale with volume)"));
       detailInputsWrap.appendChild(field);
       stageInputs[s.id] = input;
     });
@@ -604,10 +612,13 @@
     function recompute() {
       var ppw = parseFloat(ppwInput.value) || 0;
       if (!inputBox.hidden) {
-        // simple mode
-        var total = 0;
-        Object.keys(simpleInputs).forEach(function (k) { total += parseFloat(simpleInputs[k].value) || 0; });
-        var weekly = ppw * total, monthly = weekly * 4.33;
+        // simple mode — each assumption contributes per its own perProspect flag
+        var weekly = 0;
+        DATA.calculator.simple.assumptions.forEach(function (a) {
+          var v = parseFloat(simpleInputs[a.id].value) || 0;
+          weekly += a.perProspect ? v * ppw : v;
+        });
+        var monthly = weekly * 4.33;
         outputBox.innerHTML = "";
         [
           [fmt(weekly) + " min", "Saved per week"],
@@ -622,7 +633,8 @@
       }
       if (!detailBox.hidden) {
         var rows = DATA.calculator.detailed.stages.map(function (s) {
-          return { label: s.label, weekly: (parseFloat(stageInputs[s.id].value) || 0) * ppw };
+          var v = parseFloat(stageInputs[s.id].value) || 0;
+          return { label: s.label, weekly: s.perProspect ? v * ppw : v };
         });
         var grand = rows.reduce(function (a, r) { return a + r.weekly; }, 0);
         var max = Math.max.apply(null, rows.map(function (r) { return r.weekly; }).concat([1]));

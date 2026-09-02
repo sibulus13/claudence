@@ -111,6 +111,16 @@ proportional bar per row) behind a toggle, sharing the same volume input. `templ
 calculator already implements this shape; fill in `calculator.simple` and `calculator.detailed`
 rather than inventing a new structure.
 
+**Every assumption declares whether it scales with volume — never assume it does.** Found
+2026-09-02 by adversarial review: a one-time-per-cycle cost (copying a whole prospect list in a
+single paste, done once per week regardless of how many prospects are in it) was silently treated
+as a per-prospect cost and multiplied by volume, overstating that lever's weekly contribution by
+roughly 20x in a number that was already live in a published Artifact. Before entering a default,
+ask **"if volume doubled, would this actually take about twice as long?"** — a batch action
+usually doesn't. `template.html`'s calculator requires `perProspect: true|false` on every
+assumption and stage for exactly this reason; `false` means the value is already a per-week total
+and must NOT be multiplied by the volume input.
+
 ## 6 · Recommend alternatives — research first, then compare, then order
 
 **Before recommending, research what actually exists** — this is a required step, not
