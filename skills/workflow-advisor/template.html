@@ -167,7 +167,17 @@
   .card .fix b { color:var(--ink-2); font-weight:600; }
 
   /* ---- tool table ---- */
-  .toolwrap { overflow-x:auto; }
+  /* ---- tier cards: the stakeholder-altitude view, shown before the
+     detailed table ---- Build / Middle ground / Buy, one card each. */
+  .tiercards { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px; margin-bottom:16px; }
+  .tiercard { background:var(--surface); border:1px solid var(--rule); border-top:4px solid hsl(var(--th) 55% 45%); border-radius:8px; padding:16px 18px; box-shadow:var(--shadow); display:flex; flex-direction:column; gap:10px; }
+  .tiercard h4 { margin:0; font-family:var(--font-mono); font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink); }
+  .tiercard p { margin:0; font-size:13px; color:var(--ink-2); line-height:1.5; }
+  .tierpicks { display:flex; flex-wrap:wrap; gap:6px; }
+  .tierpick { font-size:12px; padding:3px 9px; border-radius:20px; background:var(--surface-2); border:1px solid var(--rule-2); color:var(--ink-2); }
+  .tierpick.rejected { text-decoration:line-through; opacity:.6; }
+  .btn.showfull { margin:4px 0 0; display:inline-block; }
+  .toolwrap { overflow-x:auto; margin-top:14px; }
   table.tools { width:100%; border-collapse:collapse; font-size:13.5px; min-width:640px; }
   table.tools th { text-align:left; font-family:var(--font-mono); font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-3); padding:10px; border-bottom:1px solid var(--rule-2); background:var(--surface-2); }
   table.tools td { padding:11px 10px; border-bottom:1px solid var(--rule); vertical-align:top; }
@@ -240,7 +250,9 @@
   <section id="sec-tools">
     <h2><span class="n">03</span>Tools researched</h2>
     <p class="lede" id="c-tools-lede"></p>
-    <div class="toolwrap">
+    <div class="tiercards" id="tiercards"></div>
+    <button class="btn showfull" id="showfulltable" type="button" aria-expanded="false">Show full comparison ▾</button>
+    <div class="toolwrap" id="toolwrap" hidden>
       <table class="tools" id="tooltable"></table>
     </div>
   </section>
@@ -282,6 +294,11 @@
       // "REPLACE — a fact that changes how a lever should be scoped, e.g. a tool's non-obvious second purpose."
     ],
     toolsLede: "What's already available (including anything already connected) versus what would need adopting, mapped to the gap each one closes.",
+    tierVerdicts: {
+      build: "REPLACE — one-line verdict: when a Claude skill/workflow is the right call, and why it's the first thing to try.",
+      middle: "REPLACE — one-line verdict: existing or lightweight connectors that need enabling or a small subscription, short of a full platform.",
+      buy: "REPLACE — one-line verdict: full third-party platforms, and why they're heavier than this gap needs (or worth it, if they are)."
+    },
     recommendedOrder: "REPLACE — the reasoned build order, in one or two sentences."
   };
 
@@ -314,8 +331,11 @@
       // { title: "REPLACE step name", cause: "missing|unreliable|gate|unclear", note: "REPLACE what's happening", fix: "REPLACE the fix this implies" }
     ],
 
+    /* tier: "build" (a Claude skill/workflow) | "middle" (an existing or
+       lightweight connector, short of a full platform) | "buy" (a full
+       third-party platform). Drives the tier-card summary above the table. */
     tools: [
-      // { name: "REPLACE", addresses: "REPLACE lever", cost: "REPLACE", tradeoff: "REPLACE", buildable: "REPLACE — could this be a Claude skill/workflow instead of a purchase?", status: "available|adopt|reject", source: "REPLACE, YYYY-MM-DD" }
+      // { name: "REPLACE", addresses: "REPLACE lever", cost: "REPLACE", tradeoff: "REPLACE", buildable: "REPLACE — could this be a Claude skill/workflow instead of a purchase?", tier: "build|middle|buy", status: "available|adopt|reject", source: "REPLACE, YYYY-MM-DD" }
     ],
 
     /* Calculator: prospectsPerWeek is shared by both modes.
@@ -343,6 +363,9 @@
   var CAUSE_LABEL = { missing: "No integration built", unreliable: "Connection exists, unreliable", gate: "Deliberate checkpoint", unclear: "Not yet understood" };
   var STATUS_H = { available: 152, adopt: 42, reject: 352 };
   var STATUS_LABEL = { available: "Already available", adopt: "Worth adopting", reject: "Not recommended" };
+  var TIER_H = { build: 152, middle: 42, buy: 352 };
+  var TIER_LABEL = { build: "Build", middle: "Middle ground", buy: "Buy" };
+  var TIER_ORDER = ["build", "middle", "buy"];
   var STEP_H = { automated: 152, manual: 352, gate: 42, unclear: 200 };
   var STEP_LABEL = { automated: "Automated", manual: "Manual", gate: "Manual — gate", unclear: "Unclear" };
 
@@ -460,10 +483,26 @@
   });
   if (!DATA.painPoints.length) document.getElementById("sec-pain").hidden = true;
 
-  /* ---- tools ---- */
+  /* ---- tools: tier cards (stakeholder view) + a full table behind a toggle ---- */
+  var tierCardBox = document.getElementById("tiercards");
+  TIER_ORDER.forEach(function (tier) {
+    var inTier = DATA.tools.filter(function (t) { return t.tier === tier; });
+    if (!inTier.length) return;
+    var card = el("div", "tiercard");
+    card.style.setProperty("--th", String(TIER_H[tier]));
+    card.appendChild(el("h4", null, TIER_LABEL[tier]));
+    card.appendChild(el("p", null, (CONFIG.tierVerdicts || {})[tier] || ""));
+    var picks = el("div", "tierpicks");
+    inTier.forEach(function (t) {
+      picks.appendChild(el("span", "tierpick" + (t.status === "reject" ? " rejected" : ""), t.name));
+    });
+    card.appendChild(picks);
+    tierCardBox.appendChild(card);
+  });
+
   var toolTbl = document.getElementById("tooltable");
   var thead = el("thead", null,
-    "<tr><th>Tool</th><th>Addresses</th><th>Cost</th><th>Trade-off</th><th>Build instead?</th><th>Status</th><th>Source</th></tr>");
+    "<tr><th>Tool</th><th>Addresses</th><th>Cost</th><th>Trade-off</th><th>Build instead?</th><th>Tier</th><th>Status</th><th>Source</th></tr>");
   toolTbl.appendChild(thead);
   var tbody = document.createElement("tbody");
   DATA.tools.forEach(function (t) {
@@ -473,12 +512,22 @@
     tr.appendChild(el("td", null, t.cost));
     tr.appendChild(el("td", null, t.tradeoff));
     tr.appendChild(el("td", null, t.buildable || "—"));
+    var tierTd = el("td"); tierTd.appendChild(pill(TIER_H, TIER_LABEL, t.tier)); tr.appendChild(tierTd);
     var td = el("td"); td.appendChild(pill(STATUS_H, STATUS_LABEL, t.status)); tr.appendChild(td);
     tr.appendChild(el("td", "src", t.source));
     tbody.appendChild(tr);
   });
   toolTbl.appendChild(tbody);
   if (!DATA.tools.length) document.getElementById("sec-tools").hidden = true;
+
+  var showFullBtn = document.getElementById("showfulltable");
+  var toolWrapBox = document.getElementById("toolwrap");
+  showFullBtn.addEventListener("click", function () {
+    var open = toolWrapBox.hidden;
+    toolWrapBox.hidden = !open;
+    showFullBtn.setAttribute("aria-expanded", String(open));
+    showFullBtn.textContent = open ? "Hide full comparison ▴" : "Show full comparison ▾";
+  });
 
   /* ---- calculator: shared prospects/week + a Simple/Detailed toggle ---- */
   var sharedBox = document.getElementById("calc-shared");

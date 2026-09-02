@@ -128,11 +128,19 @@ background colour:
 3. **Then research what could be adopted**: real products, with real (dated, sourced) pricing —
    never an invented number. Note when pricing is quote-based or a lead rather than a locked
    figure.
-4. **Map every candidate to the specific named pain point (from step 4) it closes, and record
-   whether it's buildable** — a tool that would replace the whole pipeline is a different kind of
-   recommendation than one that closes a single gap, and a purchased platform that also happens to
-   be buildable in-house cheaper is worth flagging even when the vendor still gets listed. The
-   comparison table needs a `buildable` column, not just cost/trade-off/status.
+4. **Map every candidate to the specific named pain point (from step 4) it closes, and classify
+   it into exactly one of three tiers, alongside the free-text buildable reasoning from point 1**
+   — added 2026-09-02, because a non-technical stakeholder deciding between options needs a
+   category to scan first, not a paragraph to parse per row. The tier is the forced choice; the
+   free-text field still carries the reasoning behind it:
+   - **Build** — a Claude skill/workflow, no new subscription. The default first move for a
+     bounded task (see point 1).
+   - **Middle ground** — an existing native connector, or a lightweight integration platform
+     (Make.com/Power-Automate-class), that needs enabling or a small subscription but isn't a full
+     platform. Most "worth adopting" recommendations land here.
+   - **Buy** — a full third-party platform. Reserve for when the gap is genuinely platform-sized,
+     not just because a vendor sells one — a platform that would also replace parts already working
+     fine is a cost, not a convenience.
 
 - No jargon. A comparison table beats prose for this.
 - **State what each option costs the person, not just what it saves.** "Removes the review step"
@@ -142,6 +150,13 @@ background colour:
   Free removals of mechanical friction (no quality trade-off) generally come before anything that
   trades a deliberate control away, so the domain expert can judge the remaining bottleneck with
   the easy wins already banked.
+- **Land the tool section closed, like everything else in this skill's output.** A stakeholder
+  altitude view — one card per tier, its verdict in one line, its candidates listed — comes first;
+  the full cost/trade-off/source table sits behind a "Show full comparison" toggle. Progressive
+  disclosure applies to tool research exactly as it does to the flow diagram: the top level is the
+  whole answer at decision altitude, detail is opt-in. `template.html`'s `tiercards` + `tools`
+  table implement this; fill in `tier` per tool and `CONFIG.tierVerdicts` rather than flattening
+  everything back into one table.
 
 ## 7 · Output format — default to a published Artifact for a non-technical audience
 
@@ -161,8 +176,11 @@ the Artifact is the reading copy, not a replacement for it.
 and `DATA` objects with this workflow's real content, and publish that.** It follows the same
 zero-dependency, hue-driven-token pattern as `skills/depth-tree/template.html`: one file, no
 build step, data and presentation cleanly separated by construction (nothing above its `<script>`
-tag needs to change for a new workflow). Mermaid diagrams render natively in the Artifact host —
-write plain Mermaid syntax into the `mermaid` field, do not load a Mermaid library.
+tag needs to change for a new workflow). **There is no `mermaid` field and no Mermaid dependency
+at all** — see § 3: the flow diagram is hand-built from `steps[]`, because a dynamically-inserted
+`<pre class="mermaid">` never rendered in practice. (Corrected 2026-09-02 — an earlier version of
+this section still said to write Mermaid syntax here, left over from before that bug was found;
+caught auditing this file for internal consistency, not by a fresh report.)
 
 **On React, Tailwind, and shadcn — decided 2026-09-02, after a real frustration report** (editing
 a previously-published Artifact was slow because its data was interleaved into its markup and
