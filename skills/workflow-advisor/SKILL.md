@@ -211,13 +211,19 @@ background colour:
    - **Buy** — a full third-party platform. Reserve for when the gap is genuinely platform-sized,
      not just because a vendor sells one — a platform that would also replace parts already working
      fine is a cost, not a convenience.
-5. **Tag every candidate `maturity: now | aspirational`, independent of its tier** — added
-   2026-09-02. Tier answers "what kind of thing is this"; maturity answers "does it depend on
-   something not yet true" (a beta, an unconfirmed integration, access not yet granted). A Build
-   candidate can be aspirational (feasibility unconfirmed) and a Middle-ground candidate can be
-   feasible now (an established fallback product) — the two axes are genuinely independent, and
+5. **Tag every candidate `maturity: aspirational | now | done`, independent of its tier** — added
+   2026-09-02, extended to three values the same day after a domain expert reported one graduating
+   mid-conversation. Tier answers "what kind of thing is this"; maturity answers "how real is it
+   right now": `aspirational` depends on something not yet true (a beta, an unconfirmed
+   integration, access not yet granted); `now` is feasible today but not yet tried; `done` means
+   someone actually reported it deployed and working — never assign `done` on your own inference,
+   only on the domain expert's word. A Build candidate can be aspirational and a Middle-ground
+   candidate can be `done` (an already-live connector) — the axes are genuinely independent, and
    conflating them is how an idealized bet gets presented with the same confidence as a working
-   option.
+   option. **Re-check this field whenever the domain expert reports back** — a lever marked
+   aspirational when the document was written can graduate to `done` within days, and the
+   pipeline's own "X becomes Y" framing stays useful even after the swap is live, as the record of
+   what changed and when (don't delete the before-state once it's real; that's the changelog).
 6. **Recommend at MOST TWO "top picks" total, chosen for consolidation impact — not one per
    tier.** Added 2026-09-02: a flat list where every tier reads equally viable leaves the reader to
    guess which one is actually the recommendation. Pick the tool(s) that close the most/biggest

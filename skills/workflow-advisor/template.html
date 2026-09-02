@@ -374,10 +374,17 @@
          { kind: "unchanged", step, status, note }
          { kind: "replaced",     from: {step,status}, into: {tool, maturity, note} }   — 1 step -> 1 tool
          { kind: "consolidated", from: [{step,status}, ...], into: {tool, maturity, note} } — N steps -> 1 tool
-       maturity: "now" (feasible today) | "aspirational" (depends on something
-       not yet true — a beta, an unconfirmed integration). Never omit it on
-       an `into` — that is exactly the idealized-vs-realistic distinction
-       a reviewer needs to tell a real recommendation from a bet. */
+       maturity: "aspirational" (depends on something not yet true — a beta,
+       an unconfirmed integration) | "now" (feasible today, not yet tried) |
+       "done" (deployed and confirmed working — a lever graduates here once
+       someone actually reports it running, not before). Never omit it on
+       an `into` — that is exactly the idealized-vs-realistic-vs-realized
+       distinction a reviewer needs to tell a bet from a plan from a fact.
+       Found 2026-09-02: re-check this field when the domain expert reports
+       back — a lever marked aspirational when the doc was written can
+       graduate to done within the same week, and the pipeline node's
+       framing (still shown as "X becomes Y") stays useful even after the
+       swap is live, as the record of what changed and when. */
     pipeline: [
       // { kind: "unchanged", step: "REPLACE", status: "automated|manual|gate|unclear", note: "REPLACE" }
     ],
@@ -389,15 +396,14 @@
     /* tier: "build" (a Claude skill/workflow) | "middle" (an existing or
        lightweight connector, short of a full platform) | "buy" (a full
        third-party platform). Drives the tier-card summary above the table.
-       maturity: "now" (feasible today, nothing left to depend on) |
-       "aspirational" (real, but depends on a beta/unconfirmed integration/
-       something outside this account's control).
+       maturity: "aspirational" | "now" | "done" — see the pipeline[]
+       comment above for what each means and when to graduate a lever.
        recommended: true on AT MOST TWO tools total across the whole list —
        these render as the "Top picks" hero above the tier landscape. Every
        other tool is real research, not a recommendation; don't mark more
        than two or the hero stops meaning anything. */
     tools: [
-      // { name: "REPLACE", addresses: "REPLACE lever", cost: "REPLACE", tradeoff: "REPLACE", buildable: "REPLACE — could this be a Claude skill/workflow instead of a purchase?", tier: "build|middle|buy", maturity: "now|aspirational", recommended: false, status: "available|adopt|reject", source: "REPLACE, YYYY-MM-DD" }
+      // { name: "REPLACE", addresses: "REPLACE lever", cost: "REPLACE", tradeoff: "REPLACE", buildable: "REPLACE — could this be a Claude skill/workflow instead of a purchase?", tier: "build|middle|buy", maturity: "aspirational|now|done", recommended: false, status: "available|adopt|reject", source: "REPLACE, YYYY-MM-DD" }
     ],
 
     /* The build order, as a short visual sequence — not a paragraph.
@@ -405,7 +411,7 @@
        in the tool/lever detail above. tier/maturity may be null for a
        lever that isn't a tool pick (e.g. "loosen a human gate"). */
     order: [
-      // { n: 1, lever: "REPLACE", label: "REPLACE short label", tier: "build|middle|buy|null", maturity: "now|aspirational|null", reason: "REPLACE, one sentence" }
+      // { n: 1, lever: "REPLACE", label: "REPLACE short label", tier: "build|middle|buy|null", maturity: "aspirational|now|done|null", reason: "REPLACE, one sentence" }
     ],
 
     /* Never leave this empty — every lever gets exactly one verdict.
@@ -467,8 +473,8 @@
   var TIER_ORDER = ["build", "middle", "buy"];
   var STEP_H = { automated: 152, manual: 352, gate: 42, unclear: 200 };
   var STEP_LABEL = { automated: "✅ Automated", manual: "✋ Manual", gate: "🚦 Manual — gate", unclear: "❓ Unclear" };
-  var MATURITY_H = { now: 152, aspirational: 272 };
-  var MATURITY_LABEL = { now: "✅ Feasible now", aspirational: "🔮 Aspirational — beta/unconfirmed" };
+  var MATURITY_H = { done: 152, now: 42, aspirational: 272 };
+  var MATURITY_LABEL = { done: "🚀 Deployed — confirmed working", now: "✅ Feasible now", aspirational: "🔮 Aspirational — beta/unconfirmed" };
   var VERDICT_H = { self: 152, consult: 42, share: 272, deferred: 200 };
   var VERDICT_LABEL = { self: "✅ Self-investigate", consult: "🔬 Book a technical consultation", share: "📤 Share as pre-loaded context", deferred: "⏸️ Deferred, no verdict yet" };
   var REF_H = { primary: 152, verified: 152, secondary: 42, vendor: 42, idealized: 352 };
