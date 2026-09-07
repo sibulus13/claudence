@@ -59,6 +59,7 @@ flowchart LR
 - Each pipeline phase actually run becomes one `Milestone`; phase 1 and phase 2.5 (the kill/lock gates) get `status: gate` specifically, since Helm's schema already has a dedicated value for exactly that shape of milestone.
 - Phase -1 sets the idea-bank entry's `Repo path` and copies the "Helm Integration" `CLAUDE.md` block from an existing Helm-tracked project — this is what makes a brand-new `dark-factory` project show up in Nexus's sidebar automatically, with zero new code written.
 - **This also closes Ask #1 from the original dark-factory memory** (a cross-project roadmap by phase, research/design/build-ready) — Nexus's sidebar-of-projects-with-a-roadmap-tab-each *is* that view, once every tracked project's `helm-roadmap.json` reflects real phase status.
+- **Verified 2026-09-07:** `cd Life/second-brain && pnpm build` succeeds cleanly and lists `/workspace` (Nexus) plus every route this design depends on (`/api/projects/[filename]/{design,roadmap,schedule,repofile}`, `/api/sessions/*`) — this was a genuine risk given the code hadn't been touched since 2026-06-21, and it checked out. Access at `http://localhost:3000/workspace` after `pnpm dev`.
 
 ---
 
