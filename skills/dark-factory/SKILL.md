@@ -1,9 +1,9 @@
 ---
-name: feature-pipeline
-description: End-to-end gate pipeline for building a new feature, a brand-new idea/product from zero, or evaluating whether a product bet is worth building. Adds idea intake, a product-validity gate, a requirements phase with traceable IDs, and a multi-domain spec review in FRONT of the existing build orchestration; adds project-specific audit gates and a full spec-conformance integration check BEHIND it. Delegates the build itself to /orchestrate and the fanout-design-build-audit workflow rather than reimplementing them. This is the consolidated "dark factory" pipeline — see docs/DARK-FACTORY-DESIGN.md at the session docs root for the full architecture and rationale. Use for any non-trivial feature, a new project from an idea, or to decide whether a proposed feature/idea should exist at all.
+name: dark-factory
+description: The idea-to-product pipeline — validates whether something should be built, authors a traceable spec, runs a multi-domain review of the spec itself, decomposes and builds it (delegated to /orchestrate + fanout-design-build-audit), and integration-checks the result against the original spec. Runs as a brand-new product from zero, or in narrower entry modes (feature-add, spec-only, review-only, build-only, integration-check, gap-log) so any single phase or subset can be reused without the rest. Was named feature-pipeline; renamed because the pipeline builds whole products, not just features — "feature-add" is now one entry mode among several. Writes helm-design.json / helm-roadmap.json / helm-status.json so build status is visible live in the existing Helm "Nexus" workspace (Life/second-brain) — no separate dashboard needed. See docs/DARK-FACTORY-DESIGN.md at the session docs root for the full architecture.
 ---
 
-# feature-pipeline
+# dark-factory
 
 **This skill does not replace `/orchestrate` or `fanout-design-build-audit`. It wraps them.**
 
@@ -31,6 +31,89 @@ Phases -1, 0–3, and 5–7.5 are this skill. **Phase 4 is a delegation, not a r
 
 ---
 
+## Entry modes — decomposable, not all-or-nothing
+
+**The full chain above is one mode, not the only mode.** Any subset is independently invocable —
+say the mode explicitly when starting, or infer it from what's being asked (a follow-up on an
+existing project reads as `feature-add`, a bare idea with nothing built yet reads as `new-product`).
+
+| Mode | Runs | Skips | Use when |
+|---|---|---|---|
+| **`new-product`** (default) | -1 → 7.5, full chain | nothing | Building something from zero |
+| **`feature-add`** | 0 → 7.5; kill gate (1) scoped to the increment; phase 2's FR/NFR are appended to the existing `SPEC.md` with new IDs, not a fresh document; phase 2.5 reviews only the diff | -1 (idea intake), repo scaffold | Iterating a new feature onto a product this pipeline (or anything else) already built |
+| **`spec-only`** | -1 → 2.5 | 3 onward | Want a validated, reviewed, locked spec, not ready to build yet — e.g. queuing work, or handing the spec to a human |
+| **`review-only`** | 2.5 only, against an already-written doc suite | everything else | Retrofitting the multi-domain review onto a spec authored outside this pipeline |
+| **`build-only`** | 3 → 7.5 | -1, 0, 1, 2, 2.5 | Spec already locked (by a prior `spec-only` run, or by hand); resume straight into decomposition |
+| **`integration-check`** | 7.5 only | everything else | Periodic health check on an already-shipped project — re-verify it still matches its spec, refresh `docs/TRACE.md` |
+| **`gap-log`** | nothing — appends one row to the Spec-Gap Ledger | everything | A follow-up just revealed a spec miss; record it without running the pipeline |
+
+Record which mode ran and which phases it covered in `docs/STATE.md`'s `pipelineMode` /
+`phasesRun` fields (schema below) — this is what makes a later `build-only` or
+`integration-check` run know where a previous partial run left off, and what makes the mode
+itself part of the traceability story instead of an undocumented shortcut.
+
+---
+
+## `docs/STATE.md` — machine-readable header (every mode writes this)
+
+`STATE.md` carries a small YAML front-matter block ahead of its prose/Mermaid content, so both
+this pipeline and Helm's Nexus workspace can read it without parsing English:
+
+```yaml
+---
+project: <name>
+category: <D:\repo category, e.g. AI | web | Bot | Data | Experiment | _Misc>
+deploymentTier: pre-traffic | live
+rigor: mvp | production
+status: proposed | validated | spec-drafted | spec-locked | decomposing | building | poc |
+        integration-checked | shipped | blocked | awaiting-human-approval | killed
+pipelineMode: new-product | feature-add | spec-only | review-only | build-only |
+              integration-check
+phasesRun: [ "-1", "0", "1", "2", "2.5" ]
+lastCompletedPhase: "2.5"
+updatedAt: <ISO timestamp>
+blockers: []
+---
+```
+
+Update this block at the end of **every** phase, in every mode — it is the single source both
+the pipeline's own resumption logic and the Helm sync (below) read from.
+
+---
+
+## Syncing to Helm's Nexus workspace — reuse, not a new dashboard
+
+**Reuse check, stated:** searched `Life/second-brain` for a "visualize build status" role before
+designing anything new — found `components/WorkspaceView.tsx` ("Nexus"), `DesignTree` +
+`RoadmapTimeline` components, and `app/api/projects/[filename]/{design,roadmap}/route.ts`, already
+reading `helm-design.json` / `helm-roadmap.json` from any tracked idea's `repoPath`, plus the
+existing `helm-status.json` heartbeat + `helm-directive.json` redirect contract (`CLAUDE.md`
+"Helm Integration" section). All of it already works end to end for any project with a `repoPath`.
+**Extending it, not building a second one.**
+
+At the end of every phase (every mode), regenerate three files at the project root from
+`STATE.md`'s YAML block and its build-status Mermaid, so Nexus always shows current reality:
+
+- **`helm-design.json`** (`HelmDesignSchema`) — one `DesignNode` per component from the spec's
+  component-bullets section, `status` mapped `⬜ not started → planned`, `🚧 in progress →
+  in-progress`, `✅ built → stable`, superseded/retired → `deprecated`.
+- **`helm-roadmap.json`** (`RoadmapSchema`) — one `Milestone` per pipeline phase actually run
+  (`phasesRun`), `status` `done` for completed phases, `in-progress` for the current one,
+  `planned` for the rest of the chosen mode's chain, `gate` for phase 1 and phase 2.5 specifically
+  (they are kill/lock gates, not ordinary steps), `blocked` if `STATE.md.status` is `blocked` or
+  `awaiting-human-approval`.
+- **`helm-status.json`** (`HelmStatusSchema`) — the existing heartbeat contract; write it after
+  every significant step exactly as `CLAUDE.md`'s "Helm Integration" section already specifies
+  for any Helm-tracked project. Check `helm-directive.json` before each major step and follow it
+  if present, per that same existing contract.
+
+**Phase -1, when scaffolding a `new-product`:** set the idea bank entry's `Repo path` field
+(`Life/notion ideas/SCHEMA.md`) to the new project's path, so it appears in Nexus's sidebar
+automatically, and copy the "Helm Integration" block from an existing Helm-tracked project's
+`CLAUDE.md` (e.g. `Life/second-brain/CLAUDE.md`) into the new project's `CLAUDE.md` verbatim.
+
+---
+
 ## -1 · Idea intake
 
 Two entry shapes — handle both:
@@ -42,12 +125,14 @@ Two entry shapes — handle both:
    write a minimal entry into the idea bank first, following its existing schema
    (`Life/notion ideas/SCHEMA.md`), so everything built stays traceable back to an idea record even
    when it started as a one-off request. Skip this for a feature inside an already-existing,
-   already-tracked project — only new, from-zero ideas need a bank entry.
+   already-tracked project — only new, from-zero ideas need a bank entry (this is the
+   `feature-add` mode).
 
 If phase 1 says **BUILD** and this is a new idea (not a feature in an existing repo): scaffold its
 home now, per the standing Repository Organization rule — `D:\repo\<Category>\<project>`, never
 bare at the root. State the chosen category. `git init`. Create `docs/SPEC.md`, `docs/DESIGN.md`,
-`docs/DECISIONS.md`, `docs/STATE.md` from the template in "Phase 0 template" below.
+`docs/DECISIONS.md`, `docs/STATE.md` from "Spec template" below, plus the `Repo path` +
+`CLAUDE.md` "Helm Integration" step from "Syncing to Helm's Nexus workspace" above.
 
 ---
 
@@ -408,8 +493,9 @@ from that notification, never by scheduling a check-back. The `Agent`/`Workflow`
 completion signaling *is* the event-driven mechanism; nothing new is needed here.
 
 **Kickoff is a deliberate act, not a background watcher.** Going from "an idea exists" to "the
-pipeline is running" still means invoking `/feature-pipeline` — manually, or from another skill/
-agent that decided to. That is not a gap in the design: it is the one point a human (or an
+pipeline is running" still means invoking `/dark-factory` (with a mode, per "Entry modes" above)
+— manually, or from another skill/agent that decided to. That is not a gap in the design: it is
+the one point a human (or an
 upstream agent) actually chooses to start work, and it happens the instant it's asked for, which
 is already as fast as this can go. A fully unattended kickoff (idea appears in the bank → pipeline
 starts with nobody asking) is a separate, later capability, not required for "front-load into the

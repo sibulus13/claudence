@@ -1,12 +1,12 @@
 # Dark Factory v1 — Consolidated Design
 
-> Supersedes the "two competing engines" state described in `DARK-FACTORY-AUDIT.md`. Consolidates onto the harness-native path (`/feature-pipeline` → `/orchestrate` → `fanout-design-build-audit`), extended with Bifrost's three distinctive ideas and the new requirements below. `deploymentTier: pre-traffic` (this is tooling; no live users of the factory itself).
+> Supersedes the "two competing engines" state described in `DARK-FACTORY-AUDIT.md`. Consolidates onto the harness-native path (`~/.claude/skills/dark-factory` → `/orchestrate` → `fanout-design-build-audit`), extended with Bifrost's three distinctive ideas and the requirements below. `deploymentTier: pre-traffic` (this is tooling; no live users of the factory itself). **Renamed from `feature-pipeline` to `dark-factory` 2026-09-07** — the skill builds whole products from zero, not just features; "feature-add" is now one entry mode among several (see "Entry modes" below), not the skill's whole identity.
 
 ## What changed vs. the audit
 
-`/feature-pipeline` already had 7 of the ~10 pieces this needs (kill gate, FR/NFR, decomposition, delegated build, test strategy, audit gates, adversarial smoke). This design adds the four pieces it was missing and states where each lands:
+`feature-pipeline` (now `dark-factory`) already had 7 of the ~10 pieces this needs (kill gate, FR/NFR, decomposition, delegated build, test strategy, audit gates, adversarial smoke). This design adds the pieces it was missing and states where each lands:
 
-| Missing piece (from the 2026-09-07 ask) | Landed in |
+| Missing piece | Landed in |
 |---|---|
 | Validate a **brand-new idea from zero**, not just a feature in an existing repo | New Phase -1 |
 | One canonical spec sheet, template-enforced, with a build-status visualization | New Phase 0 template |
@@ -15,7 +15,50 @@
 | Full re-check against the original spec once integrated | New Phase 7.5 |
 | Record every post-ship follow-up as a spec gap, feed forward to the *next* idea's spec phase | New Spec-Gap Ledger (cross-project) |
 | Bifrost's continuity check, rigor dial, human-approval-as-node | Ported into Phases 3/2/4+7 |
-| Run without a human clicking through each gate | Phase 1/2.5 auto-advance rule + continuous same-run execution (event-driven, not scheduled — see below) |
+| Run without a human clicking through each gate | Phase 1/2.5 auto-advance rule + continuous same-run execution (event-driven, not scheduled) |
+| **Reusable in pieces, not all-or-nothing** (2026-09-07 ask) | New **Entry modes** — `new-product` / `feature-add` / `spec-only` / `review-only` / `build-only` / `integration-check` / `gap-log` |
+| **Visualize in-progress build status** (2026-09-07 ask, = Ask #1 from the original dark-factory memory) | **Not a new dashboard** — the pipeline now writes `helm-design.json` / `helm-roadmap.json` / `helm-status.json`, which Helm's existing "Nexus" workspace (`Life/second-brain`) already renders live |
+
+---
+
+## Entry modes — decomposable, not all-or-nothing
+
+The full -1→7.5 chain is `new-product`, the default — but any subset is independently runnable so you can reuse only the piece you need instead of the whole pipeline:
+
+| Mode | Runs | Use when |
+|---|---|---|
+| `new-product` | -1 → 7.5 | Building something from zero |
+| `feature-add` | 0 → 7.5, scoped to the increment | Iterating a new feature onto a product this pipeline (or anything else) already built — appends new FR/NFR IDs to the existing SPEC.md rather than starting a fresh doc, and phase 2.5 reviews only the diff |
+| `spec-only` | -1 → 2.5 | Want a validated, reviewed, locked spec without building yet |
+| `review-only` | 2.5 only | Retrofitting the multi-domain review onto a spec written outside this pipeline |
+| `build-only` | 3 → 7.5 | Spec already locked; resume straight into decomposition |
+| `integration-check` | 7.5 only | Periodic health check on a shipped project; refresh `docs/TRACE.md` |
+| `gap-log` | Spec-Gap Ledger append only | Record a spec miss without running anything else |
+
+Full detail (including the `STATE.md.pipelineMode`/`phasesRun` tracking that makes a later `build-only` know where a prior partial run stopped): `~/.claude/skills/dark-factory/SKILL.md` ("Entry modes").
+
+---
+
+## Visualizing in-progress builds — reuse, not a new dashboard
+
+**Reuse check, stated:** before designing anything, searched `Life/second-brain` (Helm) for a "visualize build status" role. Found it already built and wired: `components/WorkspaceView.tsx` ("Nexus" — a per-project workspace with Live-context / System-design / Spec / Roadmap / Schedule tabs), `DesignTree` + `RoadmapTimeline` components, and `app/api/projects/[filename]/{design,roadmap}/route.ts` reading `helm-design.json` (`HelmDesignSchema`: a `DesignNode` tree with `status: stable|in-progress|planned|deprecated`) and `helm-roadmap.json` (`RoadmapSchema`: `Milestone[]` with `status: done|in-progress|planned|gate|blocked`) from any idea-bank entry's `repoPath`. The existing `helm-status.json`/`helm-directive.json` heartbeat contract (from Helm's M8) already gives live context + mid-run redirects for any Helm-tracked project's `CLAUDE.md`. **All of this predates this design and already works end to end** — it was simply never fed by anything, since no project had regenerated those three files since Helm's own M8 changelog entries (`Life/second-brain/helm-roadmap.json`'s own milestone list stalls at 2026-06-21).
+
+```mermaid
+flowchart LR
+    STATE["docs/STATE.md<br/>(YAML header + Mermaid)"] -->|every phase end| SYNC[Regenerate]
+    SYNC --> DESIGN[helm-design.json]
+    SYNC --> ROADMAP[helm-roadmap.json]
+    SYNC --> STATUS[helm-status.json]
+    DESIGN --> NEXUS["Helm Nexus workspace<br/>(already built, already live)"]
+    ROADMAP --> NEXUS
+    STATUS --> NEXUS
+```
+
+- `STATE.md`'s YAML header (below) is the single source of truth; the three Helm files are **derived views**, regenerated at the end of every phase in every mode — so Nexus is never looking at stale state.
+- Component build-status (`⬜`/`🚧`/`✅` from the Phase 0 template's Mermaid) maps to `HelmDesignSchema`'s `planned`/`in-progress`/`stable`.
+- Each pipeline phase actually run becomes one `Milestone`; phase 1 and phase 2.5 (the kill/lock gates) get `status: gate` specifically, since Helm's schema already has a dedicated value for exactly that shape of milestone.
+- Phase -1 sets the idea-bank entry's `Repo path` and copies the "Helm Integration" `CLAUDE.md` block from an existing Helm-tracked project — this is what makes a brand-new `dark-factory` project show up in Nexus's sidebar automatically, with zero new code written.
+- **This also closes Ask #1 from the original dark-factory memory** (a cross-project roadmap by phase, research/design/build-ready) — Nexus's sidebar-of-projects-with-a-roadmap-tab-each *is* that view, once every tracked project's `helm-roadmap.json` reflects real phase status.
 
 ---
 
@@ -40,7 +83,7 @@ flowchart TD
     POC --> LEDGER[("Spec-Gap Ledger<br/>updated on every future follow-up")]
 ```
 
-Phases 0, 1, 3–7 are the existing `/feature-pipeline` (unchanged in spirit). **-1, 2.5, 7.5, and the ledger are new.** Phase 4 is still a delegation to `fanout-design-build-audit` / `/orchestrate` — this design does not reimplement a build engine.
+Phases 0, 1, 3–7 are the existing pipeline (unchanged in spirit, renamed skill). **-1, 2.5, 7.5, and the ledger are new.** Phase 4 is still a delegation to `fanout-design-build-audit` / `/orchestrate` — this design does not reimplement a build engine.
 
 ---
 
@@ -165,7 +208,7 @@ flowchart LR
 
 - **No trigger needed between phases.** Each phase's gate passing is itself what starts the next one, in the *same run* — this is just the standing Autonomous Execution Contract loop (next unblocked step → do it → repeat until done or a hard blocker) applied to this pipeline. There is nothing to schedule because there is no gap to fill.
 - **Phase 4's delegation is already event-driven.** `fanout-design-build-audit` runs as a background `Workflow`; its own task-notification is what resumes the pipeline the instant it converges — the harness's existing event mechanism, not something new to build.
-- **Kickoff remains a deliberate invocation** (of `/feature-pipeline`, by a human or an upstream agent) — that is the one real "start" event, and it happens exactly when asked, which is already as fast as possible. A fully unattended kickoff (new idea appears in the bank → pipeline starts with nobody asking) is a separate, later capability, not required by "front-load into the spec, autonomous after."
+- **Kickoff remains a deliberate invocation** (of `/dark-factory`, with a mode, by a human or an upstream agent) — that is the one real "start" event, and it happens exactly when asked, which is already as fast as possible. A fully unattended kickoff (new idea appears in the bank → pipeline starts with nobody asking) is a separate, later capability, not required by "front-load into the spec, autonomous after."
 - **The one genuine suspend point** — `awaiting-human-approval`, `live` tier only — resumes on the approval event itself (the human sets the field and re-invokes), never on a timer. `pre-traffic` projects never reach this state.
 - **Crucible's every-6-hours auto-implementer** (`Stock/Research 2026`) stays a useful reference for *that* domain's shape (hundreds of independent trading strategies genuinely do warrant a regular re-scan), but is not a template to copy here — this pipeline's phases are dependent and sequential, not an independent batch to re-poll.
 
@@ -186,14 +229,17 @@ Phase 2 (FR/NFR) of every future run **reads this ledger first** and explicitly 
 
 | id | decision | status | rationale | revisit-when |
 |---|---|---|---|---|
-| DF-1 | Extend `/feature-pipeline` in place rather than create a parallel `dark-factory` skill | confirmed | single-canonical-per-concern rule; feature-pipeline already claimed "or evaluating whether a product bet is worth building" | never — this is the design |
+| DF-1 | Extend `feature-pipeline` in place rather than create a parallel skill | confirmed | single-canonical-per-concern rule; feature-pipeline already claimed "or evaluating whether a product bet is worth building" | never — this is the design |
+| DF-5 | Renamed `feature-pipeline` → `dark-factory` | confirmed 2026-09-07 | user: "does it make sense to call it feature pipeline when the reality is we want to build our fully flush solution and product overall" — correct, the old name undersold the scope and made "feature-add" read as the whole skill instead of one mode | if the pipeline later needs to shed the "dark factory" framing entirely (e.g. productized under a different name), revisit together with all doc cross-references |
+| DF-6 | Pipeline decomposed into named entry modes (`new-product`/`feature-add`/`spec-only`/`review-only`/`build-only`/`integration-check`/`gap-log`) rather than one all-or-nothing chain | confirmed 2026-09-07 | user: needs to reuse only parts, and to switch off phases when iterating a feature onto existing scope | a mode's phase subset stops matching real usage — split or merge modes, don't bolt on ad hoc flags |
+| DF-7 | Build-status visualization reuses Helm's existing Nexus workspace (`helm-design.json`/`helm-roadmap.json`/`helm-status.json`) instead of a new dashboard | confirmed 2026-09-07 | reuse-check found the UI, schemas, and API routes already built and wired — a new dashboard would have duplicated a working system | Nexus's tab set stops covering what dark-factory projects need to show — extend Nexus's own components first, still don't fork a second dashboard |
 | DF-2 | Bifrost retired as a standalone engine; its 3 ideas ported, code kept but not developed further | confirmed 2026-09-07 (user said "let's consolidate") | avoids two competing engines | if a future project needs true multi-day unattended planning search Claude Code role-flows can't do |
 | DF-3 | ~~Autonomous trigger = scheduled cron~~ **superseded** — continuous same-run execution, event-driven via task-notifications; no cadence to choose | corrected 2026-09-07 | user: "shouldn't it queue up event-driven rather than time-driven" — conceded, a fixed-interval poll is exactly the delay a continuous pipeline shouldn't have | if a genuinely async, no-session-running kickoff is wanted later, revisit as its own capability, not by reviving cron |
 | DF-4 | `pre-traffic` auto-advances past the spec-lock gate on GO/CONDITIONAL-GO with no R-findings; `live` always halts for a human field | assumed | mirrors existing tier table exactly | if a pre-traffic project's auto-advance ships something the user didn't want, tighten to always-halt |
 
 ## Open item — needs you
 
-Nothing is blocking the pipeline itself anymore — it's usable today via `/feature-pipeline`. The
+Nothing is blocking the pipeline itself anymore — it's usable today via `/dark-factory`. The
 only remaining open question is a product choice, not an architecture one:
 1. **Pilot idea** — which idea from the bank should be the first one run end-to-end through this
    pipeline, to prove it out? (Scout was Bifrost's intended validation target and is already
