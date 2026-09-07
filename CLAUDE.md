@@ -4,6 +4,61 @@ These instructions apply to every project on this machine. Project-level CLAUDE.
 
 ---
 
+**Promoted to the top 2026-08-28**: these three sections govern how every response is shaped —
+before execution, during it, and at close. They sat sixth-plus among ~30 sections and were
+observed drifting out of practice as a result; position is not a substitute for enforcement, but
+a behavioral contract read after two dozen reference sections competes for attention it should
+not have to.
+
+## The Contract Letter — plan before execution, every session (Global)
+
+**The first substantive response to a new prompt opens with the plan, not the work.** Before
+executing, restate the contract between us:
+
+- **The asks, as bullets** — parsed back in my own words, so a misread surfaces before it costs
+  anything. Ambiguous phrasing is named as ambiguous, with the reading I am taking.
+- **How each will be accomplished** — the concrete steps, ideally as a table with a status column, so
+  the user knows what to expect rather than inferring it from tool calls scrolling past.
+- **Any key design call flagged early**, phrased so it can be vetoed cheaply — "here is the decision I
+  am about to bake in" beats discovering it three files later.
+
+Then execute. This is *not* a request for permission and **not a reason to stop and wait** — the
+Autonomous Execution Contract still governs once the plan is stated. It exists because a plan is
+cheap to correct and finished work is not, and because the user should never have to reverse-engineer
+intent from a stream of tool output.
+
+**Update the letter when the prompt changes.** A new session, or a materially new direction inside
+one, gets a fresh statement of asks-and-plan. Mid-turn instructions that change the shape of the work
+get the plan re-stated rather than silently absorbed.
+
+Scope: substantive multi-step work. A one-line question or a single mechanical edit does not need a
+plan preamble — answering *is* the plan.
+
+## Response Style
+
+- Be concise — lead with the answer, not the reasoning
+- Do not summarize what you just did at the end of a response, EXCEPT per the End-of-Response Contract below
+- Do not add unsolicited comments, docstrings, or type annotations to code you didn't change
+- Do not add emojis unless explicitly asked
+- Reference code by `file:line` pattern so the user can navigate directly
+- **Lead with the finding, not the label.** The subject of the sentence is *what is true and why it matters*; the identifier trails as a citation. **Never open a bullet, row, or heading with an identifier** — a reader scanning your response should learn the substance without decoding a register first
+  - ✅ *"Two thirds of the planning corpus is dormant — 68,337 activities untouched for a year hold 59% of all progress updates, so uniform indexing answers today's question with last cycle's material (`RI-021`)"*
+  - ❌ *"`RI-021` ("two thirds of the corpus is dormant") — 68,337 activities…"* — this is an index entry. It names a category and makes the reader do the work
+- **State the consequence, not just the fact.** "450k progress updates" is a measurement; "450k progress updates, 59% of them on work nobody has touched in a year" is a finding. If a bullet has no *so what*, it is inventory, not analysis
+- **Action-biased** — when a clear implementation path exists, take it. Do not present options or ask which approach to use. Make the call, implement it, then summarize the design choices and trade-offs made at the end of the response.
+
+## End-of-Response Contract
+
+Applies to every project. At the end of the final response in a turn, surface anything not yet addressed — skip any section with nothing outstanding, don't restate what's already been fully resolved/acknowledged earlier in the same response:
+
+- **Action items done** — only if not already stated plainly earlier in the response (don't repeat a summary you already gave)
+- **Session to-dos / reminders (open loops)** — the running ledger of what's still outstanding IN THIS SESSION: in-flight background work (name what completes it — e.g. "sweep running → I finish the regen+restart on completion"), changes **staged but not yet deployed**, queued next actions, and **decisions awaiting the user**. This is the "don't drop the thread" list — surface every open loop so nothing started-but-unfinished is silently lost. Tag each: ⏳ in-flight · 🅿️ staged · ⛔ blocked-on-you.
+- **Next-step proposals** — concrete, named next actions; not "let me know if you want me to continue"
+- **Open findings** — anything discovered but not yet acted on or decided
+- **Vocabulary / domain knowledge** — for any non-trivial domain term, tool, or concept used in the response: a short "what it is" + "why it matters here" gloss, so the user builds a working mental model of the area, not just the specific fix
+
+Keep this compact — bullets, not prose. If everything in a turn was simple and fully resolved with nothing pending, this contract produces nothing extra (don't pad).
+
 ## Environment
 
 - **OS**: macOS (Apple silicon) — use POSIX shell syntax; there is no PowerShell on this machine
@@ -67,48 +122,20 @@ Whenever a new rule, convention, or operating contract is established, **explici
 
 **Test:** *would this rule be desirable in an unrelated project?* Yes → global; only-makes-sense-here → project. **State the chosen scope when adopting the rule**, and **promote** a project rule to global once it proves generally applicable (leave a memory note when you do — cf. Domain Literacy above).
 
-## The Contract Letter — plan before execution, every session (Global)
-
-**The first substantive response to a new prompt opens with the plan, not the work.** Before
-executing, restate the contract between us:
-
-- **The asks, as bullets** — parsed back in my own words, so a misread surfaces before it costs
-  anything. Ambiguous phrasing is named as ambiguous, with the reading I am taking.
-- **How each will be accomplished** — the concrete steps, ideally as a table with a status column, so
-  the user knows what to expect rather than inferring it from tool calls scrolling past.
-- **Any key design call flagged early**, phrased so it can be vetoed cheaply — "here is the decision I
-  am about to bake in" beats discovering it three files later.
-
-Then execute. This is *not* a request for permission and **not a reason to stop and wait** — the
-Autonomous Execution Contract still governs once the plan is stated. It exists because a plan is
-cheap to correct and finished work is not, and because the user should never have to reverse-engineer
-intent from a stream of tool output.
-
-**Update the letter when the prompt changes.** A new session, or a materially new direction inside
-one, gets a fresh statement of asks-and-plan. Mid-turn instructions that change the shape of the work
-get the plan re-stated rather than silently absorbed.
-
-Scope: substantive multi-step work. A one-line question or a single mechanical edit does not need a
-plan preamble — answering *is* the plan.
-
-## Response Style
-
-- Be concise — lead with the answer, not the reasoning
-- Do not summarize what you just did at the end of a response, EXCEPT per the End-of-Response Contract below
-- Do not add unsolicited comments, docstrings, or type annotations to code you didn't change
-- Do not add emojis unless explicitly asked
-- Reference code by `file:line` pattern so the user can navigate directly
-- **Lead with the finding, not the label.** The subject of the sentence is *what is true and why it matters*; the identifier trails as a citation. **Never open a bullet, row, or heading with an identifier** — a reader scanning your response should learn the substance without decoding a register first
-  - ✅ *"Two thirds of the planning corpus is dormant — 68,337 activities untouched for a year hold 59% of all progress updates, so uniform indexing answers today's question with last cycle's material (`RI-021`)"*
-  - ❌ *"`RI-021` ("two thirds of the corpus is dormant") — 68,337 activities…"* — this is an index entry. It names a category and makes the reader do the work
-- **State the consequence, not just the fact.** "450k progress updates" is a measurement; "450k progress updates, 59% of them on work nobody has touched in a year" is a finding. If a bullet has no *so what*, it is inventory, not analysis
-- **Action-biased** — when a clear implementation path exists, take it. Do not present options or ask which approach to use. Make the call, implement it, then summarize the design choices and trade-offs made at the end of the response.
-
 ## Documentation Style — Visual-First (Mermaid)
 
 Write every doc / spec / context **visual-first**: lead with **Mermaid diagrams**; use text only for what a diagram can't carry (data/code contracts, exact copy, pricing tables, fine nuance).
 - Maps: architecture → `flowchart` · runtime/data flow → `sequenceDiagram` · branching/decision → `flowchart`/`stateDiagram` · schemas + relationships → `erDiagram`/`classDiagram`.
 - **≤ 5 elements per row** — lay out for portrait/vertical space; prefer top-down (`flowchart TD`); ≤5 participants per sequence diagram; wrap/stack wide chains.
+- **`TD` is NOT a synonym for "vertical", and assuming it is produces the exact wide diagram the rule above forbids.** The mechanism: **`TD` stacks DEPTH vertically and fans BREADTH horizontally** — one parent with eight children renders as eight columns, off the side of the page. **`LR` is the opposite: it fans breadth down the page.** Pick by shape, not habit:
+
+  | The diagram is | Use | Because |
+  |---|---|---|
+  | A **deep chain** — few siblings, many levels (a pipeline, a hierarchy walk) | **`TD`** | Depth is the long axis and it runs down the page |
+  | A **wide fan-out** — one parent, >5 children (a taxonomy, a theme breakdown, a catalogue) | **`LR`** | Breadth becomes the vertical axis, using portrait space |
+  | **Both deep and wide** | **SPLIT IT** | One diagram per branch, or a `TD` overview whose leaves end in *…* and expand elsewhere |
+
+  **Count the widest row before choosing the direction** — that is the whole test, and it is cheap. Added 2026-09-07 after shipping an 8-child `TD` fan-out that rendered as a horizontal band; `≤5 per row` was already written above and was read as satisfied because the direction said "TD".
 - A doc opens with a diagram, not a paragraph. (Promoted from a project rule 2026-06-27. Exemplars are listed in `CLAUDE.local.md`.)
 - **This covers ARTIFACTS too, and there the diagram must be INTERACTIVE where the content is a hierarchy** — `/depth-tree`, whose rows advertise whether they open. Extended 2026-08-24 after a scored readiness page shipped as a wall of text; a static page of tables is not visual-first because it has tables in it.
 - **The terminal is not a render surface — never put a mermaid fence in a reply.** Claude Code's
@@ -121,18 +148,6 @@ Write every doc / spec / context **visual-first**: lead with **Mermaid diagrams*
   | A person who must look at it now | an **Artifact** | renders mermaid natively, from a ```mermaid fence or `<pre class="mermaid">` |
   | Anyone, in a terminal | **nothing** | inline-image protocols exist in WezTerm but Claude Code's own pane re-renders tool output as text, so they do not survive |
 - **Progressive disclosure is the default, not a nicety.** The reader is a high-level stakeholder: **the top level is the whole answer at their altitude, and every detail is expandable rather than present.** A page that shows depth by default has decided the reader has time to read it, which they do not. **Land closed** (`startDepth: 1`), and let them choose where to go down.
-
-## End-of-Response Contract
-
-Applies to every project. At the end of the final response in a turn, surface anything not yet addressed — skip any section with nothing outstanding, don't restate what's already been fully resolved/acknowledged earlier in the same response:
-
-- **Action items done** — only if not already stated plainly earlier in the response (don't repeat a summary you already gave)
-- **Session to-dos / reminders (open loops)** — the running ledger of what's still outstanding IN THIS SESSION: in-flight background work (name what completes it — e.g. "sweep running → I finish the regen+restart on completion"), changes **staged but not yet deployed**, queued next actions, and **decisions awaiting the user**. This is the "don't drop the thread" list — surface every open loop so nothing started-but-unfinished is silently lost. Tag each: ⏳ in-flight · 🅿️ staged · ⛔ blocked-on-you.
-- **Next-step proposals** — concrete, named next actions; not "let me know if you want me to continue"
-- **Open findings** — anything discovered but not yet acted on or decided
-- **Vocabulary / domain knowledge** — for any non-trivial domain term, tool, or concept used in the response: a short "what it is" + "why it matters here" gloss, so the user builds a working mental model of the area, not just the specific fix
-
-Keep this compact — bullets, not prose. If everything in a turn was simple and fully resolved with nothing pending, this contract produces nothing extra (don't pad).
 
 ## Code Quality — Universal
 
@@ -590,7 +605,9 @@ These user-defined skills are loaded at session start from `~/.claude/skills/`:
 - `/qa` — Validate an implementation against its spec AC. Outputs per-item verdict (MET / PARTIAL / FAILED) + regression risk list. Use after any Implementer agent completes.
 - `/brief` — Generate a role-specific context package for a downstream agent. Takes: role name + project + milestone. Strips irrelevant context and produces a minimum viable briefing.
 - `/self-improve` — Run the self-improvement loop: scan recent sessions for recurring patterns, cluster by category, filter by threshold, propose additions to CLAUDE.md / memory / skill files.
+- `/tldr` — Produce a three-part on-demand summary: accomplished · outstanding (each row tagged with its owner) · next (one named action per outstanding row). Capped at three bullets a section. **A different surface from the per-turn close, which stays two-part** — see the skill's own scope note.
 - `/depth-tree` — Build a click-to-expand hierarchy artifact: a system, product, org or roadmap rendered as collapsible depth levels where every row advertises whether it opens. Carries `template.html` (zero dependencies, hue-driven theming, two colour channels). Use when a Mermaid diagram is about to outgrow legibility, or when the same content must read at both executive and engineer altitude.
+- `/google-form-builder` — Build a live Google Form via Claude-in-Chrome browser automation from a finalized question-set doc. **Token-heavy — warn the user up front** (screenshots after nearly every action). Carries hard-won gotchas: title-wrap layout shifts, ghost type-dropdown overlays, editor-only ellipsis truncation, and an org-Workspace email-collection lock that can silently defeat "anonymous" framing.
 
 ## Platform Note
 
