@@ -1,6 +1,6 @@
 ---
 name: dark-factory
-description: The idea-to-product pipeline — validates whether something should be built, authors a traceable spec, runs a multi-domain review of the spec itself, decomposes and builds it (delegated to /orchestrate + fanout-design-build-audit), and integration-checks the result against the original spec. Runs as a brand-new product from zero, or in narrower entry modes (feature-add, spec-only, review-only, build-only, integration-check, gap-log) so any single phase or subset can be reused without the rest. Was named feature-pipeline; renamed because the pipeline builds whole products, not just features — "feature-add" is now one entry mode among several. Writes helm-design.json / helm-roadmap.json / helm-status.json so build status is visible live in the existing Helm "Nexus" workspace (Life/second-brain) — no separate dashboard needed. See docs/DARK-FACTORY-DESIGN.md at the session docs root for the full architecture.
+description: The idea-to-product pipeline — validates whether something should be built, authors a traceable spec, runs a multi-domain review of the spec itself (with a low-fidelity wireframe as the human's actual checkpoint on any new UI surface), decomposes and builds it (delegated to /orchestrate + fanout-design-build-audit, each component leaving a durable inspectable build-record), and integration-checks the result against the original spec. Runs as a brand-new product from zero, or in narrower entry modes (feature-add, spec-only, review-only, build-only, integration-check, gap-log) so any single phase or subset can be reused without the rest. Was named feature-pipeline; renamed because the pipeline builds whole products, not just features — "feature-add" is now one entry mode among several. Keeps docs/STATE.md current every phase so build status is visible live in Catwalk (D:\repo\AI\catwalk) — no separate sync step needed. See docs/DARK-FACTORY-DESIGN.md at the session docs root for the full architecture.
 ---
 
 # dark-factory
@@ -57,7 +57,7 @@ itself part of the traceability story instead of an undocumented shortcut.
 ## `docs/STATE.md` — machine-readable header (every mode writes this)
 
 `STATE.md` carries a small YAML front-matter block ahead of its prose/Mermaid content, so both
-this pipeline and Helm's Nexus workspace can read it without parsing English:
+this pipeline and Catwalk (the build-status dashboard, below) can read it without parsing English:
 
 ```yaml
 ---
@@ -77,40 +77,28 @@ blockers: []
 ```
 
 Update this block at the end of **every** phase, in every mode — it is the single source both
-the pipeline's own resumption logic and the Helm sync (below) read from.
+the pipeline's own resumption logic and Catwalk (below) read from.
 
 ---
 
-## Syncing to Helm's Nexus workspace — reuse, not a new dashboard
+## Visualizing build status — Catwalk, reuse not a new dashboard
 
-**Reuse check, stated:** searched `Life/second-brain` for a "visualize build status" role before
-designing anything new — found `components/WorkspaceView.tsx` ("Nexus"), `DesignTree` +
-`RoadmapTimeline` components, and `app/api/projects/[filename]/{design,roadmap}/route.ts`, already
-reading `helm-design.json` / `helm-roadmap.json` from any tracked idea's `repoPath`, plus the
-existing `helm-status.json` heartbeat + `helm-directive.json` redirect contract (`CLAUDE.md`
-"Helm Integration" section). All of it already works end to end for any project with a `repoPath`.
-**Extending it, not building a second one.**
+**Superseded 2026-09-07 (D13/D14, `~/.claude/docs/DECISIONS.md`):** this section previously
+described syncing `STATE.md` into Helm's "Nexus" workspace via generated `helm-*.json` files.
+Helm was verified dormant (3 commits ever, no runtime data since build day) and archived.
+Its design was extracted into requirements for a purpose-built replacement, **Catwalk**
+(`D:\repo\AI\catwalk`), which shipped 2026-09-07.
 
-At the end of every phase (every mode), regenerate three files at the project root from
-`STATE.md`'s YAML block and its build-status Mermaid, so Nexus always shows current reality:
+**No file generation needed — this is simpler than the section it replaced.** Catwalk polls
+`~/.foreman/repos.json` (the project registry) and each registered project's `docs/STATE.md`
+directly every 5s; there is no intermediate JSON to keep in sync. The only actions this pipeline
+takes:
 
-- **`helm-design.json`** (`HelmDesignSchema`) — one `DesignNode` per component from the spec's
-  component-bullets section, `status` mapped `⬜ not started → planned`, `🚧 in progress →
-  in-progress`, `✅ built → stable`, superseded/retired → `deprecated`.
-- **`helm-roadmap.json`** (`RoadmapSchema`) — one `Milestone` per pipeline phase actually run
-  (`phasesRun`), `status` `done` for completed phases, `in-progress` for the current one,
-  `planned` for the rest of the chosen mode's chain, `gate` for phase 1 and phase 2.5 specifically
-  (they are kill/lock gates, not ordinary steps), `blocked` if `STATE.md.status` is `blocked` or
-  `awaiting-human-approval`.
-- **`helm-status.json`** (`HelmStatusSchema`) — the existing heartbeat contract; write it after
-  every significant step exactly as `CLAUDE.md`'s "Helm Integration" section already specifies
-  for any Helm-tracked project. Check `helm-directive.json` before each major step and follow it
-  if present, per that same existing contract.
-
-**Phase -1, when scaffolding a `new-product`:** set the idea bank entry's `Repo path` field
-(`Life/notion ideas/SCHEMA.md`) to the new project's path, so it appears in Nexus's sidebar
-automatically, and copy the "Helm Integration" block from an existing Helm-tracked project's
-`CLAUDE.md` (e.g. `Life/second-brain/CLAUDE.md`) into the new project's `CLAUDE.md` verbatim.
+- **Phase -1, when scaffolding a `new-product`:** register the repo once — `foreman repos add
+  <path>` (see `D:\repo\AI\foreman\docs\SPEC.md`) — so it appears in Catwalk's sidebar.
+- **Every phase, every mode:** keep `STATE.md`'s YAML block and build-status Mermaid current
+  (already required above). That alone is what Catwalk renders — the phase highlighting comes
+  straight from `phasesRun` / `lastCompletedPhase` / `status`.
 
 ---
 
@@ -292,6 +280,17 @@ flowchart TD
     explicit human-set `approvedBy` / `approvedAt` field in `STATE.md`. This is the one place a
     human is structurally required for a `live` project; a `pre-traffic` project never stops here.
 
+**Human checkpoint modality — wireframe, not prose (added 2026-09-07, Nüwa M3 pilot).** The
+4 adversarial reviewers above read the full spec text; the human does not, reliably — asked
+directly during this pilot, the answer was that reading a written FR/NFR list is not how
+alignment actually gets checked. **If any FR in this slice defines a new or changed UI surface,
+produce a low-fidelity wireframe artifact (an Artifact-tool HTML page, schematic — placeholder
+blocks and real field names, not a finished visual design) before phase 2.5 closes**, and get the
+human's yes/redirect on *that*, not on the prose. This is the human's actual review surface;
+the written spec stays the reviewers' and phase 7.5's. A redirect at this point (something looks
+wrong, missing, or not what was pictured) routes back into phase 2 like any other R finding —
+cheaper here than after phase 4 has already spent build effort against the wrong shape.
+
 ---
 
 ## 3 · Decomposition + coupling map
@@ -322,6 +321,16 @@ the test plan in phase 5.
 worktrees, merged one at a time with the suite green between merges. Shared integration files
 (the ones every component touches) are reconciled in a **single serial pass**, never in parallel.
 
+**Parallel build and per-component verification are not in tension — this is worth stating
+explicitly, it was asked directly during the Nüwa M3 pilot (2026-09-07).** Parallelism here means
+*where the work happens* (agents in separate worktrees, simultaneously); verification happens at
+*merge*, which is already serial ("merged one at a time, suite green between merges"). Gating each
+component's merge on its own checkpoint does not serialize the building — it only serializes the
+one-at-a-time integration step that was already serial. Do not "simplify" this into either building
+everything in one pass with a single end checkpoint (loses the per-component fault localization
+below) or fully serializing the builds themselves (gives up the parallelism this skill exists to
+provide, for no verification benefit — the checkpoint was never the bottleneck).
+
 ---
 
 ## 4 · Build — delegate, do not reimplement
@@ -333,6 +342,17 @@ worktrees, merged one at a time with the suite green between merges. Shared inte
 
 Hand each agent: its component spec from phase 3 (including the FR/NFR IDs it must satisfy), an
 explicit deliverable, and a **stop condition**.
+
+**Every component's merge includes a durable, inspectable build-record — not just green tests
+(added 2026-09-07, Nüwa M3 pilot).** Green tests are evidence assertions pass; they are not
+evidence of what the component actually produces, and a later regression needs to see the last-known-
+good output to know which component broke, not just which suite is currently red. At merge, each
+component writes one real sample of its own output — a real generated file, a real API response
+body, a real rendered frame, whatever the component's actual artifact is — to
+`docs/build-records/<component-id>.md` (or the project's equivalent location), timestamped and
+committed alongside the code. This is the per-component instance of the global Observability &
+Self-Validating Output rule, applied at build time instead of at runtime: the artifact that lets
+phase 7.5's `TRACE.md` point at *evidence*, not just a test-name string.
 
 **RigorPolicy governs the loop's patience, by tier** (ported from Bifrost's `RigorPolicy`,
 formalized as a `STATE.md` field instead of left as prose):
@@ -394,6 +414,7 @@ project's manifest — the pipeline does not change.
 | **Graceful degradation** | Every external dependency failing leaves a usable page |
 | **No dead code** | Unreferenced code still carries dependencies, and dependencies carry CVEs |
 | **State over events** | If a fact is derivable from stored state, derive it. Reserve events for what leaves no trace |
+| **Durable build evidence** | Does every merged component have a real-output build-record committed (phase 4), not just a passing test name — so a regression can be localized to a component without re-running the world? |
 
 ---
 
