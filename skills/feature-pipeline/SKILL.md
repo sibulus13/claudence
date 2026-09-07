@@ -249,9 +249,10 @@ formalized as a `STATE.md` field instead of left as prose):
 **Human-approval is a state, not a reminder — `live` tier only.** When a component's build reaches
 a point that would normally need a human look (a `live`-tier project's phase 4 completion, or any
 point the project's own gate manifest names), set `STATE.md`'s `status: awaiting-human-approval`
-explicitly and stop. Do not rely on remembering to ask — the halted state is what the scheduled
-trigger (see below) checks for and refuses to advance past. `pre-traffic` projects never enter
-this state; gate-green is the approval.
+explicitly and stop. Do not rely on remembering to ask — the halted state is what stops this
+pipeline from advancing past it, and it resumes on the approval event itself (see "Continuous
+execution" below), never on a timer. `pre-traffic` projects never enter this state; gate-green is
+the approval.
 
 ---
 
@@ -390,27 +391,37 @@ consecutive specs checked it with no repeat miss, never deleted outright.
 
 ---
 
-## The autonomous trigger — running without a human clicking through each gate
+## Continuous execution — event-driven, not polled
 
-Claude Code has no persistent daemon; the real primitive for "runs on its own" is a **scheduled
-cloud agent** (`schedule` skill / `CronCreate`) — the same pattern already proven in this
-environment by `Stock/Research 2026`'s every-6-hours auto-implementer. A scheduled tick:
+**Once phase 2.5 auto-advances a `pre-traffic` project, do not stop between phases.** Phase 3 → 4
+→ 5 → 6 → 7 → 7.5 run back to back in the *same* pipeline run, each phase's completed gate being
+the only "trigger" the next phase needs — this is just the existing Autonomous Execution Contract
+loop (identify next unblocked step → do it → repeat until done or a hard blocker), applied to this
+pipeline specifically. There is no gap between a dependency being satisfied and the next phase
+starting, so there is nothing to poll for and nothing to schedule. An earlier version of this
+design proposed a scheduled cron tick to advance phases — that was wrong: it would insert exactly
+the delay this section says to avoid. Corrected 2026-09-07 per explicit user pushback.
 
-1. Scans tracked projects' `docs/STATE.md` `status` fields.
-2. `spec-locked` on a `pre-traffic` project → resumes this skill at the next uncompleted phase
-   (`STATE.md`'s `lastCompletedPhase` makes this idempotent — a tick mid-pipeline continues, it
-   does not restart at phase -1).
-3. `awaiting-human-approval` → skipped, left for a human.
-4. Nothing ready → no-op tick.
-5. The existing Autonomous Execution Contract's three hard-blocker categories (missing creds with
-   no agentic path, an irreversible action, genuine hard-to-reverse ambiguity) still apply inside
-   a tick — set `status: blocked` with a one-line reason and stop that project's tick, rather than
-   looping on it.
+**Phase 4's delegation is already event-driven, not polled.** `fanout-design-build-audit` runs as
+a background `Workflow`; the harness sends a task-notification the instant it converges — resume
+from that notification, never by scheduling a check-back. The `Agent`/`Workflow` tools' own
+completion signaling *is* the event-driven mechanism; nothing new is needed here.
 
-**Not wired up by default.** Turning this on for a given project needs two explicit inputs a human
-must supply once — which project, and an acceptable tick cadence (a recurring scheduled agent
-spends real tokens on every tick, unlike a one-shot run) — see the project's own `DECISIONS.md`
-for whether it has opted in.
+**Kickoff is a deliberate act, not a background watcher.** Going from "an idea exists" to "the
+pipeline is running" still means invoking `/feature-pipeline` — manually, or from another skill/
+agent that decided to. That is not a gap in the design: it is the one point a human (or an
+upstream agent) actually chooses to start work, and it happens the instant it's asked for, which
+is already as fast as this can go. A fully unattended kickoff (idea appears in the bank → pipeline
+starts with nobody asking) is a separate, later capability, not required for "front-load into the
+spec, autonomous after" — the point that needed to be autonomous is the phase-to-phase transitions
+above, and those already are.
+
+**The one genuine suspend point: `awaiting-human-approval` (`live` tier only).** This is the one
+place real-world wall-clock time passes for a reason Claude Code cannot resolve itself — a human
+has to actually look. Resume **on the approval event**, not on a timer: the human setting
+`approvedBy`/`approvedAt` in `STATE.md` and re-invoking (or replying in whatever channel surfaced
+the request) *is* the trigger. Do not schedule a recurring check for this either — a `pre-traffic`
+project never reaches this state at all, so in practice this almost never fires.
 
 ## Reporting
 

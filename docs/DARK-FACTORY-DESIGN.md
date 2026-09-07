@@ -15,7 +15,7 @@
 | Full re-check against the original spec once integrated | New Phase 7.5 |
 | Record every post-ship follow-up as a spec gap, feed forward to the *next* idea's spec phase | New Spec-Gap Ledger (cross-project) |
 | Bifrost's continuity check, rigor dial, human-approval-as-node | Ported into Phases 3/2/4+7 |
-| Run without a human clicking through each gate | Phase 1/2.5 auto-advance rule + scheduled trigger |
+| Run without a human clicking through each gate | Phase 1/2.5 auto-advance rule + continuous same-run execution (event-driven, not scheduled — see below) |
 
 ---
 
@@ -147,26 +147,27 @@ This replaces the prose-only tier rule with a value the pipeline can branch on, 
 
 ## Human-approval-as-node (ported from Bifrost)
 
-For `deploymentTier: live` only: Phase 2.5's lock and Phase 7.5's ship-readiness are both **explicit halted states** in `STATE.md` (`status: awaiting-human-approval`), not just an instruction the agent is trusted to remember. The scheduled trigger (below) checks this field and will not advance past it. `pre-traffic` projects never enter this state.
+For `deploymentTier: live` only: Phase 2.5's lock and Phase 7.5's ship-readiness are both **explicit halted states** in `STATE.md` (`status: awaiting-human-approval`), not just an instruction the agent is trusted to remember. This resumes on the approval event itself (see below), not a check. `pre-traffic` projects never enter this state.
 
 ---
 
-## The autonomous trigger — what "no human intervention" actually means here
+## Continuous execution — corrected 2026-09-07, event-driven not time-driven
 
-Claude Code has no persistent daemon; the closest real primitive is a **scheduled cloud agent** (the `schedule` skill / `CronCreate`), the same pattern already proven in this environment by Crucible's every-6-hours auto-implementer in `Stock/Research 2026`. Design:
+**The scheduled-cron design originally here was wrong**, and the user caught it directly: *"as soon as it completes any dependency leading up to the next phase, shouldn't it automatically queue up as event-driven architecture rather than time-driven?"* Conceded — a fixed-interval poll inserts exactly the delay a continuous pipeline should never have.
 
 ```mermaid
 flowchart LR
-    CRON["Scheduled agent<br/>(cron, e.g. every N hours)"] --> SCAN[Scan idea folders'<br/>STATE.md status fields]
-    SCAN -- spec-locked, pre-traffic --> RESUME[Invoke /feature-pipeline<br/>resuming at next phase]
-    SCAN -- awaiting-human-approval --> SKIP[Skip, leave for human]
-    SCAN -- nothing ready --> NOOP[No-op tick]
-    RESUME --> WRITE[Update STATE.md status<br/>+ TRACE.md]
+    P25["2.5 auto-advance<br/>(pre-traffic, GO)"] --> P3[3 · Decompose]
+    P3 --> P4["4 · Build<br/>(Workflow, notifies on convergence)"]
+    P4 --> P5[5 · Tests] --> P6[6 · Gates] --> P7[7 · Audit] --> P75[7.5 · Integration check]
+    P75 --> DONE[POC approved]
 ```
 
-- **Resumability, not restart:** every phase records its completion in `STATE.md` (`lastCompletedPhase`), so a cron tick that finds a project mid-pipeline continues from there rather than re-running Phase -1.
-- **Hard blockers still apply** — the existing Autonomous Execution Contract's three blocker categories (missing creds with no agentic path, irreversible action, genuinely-ambiguous-and-hard-to-reverse choice) halt a tick and set `status: blocked` with a reason, rather than looping.
-- **Not yet wired up** — this needs two inputs only the user can give: which idea pilots it first, and an acceptable cadence (token/cost tradeoff). Left as an explicit open item below rather than assumed.
+- **No trigger needed between phases.** Each phase's gate passing is itself what starts the next one, in the *same run* — this is just the standing Autonomous Execution Contract loop (next unblocked step → do it → repeat until done or a hard blocker) applied to this pipeline. There is nothing to schedule because there is no gap to fill.
+- **Phase 4's delegation is already event-driven.** `fanout-design-build-audit` runs as a background `Workflow`; its own task-notification is what resumes the pipeline the instant it converges — the harness's existing event mechanism, not something new to build.
+- **Kickoff remains a deliberate invocation** (of `/feature-pipeline`, by a human or an upstream agent) — that is the one real "start" event, and it happens exactly when asked, which is already as fast as possible. A fully unattended kickoff (new idea appears in the bank → pipeline starts with nobody asking) is a separate, later capability, not required by "front-load into the spec, autonomous after."
+- **The one genuine suspend point** — `awaiting-human-approval`, `live` tier only — resumes on the approval event itself (the human sets the field and re-invokes), never on a timer. `pre-traffic` projects never reach this state.
+- **Crucible's every-6-hours auto-implementer** (`Stock/Research 2026`) stays a useful reference for *that* domain's shape (hundreds of independent trading strategies genuinely do warrant a regular re-scan), but is not a template to copy here — this pipeline's phases are dependent and sequential, not an independent batch to re-poll.
 
 ---
 
@@ -187,11 +188,13 @@ Phase 2 (FR/NFR) of every future run **reads this ledger first** and explicitly 
 |---|---|---|---|---|
 | DF-1 | Extend `/feature-pipeline` in place rather than create a parallel `dark-factory` skill | confirmed | single-canonical-per-concern rule; feature-pipeline already claimed "or evaluating whether a product bet is worth building" | never — this is the design |
 | DF-2 | Bifrost retired as a standalone engine; its 3 ideas ported, code kept but not developed further | confirmed 2026-09-07 (user said "let's consolidate") | avoids two competing engines | if a future project needs true multi-day unattended planning search Claude Code role-flows can't do |
-| DF-3 | Autonomous trigger cadence and pilot idea | **assumed: not yet chosen** | needs user input — token cost of a recurring cron is real money/time, unlike a one-shot build | first response from the user |
+| DF-3 | ~~Autonomous trigger = scheduled cron~~ **superseded** — continuous same-run execution, event-driven via task-notifications; no cadence to choose | corrected 2026-09-07 | user: "shouldn't it queue up event-driven rather than time-driven" — conceded, a fixed-interval poll is exactly the delay a continuous pipeline shouldn't have | if a genuinely async, no-session-running kickoff is wanted later, revisit as its own capability, not by reviving cron |
 | DF-4 | `pre-traffic` auto-advances past the spec-lock gate on GO/CONDITIONAL-GO with no R-findings; `live` always halts for a human field | assumed | mirrors existing tier table exactly | if a pre-traffic project's auto-advance ships something the user didn't want, tighten to always-halt |
 
 ## Open item — needs you
 
-Two inputs before the scheduled trigger can actually be built (everything else in this doc is buildable now):
-1. **Pilot idea** — which idea from the bank should be the first one run end-to-end through this pipeline? (Scout was Bifrost's intended validation target and is already scoped at `context/top-5/04-scout.md`.)
-2. **Cadence** — how often should the scheduled agent tick? Crucible's precedent is every 6 hours.
+Nothing is blocking the pipeline itself anymore — it's usable today via `/feature-pipeline`. The
+only remaining open question is a product choice, not an architecture one:
+1. **Pilot idea** — which idea from the bank should be the first one run end-to-end through this
+   pipeline, to prove it out? (Scout was Bifrost's intended validation target and is already
+   scoped at `context/top-5/04-scout.md`, if that's still a reasonable default.)
