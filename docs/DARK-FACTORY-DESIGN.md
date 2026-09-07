@@ -17,7 +17,7 @@
 | Bifrost's continuity check, rigor dial, human-approval-as-node | Ported into Phases 3/2/4+7 |
 | Run without a human clicking through each gate | Phase 1/2.5 auto-advance rule + continuous same-run execution (event-driven, not scheduled) |
 | **Reusable in pieces, not all-or-nothing** (2026-09-07 ask) | New **Entry modes** — `new-product` / `feature-add` / `spec-only` / `review-only` / `build-only` / `integration-check` / `gap-log` |
-| **Visualize in-progress build status** (2026-09-07 ask, = Ask #1 from the original dark-factory memory) | **Not a new dashboard** — the pipeline now writes `helm-design.json` / `helm-roadmap.json` / `helm-status.json`, which Helm's existing "Nexus" workspace (`Life/second-brain`) already renders live |
+| **Visualize in-progress build status** (2026-09-07 ask, = Ask #1 from the original dark-factory memory) | Originally: reuse Helm's "Nexus" workspace. **Superseded same day** — Helm confirmed dormant; now a fresh app spec'd at `D:/repo/AI/foreman/docs/VISUALIZATION-REQUIREMENTS.md`, not yet built |
 
 ---
 
@@ -39,9 +39,24 @@ Full detail (including the `STATE.md.pipelineMode`/`phasesRun` tracking that mak
 
 ---
 
-## Visualizing in-progress builds — reuse, not a new dashboard
+## Visualizing in-progress builds — superseded 2026-09-07
 
-**Reuse check, stated:** before designing anything, searched `Life/second-brain` (Helm) for a "visualize build status" role. Found it already built and wired: `components/WorkspaceView.tsx` ("Nexus" — a per-project workspace with Live-context / System-design / Spec / Roadmap / Schedule tabs), `DesignTree` + `RoadmapTimeline` components, and `app/api/projects/[filename]/{design,roadmap}/route.ts` reading `helm-design.json` (`HelmDesignSchema`: a `DesignNode` tree with `status: stable|in-progress|planned|deprecated`) and `helm-roadmap.json` (`RoadmapSchema`: `Milestone[]` with `status: done|in-progress|planned|gate|blocked`) from any idea-bank entry's `repoPath`. The existing `helm-status.json`/`helm-directive.json` heartbeat contract (from Helm's M8) already gives live context + mid-run redirects for any Helm-tracked project's `CLAUDE.md`. **All of this predates this design and already works end to end** — it was simply never fed by anything, since no project had regenerated those three files since Helm's own M8 changelog entries (`Life/second-brain/helm-roadmap.json`'s own milestone list stalls at 2026-06-21).
+**⚠️ The plan below (reuse Helm's Nexus workspace) is superseded.** Before feeding
+it, the user asked whether Helm was actually being used — it wasn't: only 3 commits
+ever touched `Life/second-brain/` (all 2026-06-21), and every runtime state file
+(`data/capacity.json`, `helm-*.json`) still carried its original build-day
+timestamp, confirming it was never exercised since. Reusing dormant, unvalidated
+code coupled to an unrelated personal monorepo was a worse bet than a fresh,
+purpose-built surface. **Current plan:** Helm/`second-brain` is archived in place
+(marked superseded in its own `context.md`/`CLAUDE.md`, not deleted); its proven
+schemas and UX were extracted into
+`D:/repo/AI/foreman/docs/VISUALIZATION-REQUIREMENTS.md` as requirements for a new
+app in the `AI/` category — see Foreman's `docs/DECISIONS.md` D12 for the full
+evidence. The section below is kept for its still-useful analysis (the STATE.md →
+schema mapping, the phase-to-milestone logic) but "Nexus" in it should now be read
+as "whatever the new visualization app turns out to be."
+
+**Reuse check, stated (superseded rationale, kept for history):** before designing anything, searched `Life/second-brain` (Helm) for a "visualize build status" role. Found it already built and wired: `components/WorkspaceView.tsx` ("Nexus" — a per-project workspace with Live-context / System-design / Spec / Roadmap / Schedule tabs), `DesignTree` + `RoadmapTimeline` components, and `app/api/projects/[filename]/{design,roadmap}/route.ts` reading `helm-design.json` (`HelmDesignSchema`: a `DesignNode` tree with `status: stable|in-progress|planned|deprecated`) and `helm-roadmap.json` (`RoadmapSchema`: `Milestone[]` with `status: done|in-progress|planned|gate|blocked`) from any idea-bank entry's `repoPath`. The existing `helm-status.json`/`helm-directive.json` heartbeat contract (from Helm's M8) already gives live context + mid-run redirects for any Helm-tracked project's `CLAUDE.md`. **All of this predates this design and already works end to end** — it was simply never fed by anything, since no project had regenerated those three files since Helm's own M8 changelog entries (`Life/second-brain/helm-roadmap.json`'s own milestone list stalls at 2026-06-21).
 
 ```mermaid
 flowchart LR
@@ -235,7 +250,7 @@ Phase 2 (FR/NFR) of every future run **reads this ledger first** and explicitly 
 | DF-1 | Extend `feature-pipeline` in place rather than create a parallel skill | confirmed | single-canonical-per-concern rule; feature-pipeline already claimed "or evaluating whether a product bet is worth building" | never — this is the design |
 | DF-5 | Renamed `feature-pipeline` → `dark-factory` | confirmed 2026-09-07 | user: "does it make sense to call it feature pipeline when the reality is we want to build our fully flush solution and product overall" — correct, the old name undersold the scope and made "feature-add" read as the whole skill instead of one mode | if the pipeline later needs to shed the "dark factory" framing entirely (e.g. productized under a different name), revisit together with all doc cross-references |
 | DF-6 | Pipeline decomposed into named entry modes (`new-product`/`feature-add`/`spec-only`/`review-only`/`build-only`/`integration-check`/`gap-log`) rather than one all-or-nothing chain | confirmed 2026-09-07 | user: needs to reuse only parts, and to switch off phases when iterating a feature onto existing scope | a mode's phase subset stops matching real usage — split or merge modes, don't bolt on ad hoc flags |
-| DF-7 | Build-status visualization reuses Helm's existing Nexus workspace (`helm-design.json`/`helm-roadmap.json`/`helm-status.json`) instead of a new dashboard | confirmed 2026-09-07 | reuse-check found the UI, schemas, and API routes already built and wired — a new dashboard would have duplicated a working system | Nexus's tab set stops covering what dark-factory projects need to show — extend Nexus's own components first, still don't fork a second dashboard |
+| DF-7 | ~~Build-status visualization reuses Helm's existing Nexus workspace~~ **superseded same day** — Helm confirmed dormant (3 commits ever, zero runtime-state changes since 2026-06-21); archived, design extracted into a fresh spec instead | superseded 2026-09-07 | reusing unvalidated, dormant code coupled to an unrelated personal monorepo was a worse bet than a purpose-built surface validated by its own first real use | see Foreman's `docs/DECISIONS.md` D12 and `docs/VISUALIZATION-REQUIREMENTS.md` for the current plan |
 | DF-2 | Bifrost retired as a standalone engine; its 3 ideas ported, code kept but not developed further | confirmed 2026-09-07 (user said "let's consolidate") | avoids two competing engines | if a future project needs true multi-day unattended planning search Claude Code role-flows can't do |
 | DF-3 | ~~Autonomous trigger = scheduled cron~~ **superseded** — continuous same-run execution, event-driven via task-notifications; no cadence to choose | corrected 2026-09-07 | user: "shouldn't it queue up event-driven rather than time-driven" — conceded, a fixed-interval poll is exactly the delay a continuous pipeline shouldn't have | if a genuinely async, no-session-running kickoff is wanted later, revisit as its own capability, not by reviving cron |
 | DF-4 | `pre-traffic` auto-advances past the spec-lock gate on GO/CONDITIONAL-GO with no R-findings; `live` always halts for a human field | assumed | mirrors existing tier table exactly | if a pre-traffic project's auto-advance ships something the user didn't want, tighten to always-halt |
