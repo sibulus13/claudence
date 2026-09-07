@@ -213,6 +213,8 @@ flowchart LR
 - **The one genuine suspend point** — `awaiting-human-approval`, `live` tier only — resumes on the approval event itself (the human sets the field and re-invokes), never on a timer. `pre-traffic` projects never reach this state.
 - **Crucible's every-6-hours auto-implementer** (`Stock/Research 2026`) stays a useful reference for *that* domain's shape (hundreds of independent trading strategies genuinely do warrant a regular re-scan), but is not a template to copy here — this pipeline's phases are dependent and sequential, not an independent batch to re-poll.
 
+**2026-09-07 addendum — Foreman.** The above is about *within one running session*; it does not address running with literally no session active at all (true unattended operation, no human or agent currently driving anything). For that, `D:/repo/AI/foreman` (ported from `sibulus13/ostler`'s `core/`, see its own `docs/OSTLER-PRIOR-ART.md`) is now the real answer: a headless daemon with an always-on, non-blocking, wakeable dispatcher — the same "no polling delay" shape described above, but as actual running code rather than an in-session agent loop. Its board is GitHub issue labels (`factory:approved` is the human-approval act), not `STATE.md` polling, and it invokes `/dark-factory build-only` per approved issue. See `[[project_foreman]]` (session memory) for status.
+
 ---
 
 ## Spec-Gap Ledger (new, cross-project)
