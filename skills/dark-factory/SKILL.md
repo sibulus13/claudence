@@ -230,6 +230,17 @@ imagine the assertion, the requirement is not yet a requirement.
 | Security | What is the trust boundary and what crosses it? |
 | Data | Retention, migration, and what happens to existing rows? |
 | **Extensibility** | **What is the next likely addition, and what does it cost?** |
+| **Probabilistic-call reliability** (only if the feature calls an LLM/reasoner/any non-deterministic model) | **Is there a real E2E test against the REAL model** (never fake-only), a bounded retry with failure tracing, and does the spec name the model's known failure shapes (malformed output, wrong-field placement, transient error) explicitly? |
+| **Creative/domain-direction anchoring** (only if the feature generates subjective/creative output — copy, a story, an edit, a design) | **Does the prompt/spec state the concrete domain/audience explicitly** (not just the output format), and does the spec name a judged example the output must resolve correctly — not just "valid schema, 200 OK"? |
+
+Both rows above exist because they were missed in production and cost a real user-visible failure
+before being caught — see `~/.claude/docs/SPEC-GAP-LEDGER.md`'s `nuwa-m3` rows (2026-09-07): a
+reasoner call that passed every unit/integration/E2E test still failed on first real interactive
+use (a markdown-fence-wrapped response no test exercised), and a schema-valid, 200-OK output that
+was *semantically* wrong (a domain-ambiguous word resolved to the wrong subject entirely, because
+the prompt never stated the account's real content domain). **Schema validity and a green test
+suite are necessary, never sufficient, for a probabilistic or creative-output feature** — this is
+the standing lesson, not a one-off fix.
 
 **Extension points, named explicitly.** For each, state the seam and how a future addition plugs
 in without editing existing logic:
@@ -395,6 +406,11 @@ project's manifest — the pipeline does not change.
    the assertions pass.
 3. **Verify the specific claim.** If you say a file changed, assert that file is staged. If you
    say an event fires, query the destination. **An exit code of 0 is not evidence.**
+4. **A feature wrapping a probabilistic call (LLM/reasoner/any model) needs its real-model E2E
+   test run here, not just its fake-backed unit tests.** A test against a fake reasoner structurally
+   cannot catch the real reasoner's actual failure modes (a malformed response shape, a field
+   mix-up, a transient error) — only a genuine call to the real model does. This is not optional
+   for such a feature; treat a missing real-model E2E the same as a missing smoke test.
 
 ---
 
