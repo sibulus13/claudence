@@ -40,7 +40,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$HOME/.claude/improve/audit.py\""
+            "command": "python3 \"$HOME/.claude/improve/audit.py\"",
+            "async": true
           }
         ]
       }
@@ -78,6 +79,15 @@
             "type": "command",
             "command": "python3 \"$HOME/.claude/telemetry/analyze-session.py\"",
             "shell": "bash"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$HOME/.claude/improve/audit.py\"",
+            "async": true
           }
         ]
       }
