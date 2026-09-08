@@ -34,6 +34,7 @@ this convention does not apply to. Standard library only, so it runs identically
 under the Homebrew and Xcode python3 builds.
 """
 
+import pathlib
 import json
 import os
 import re
@@ -259,6 +260,34 @@ def improve_state():
     return out
 
 
+
+# The estate-drift line, injected so maintaining a knowledge estate stops depending on the owner
+# remembering to ask. Measured twice daily by a launchd job (see CLAUDENCE_ESTATE_DRIFT_PATH in
+# CLAUDE.local.md for this machine's job name and path); this only READS the state file, so a
+# session start costs a file read rather than a scan of the whole document set.
+def estate_drift_line() -> str:
+    import json
+    path = os.environ.get("CLAUDENCE_ESTATE_DRIFT_PATH")
+    if not path:
+        return ""
+    state = pathlib.Path(path).expanduser()
+    if not state.exists():
+        return ""
+    try:
+        m = json.loads(state.read_text())
+    except Exception:
+        return ""
+    bits = []
+    if m.get("stale"):
+        bits.append(f"{len(m['stale'])} unverified over 21 days")
+    if m.get("missing_fields"):
+        bits.append(f"{len(m['missing_fields'])} missing purpose or date")
+    if m.get("idle_asks"):
+        bits.append(f"{len(m['idle_asks'])} idle ask(s) — archive whole or restate")
+    if not bits:
+        return f"Estate: {m.get('total', '?')} documents, no drift (measured {m.get('measured_at','?')[:16]})"
+    return "Estate drift — " + " · ".join(bits) + f" (measured {m.get('measured_at','?')[:16]})"
+
 def main():
     try:
         raw = sys.stdin.read()
@@ -337,6 +366,11 @@ def main():
     if imp:
         parts.append('')
         parts.extend(imp)
+
+    drift = estate_drift_line()
+    if drift:
+        parts.append('')
+        parts.append(drift)
 
     sys.stdout.write(json.dumps({
         'hookSpecificOutput': {
