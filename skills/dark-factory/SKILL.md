@@ -111,8 +111,38 @@ One JSON object per line (same convention as this codebase's other JSONL logs �
 `corrections.jsonl`, `reasoner_failures.jsonl`):
 
 ```json
-{"phase": "<id>", "completedAt": "<ISO>", "summary": "<one sentence, what actually happened>", "artifacts": [{"label": "<name>", "path": "<repo-relative>"} , {"label": "<name>", "url": "<link>"}], "graph": {"nodes": [{"id": "<component key>", "label": "<short>", "status": "done|live|queued|pending|failed", "dependsOn": ["<other component key>"], "satisfies": ["FR-1"]}]}}
+{"phase": "<id>", "completedAt": "<ISO>", "summary": "<one sentence, what actually happened>", "needsAttention": false, "attentionReason": "<required if needsAttention is true, else omit>", "artifacts": [{"label": "<name>", "path": "<repo-relative>"} , {"label": "<name>", "url": "<link>"}], "graph": {"nodes": [{"id": "<component key>", "label": "<short>", "status": "done|live|queued|pending|failed", "dependsOn": ["<other component key>"], "satisfies": ["FR-1"]}]}}
 ```
+
+**`needsAttention` — the handoff signal between steps, not just a historical log.** Added
+2026-09-08, the direct fix for a real gap: a build session was killed mid-Phase-7 by a system
+OOM event, and nothing in the pipeline itself carried forward "the last step was interrupted,
+here's what's verified vs. not" — a human had to notice a stray notification and manually
+reconstruct the state from a diff. `summary`/`artifacts` are a historical record of what
+happened; `needsAttention` is different in kind — it is a claim about what the NEXT step, or
+whoever resumes this project, must not silently skip past.
+
+- **Set `needsAttention: true`** whenever a phase completes (successfully or not) leaving
+  something the next step needs to know before proceeding — a real finding deferred rather than
+  fixed, a verification that couldn't be completed, an assumption the next phase must not
+  silently trust. A phase that finished cleanly with nothing outstanding omits the field
+  (defaults false) — don't set it defensively "just in case," that trains the next reader to
+  ignore it.
+- **Every phase, in every mode, reads the single most recent PHASE-LOG.jsonl entry — across
+  ALL phases, not just its own — before doing any real work.** If `needsAttention` is true there,
+  either resolve it as this phase's first action, or state explicitly why it's safe to proceed
+  without resolving it (e.g. it's out of this phase's scope and already tracked elsewhere) —
+  never silently continue past a flagged entry as if it said nothing.
+- **`docs/STATE.md`'s `blockers` array is the human-facing summary of the SAME signal** — a
+  phase that sets `needsAttention: true` for something still unresolved at the end of its own
+  run also adds (or keeps) the matching entry in `STATE.md`'s `blockers`. The two stay in sync:
+  `PHASE-LOG` is the granular, per-event record; `blockers` is "what's true right now." Clearing
+  a blocker means removing it from `STATE.md`, not just moving on.
+- **This is also the mechanism a crash-recovery pass uses.** When a run is found interrupted
+  (see Foreman's `docs/DECISIONS.md` and the worktree-reconcile hardening it names) and real,
+  recoverable work is found in the orphaned worktree, the recovery step writes a `needsAttention`
+  entry summarizing exactly what was verified and what wasn't — the next thing to touch this
+  project reads that, not a from-scratch investigation.
 
 `summary` + `artifacts` are a pointer, never a duplicate of the real content (the same
 "backlink instead of explaining" principle the Terse-Output Contract applies to chat, applied
@@ -582,6 +612,23 @@ project's manifest — the pipeline does not change.
    else in this pipeline) — a real duplication is an R, a naming inconsistency with no functional
    cost may be an F or H. Route every R back for a fix before this phase is considered done; do
    not let "it works" substitute for "it doesn't duplicate or diverge."
+6. **A feature with a UI gets its happy path recorded, not just run.** Added 2026-09-08 — this
+   is finding #2 (the real smoke test) made replayable instead of ephemeral: "green tests are not
+   evidence" already established that a passing suite isn't proof; this closes the matching gap
+   on the human side — a text summary of what was checked isn't a substitute for actually seeing
+   it happen either. Drive the exact happy path the feature promises (the phase-1 persona use
+   case, end to end) through Playwright with video capture on (`use: { video: "on" }`, or an
+   explicit `page.video()` save), not a headless run that discards its own output. Save the
+   recording to `docs/build-records/<component>-demo.webm` (or the project's existing
+   build-record convention) and reference it from that component's `docs/PHASE-LOG.jsonl` entry
+   as a real artifact (`{"label": "demo recording", "path": "..."}`), same as any other build
+   evidence. **This artifact does double duty, named explicitly so neither purpose gets
+   shortchanged:** it IS the definition-of-done verification (a reviewer or the user can watch
+   the actual product do the actual thing, not read a claim about it) AND it is the demo the
+   feature already needed to exist somewhere — recorded once, serving both, rather than a
+   separate unrecorded smoke test plus a separate demo-recording task later. Skip only when the
+   feature genuinely has no UI (a pure backend/library change) — name that explicitly rather than
+   silently omitting the recording.
 
 ---
 
