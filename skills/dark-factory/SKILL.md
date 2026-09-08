@@ -46,6 +46,7 @@ existing project reads as `feature-add`, a bare idea with nothing built yet read
 | **`build-only`** | 3 → 7.5 | -1, 0, 1, 2, 2.5 | Spec already locked (by a prior `spec-only` run, or by hand); resume straight into decomposition |
 | **`integration-check`** | 7.5 only | everything else | Periodic health check on an already-shipped project — re-verify it still matches its spec, refresh `docs/TRACE.md` |
 | **`gap-log`** | nothing — appends one row to the Spec-Gap Ledger | everything | A follow-up just revealed a spec miss; record it without running the pipeline |
+| **`consolidate`** | nothing from the phase chain — diffs a spec range, harvests recurring patterns | everything | A feature slice is done (spec-locked, built, or at a natural pause) and it's time to check what review actually changed, and whether any of it is a recurring pattern worth pushing into the Spec-Gap Ledger / this skill itself |
 
 Record which mode ran and which phases it covered in `docs/STATE.md`'s `pipelineMode` /
 `phasesRun` fields (schema below) — this is what makes a later `build-only` or
@@ -226,6 +227,18 @@ reused or renumbered for the life of the project. These IDs are the traceability
 tags each component with the IDs it satisfies, phase 5 tags each test with the ID it verifies,
 and phase 7.5 rebuilds the full requirement → component → test → status table from them. A
 requirement with no ID cannot be traced later — assign one even for a one-line NFR.
+
+**Commit the freshly-written FR/NFR set BEFORE phase 2.5 touches it — never bundle spec-writing
+and review-fixing into one commit.** Added 2026-09-08 after checking: every feature slice built
+this session bundled the initial spec text and every review round's fixes into a single commit,
+so `git diff` between "the spec as first written" and "the spec after N rounds of review" is
+unrecoverable after the fact — there is no commit anywhere that captures the pre-review state.
+The fix is procedural, not a schema: commit here, at the end of phase 2, tagging the commit
+message with a `Spec-Baseline: <ID range>` trailer (e.g. `Spec-Baseline: FR-21..FR-26`) —
+searchable later via `git log --grep`. Phase 2.5's fixes land in their own commit(s) per round,
+same as this session already does for the findings-table narrative. This is what makes the
+`consolidate` entry mode (below) possible at all — it diffs the baseline commit against the
+current one, and that diff does not exist without this discipline.
 
 **Functional (FR)** — each written as a *testable statement*, not a description. If you cannot
 imagine the assertion, the requirement is not yet a requirement.
@@ -543,6 +556,54 @@ This is not optional bookkeeping — it is the literal mechanism for "front-load
 into the next spec": phase 2 of every future run reads this ledger **first**, before calling its
 own FR/NFR complete. Append-only; a category is marked resolved-by-convention only after 3+
 consecutive specs checked it with no repeat miss, never deleted outright.
+
+---
+
+## `consolidate` mode — turning review history into a mechanical diff, not a memory
+
+Added 2026-09-08. The Spec-Gap Ledger above depends on someone *noticing* a recurring pattern
+across review rounds — this session, that noticing was done by eye, which doesn't scale and isn't
+reliable. `consolidate` makes the noticing mechanical: a real `git diff` between "the spec as
+phase 2 first wrote it" and "the spec now," plus a check of what's already been harvested from it.
+
+**Two source-of-truth files, both cross-project at the session docs root:**
+
+- **`docs/SPEC-GAP-LEDGER.md`** (existing) — the *destination*: recurring categories worth
+  checking in every future phase 2.
+- **`docs/SPEC-DIFF-LEDGER.md`** (new) — the *consolidation record*: every time `consolidate` ran,
+  what range it covered, and what it produced. This is the high-water mark — without it, a future
+  run either re-processes the same diff (noise) or has no way to know where to pick up.
+
+**What `consolidate` does, given a project + an FR/NFR range:**
+
+1. **Find the baseline.** `git log --all --grep="Spec-Baseline: <range>"` — the commit phase 2
+   tagged when the range was first written. **If no such commit exists** (true for every feature
+   slice built before 2026-09-08 — spec-writing and review-fixing were bundled into single commits,
+   so no pre-review state survives in git), say so explicitly and skip to step 3 with whatever the
+   earliest commit touching that range actually is, clearly labeled as an approximation, not a real
+   baseline. Never fabricate a baseline that doesn't exist.
+2. **Diff it.** `git log --oneline <baseline>..HEAD -- <spec-doc-path>` for the commit list,
+   `git diff <baseline>..HEAD -- <spec-doc-path>` for the real content delta. This is what answers
+   "what did review actually change" mechanically — read the round-N findings tables already in
+   the doc as the annotated explanation of *why*, not as the source of the diff itself.
+3. **Cross-check `docs/SPEC-DIFF-LEDGER.md`** for this project/range's last entry (if any) — its
+   `last-consolidated commit` field is where THIS pass starts from, not the original baseline
+   again, so a repeat run only processes what's new since last time.
+4. **Look for recurring categories** across the round-N findings in the diffed range — same
+   category (asserted-not-verified, missing error path, stale-test-vs-decision, whatever) showing
+   up 2+ times is a Spec-Gap Ledger candidate. One-off findings stay in the doc's own round tables;
+   they don't need to graduate anywhere.
+5. **Propose the Spec-Gap Ledger row(s)** (and, if warranted, a matching rule in this skill file
+   itself — see the "asserted-not-verified-claim" precedent above) — apply them, don't just suggest.
+6. **Append one row to `docs/SPEC-DIFF-LEDGER.md`**, recording this pass:
+
+```
+| Date | Project | FR/NFR range | Baseline commit | Consolidated through commit | Rounds covered | Ledger rows produced | Notes |
+|---|---|---|---|---|---|---|---|
+```
+
+`Baseline commit` is `none — pre-convention, approximated` when step 1 found nothing real.
+`Consolidated through commit` is this pass's HEAD — the next run's new starting point.
 
 ---
 
