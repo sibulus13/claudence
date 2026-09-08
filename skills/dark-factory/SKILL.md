@@ -253,6 +253,8 @@ imagine the assertion, the requirement is not yet a requirement.
 | Security | What is the trust boundary and what crosses it? |
 | Data | Retention, migration, and what happens to existing rows? |
 | **Extensibility** | **What is the next likely addition, and what does it cost?** |
+| **Concurrency / race safety** | **Name every actor — including the system's OWN other autonomous processes, not just external users — that can read or write this same state. For each check-then-act sequence, is it atomic, and if not, what's the real TOCTOU window? Does any success/failure classifier over an external resource enumerate that resource's actual states (e.g. a PR is open/merged/closed), or does it collapse a multi-state resource into a binary check that silently mishandles every state it didn't anticipate?** |
+| **Schema / type integrity** (TypeScript stacks) | **Is every runtime-validated field (zod or equivalent) symmetric with its TS type by construction (`z.infer`), never independently maintained? When a field is added to one, is the other updated in the SAME change, with a test that fails if they drift? Does the validator fail closed (reject the whole record) or silently drop unknown/malformed data — and is that choice stated explicitly, not accidental?** |
 | **Probabilistic-call reliability** (only if the feature calls an LLM/reasoner/any non-deterministic model) | **Is there a real E2E test against the REAL model** (never fake-only), a bounded retry with failure tracing, and does the spec name the model's known failure shapes (malformed output, wrong-field placement, transient error) explicitly? |
 | **Creative/domain-direction anchoring** (only if the feature generates subjective/creative output — copy, a story, an edit, a design) | **Does the prompt/spec state the concrete domain/audience explicitly** (not just the output format), and does the spec name a judged example the output must resolve correctly — not just "valid schema, 200 OK"? |
 
@@ -264,6 +266,24 @@ was *semantically* wrong (a domain-ambiguous word resolved to the wrong subject 
 the prompt never stated the account's real content domain). **Schema validity and a green test
 suite are necessary, never sufficient, for a probabilistic or creative-output feature** — this is
 the standing lesson, not a one-off fix.
+
+**The concurrency and schema-integrity rows above were added 2026-09-08 after two real,
+live-discovered bugs in this pipeline's own supporting tools, both of a kind Phase 2.5 review
+should have caught before any code was written.** Foreman's PR-merge success classifier
+(`core/runner.js`) checked only for an OPEN pull request — under `full` autonomy the dispatched
+agent is itself instructed to (and does) merge the PR before returning, so a fully-successful,
+fully-merged build was silently misclassified `needs-human`. The spec for that classifier never
+named the actual states a GitHub PR can be in (open/merged/closed), nor the fact that the
+system's own dispatched process — not just a human — is an actor that mutates the tracked
+resource. Separately, Catwalk's `GraphNode` TypeScript interface gained two new fields that were
+never mirrored into the matching zod runtime schema — zod's default is to silently strip unknown
+keys, so the feature compiled, rendered, and looked shipped while quietly discarding the exact
+data it existed to show; caught only by live browser click-testing, not by any test or
+type-check. Both are exactly what asking the two questions above of the SPEC, before Phase 3
+decomposition starts, would have surfaced — this is not hypothetical hardening, it is what
+actually happened, twice, in one evening, in code written specifically to make other builds more
+observable. See `~/.claude/docs/SPEC-GAP-LEDGER.md`'s `concurrent-actor-incomplete` and
+`runtime-schema-drift` rows.
 
 **Every claim about a dependency's behavior needs a verification pointer, or it doesn't go in.**
 Added 2026-09-08 after the SAME failure recurred 4 times across rounds 1/4/4→5 of one feature's
@@ -309,8 +329,15 @@ flowchart TD
 ```
 
 - **Functional, UX, and Technical reviewers always run.** Add **Security** if the spec touches
-  auth/PII/money, **Data** if it defines a schema or migration, **GTM** if it has users beyond the
-  builder. State which dimensions ran and why.
+  auth/PII/money, **OR** if it involves state mutated by more than one actor/process (race
+  conditions are a security-adjacent correctness class, not just a performance one — see the
+  Concurrency/race-safety NFR above), **OR** if it defines/extends a runtime-validated schema on
+  a TypeScript stack (schema drift is a security-adjacent completeness gap). Add **Data** if it
+  defines a schema or migration, **GTM** if it has users beyond the builder. State which
+  dimensions ran and why. **These triggers apply regardless of `deploymentTier`** — a
+  `pre-traffic` tool's own tooling can still ship a real race condition or a silently-dropped
+  field, as it did in this pipeline's own supporting repos; the deployment-tier gate (below)
+  controls whether a human must click through the lock, not whether these checks run at all.
 - **A weak review is not a pass.** The skeptic pass must genuinely attempt to refute each finding;
   "found little" only counts as approved if refutation was actually attempted, not skipped. This
   is the step most likely to get rubber-stamped when nothing forces a human to read it — say
@@ -336,6 +363,25 @@ human's yes/redirect on *that*, not on the prose. This is the human's actual rev
 the written spec stays the reviewers' and phase 7.5's. A redirect at this point (something looks
 wrong, missing, or not what was pictured) routes back into phase 2 like any other R finding —
 cheaper here than after phase 4 has already spent build effort against the wrong shape.
+
+**Every review round gets a durable record — the same idea as D15's build-records,
+applied to review instead of build.** Added 2026-09-08 after a spec went 12 rounds deep
+with no durable trace of any round beyond a compressed summary folded into the FR text
+itself — the exact dispatch brief (what was actually asked) existed nowhere once the
+conversation that sent it ended. Write `docs/review-records/<feature-slug>-round-<N>.md`
+for every round, every mode, containing:
+
+- **Input** — the exact dispatch brief sent to the reviewer, verbatim. This is the
+  part that has no other home; the doc's own round-N section is the summary/output,
+  never a substitute for what was actually asked.
+- **Output** — a pointer to the doc's own "Phase 2.5, round N" section (file path +
+  the section heading), not a duplicate copy — single source of truth, per the
+  standing rule; the finding text already lives there.
+- **Iterations, tracked as data, not just narrative:** the round number IS the
+  iteration count for that phase — `docs/PHASE-LOG.jsonl`'s eventual phase-"2.5" entry
+  (written once the phase locks) carries `"iterations": N` so a future reader — or
+  Catwalk — can see how many rounds a phase actually took without counting section
+  headings by hand.
 
 ---
 
