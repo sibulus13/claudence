@@ -418,8 +418,20 @@ for every round, every mode, containing:
 Split into components that are **file-disjoint** so agents can run in parallel worktrees.
 
 For each component state: **owned files · public interface (schema first) · dependencies ·
-whether it can be built in isolation · which FR/NFR IDs from phase 2 it satisfies.** The last item
-is not optional — a component with no requirement ID attached cannot be traced later.
+whether it can be built in isolation · which FR/NFR IDs from phase 2 it satisfies · what it
+REUSES.** The last two are not optional — a component with no requirement ID attached cannot be
+traced later, and a component with no stated reuse answer has not actually checked for it.
+
+**Reuse, DRY, and standardization — a design-time question, not just a build-time habit.**
+Added 2026-09-08, paired with the Phase 7 review step below (front-load the concern, then check
+the built result against it — same shape as this document's Concurrency/Schema-integrity NFRs).
+For every component: **name the specific existing function/pattern/component it reuses** (the
+global reuse-check rule, applied per-component, not just once at repo-scaffold time) — "none, this
+is genuinely new" is a valid answer, but it must be stated, not silently assumed. When two or more
+components in the SAME decomposition would each need similar logic, that is a **defect to
+consolidate into one shared piece now**, not two near-duplicates to reconcile later — the same
+"two implementations of a role is a menu to consolidate, not add to" rule the reuse-check already
+applies to whole files, applied here to components at design time, before either is built.
 
 **Continuity check — before phase 4 starts, not after.** For every component's stated `requires`,
 confirm some other component's stated `produces` actually covers it. This is a static pass over
@@ -552,6 +564,24 @@ project's manifest — the pipeline does not change.
    cannot catch the real reasoner's actual failure modes (a malformed response shape, a field
    mix-up, a transient error) — only a genuine call to the real model does. This is not optional
    for such a feature; treat a missing real-model E2E the same as a missing smoke test.
+5. **Refactor pass: check the built result against Phase 3's reuse answers, not just
+   correctness.** Added 2026-09-08, the other half of Phase 3's reuse question above — a design
+   can state the right reuse intent and the build still drift from it (a rushed implementation
+   copy-pastes instead of extracting, or invents a fourth way to do something three other places
+   in the codebase already do). Distinct from finding #1's correctness mandate — this pass asks
+   three questions of the actual diff, not the design doc:
+   - **Duplication**: does this diff repeat logic that already exists elsewhere in the codebase?
+     Grep for it — don't guess. Two near-identical blocks (in this diff, or one in this diff and
+     one already in the codebase) is a finding, not a style note.
+   - **Reuse fidelity**: does the diff actually use what Phase 3 said it would reuse, or did the
+     build silently reimplement it instead?
+   - **Standardization**: does the diff match this codebase's established patterns (naming, error
+     handling shape, component structure, file layout) instead of introducing a new, equally-valid
+     but different way to do the same kind of thing?
+   Rate findings the same R/F/H scale as correctness findings (Bifrost's scale, used everywhere
+   else in this pipeline) — a real duplication is an R, a naming inconsistency with no functional
+   cost may be an F or H. Route every R back for a fix before this phase is considered done; do
+   not let "it works" substitute for "it doesn't duplicate or diverge."
 
 ---
 
