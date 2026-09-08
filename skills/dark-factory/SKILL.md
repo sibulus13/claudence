@@ -74,11 +74,34 @@ phasesRun: [ "-1", "0", "1", "2", "2.5" ]
 lastCompletedPhase: "2.5"
 updatedAt: <ISO timestamp>
 blockers: []
+featureHistory:
+  - name: <short feature-slice name, e.g. "Correction & Personalization Layer">
+    kind: new-product | feature-add | pivot | correction
+    frRange: <e.g. "FR-10..FR-14">
+    specWrittenAt: <ISO date the FR/NFR IDs were first assigned, phase 2>
+    status: proposed | spec-locked | building | built | killed
+    reviewRounds: <int, optional — this slice's own Phase 2.5 round count, once known>
 ---
 ```
 
 Update this block at the end of **every** phase, in every mode — it is the single source both
 the pipeline's own resumption logic and Catwalk (below) read from.
+
+**`featureHistory` — the project-level iteration counter, distinct from a single phase's
+review-round count.** Added 2026-09-08 after being asked directly whether iteration counts
+(spec additions, feature additions, pivots) are tracked across a PROJECT's whole lifetime, not
+just within one Phase 2.5 review chain. `PHASE-LOG.jsonl`'s `iterations` field (above) answers
+"how many rounds did THIS phase take"; `featureHistory` answers "how many times has this
+project's spec grown or changed direction, ever." **Every Phase 2 (Requirements) run — whether
+`new-product`'s first pass or a later `feature-add` — appends exactly one entry here, at the end
+of that phase, never retroactively batched.** `kind: pivot` is for a spec addition that reverses
+or materially changes an earlier decision (not just extends it) — mark it explicitly rather than
+letting it read as an ordinary addition; `kind: correction` is for a fix to a previously
+mis-specified requirement (not a real new capability). This is what lets Catwalk show "N feature
+slices, M pivots" per project without re-deriving it from git archaeology each time it's asked —
+found the hard way: nuwa's own history required a manual git-log reconstruction (4 real spec
+commits, `docs/M3-UI-DESIGN.md`) the first time this was asked, because nothing had been tracking
+it. Never skipped for a "small" addition — a one-FR addition is still one `featureHistory` entry.
 
 **Also append one line to `docs/PHASE-LOG.jsonl`** at the end of every phase, in every mode —
 added 2026-09-08 (FR-D3/D5, `D:/repo/AI/foreman/docs/VISUALIZATION-REQUIREMENTS.md`) after a
@@ -221,6 +244,11 @@ Record the verdict. A "no" here is the highest-value output this skill produces.
 projects' specs *missed*, discovered only after a post-ship follow-up pointed it out. Walk the
 list before calling requirements complete — this is the mechanism that stops the same category of
 miss from recurring project after project.
+
+**Append one `featureHistory` entry to `docs/STATE.md` before this phase is considered done** —
+see the schema block above. This is the project-level iteration counter (spec additions, feature
+additions, pivots); it is not optional bookkeeping, and it is not the same as the phase 2.5
+review-round count (that's tracked separately, per-slice, once its review chain locks).
 
 **Every FR and NFR gets a stable ID** (`FR-1`, `FR-2`, …, `NFR-1`, …), assigned here and never
 reused or renumbered for the life of the project. These IDs are the traceability spine: phase 3
