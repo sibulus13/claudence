@@ -55,6 +55,56 @@ def elapsed_seconds(session_id):
     return max(0.0, (datetime.now(started.tzinfo) - started).total_seconds())
 
 
+FRICTION_KINDS = ('override', 'addition', 'denial_context')
+STREAK_MIN = 2
+
+
+def _normalised(text):
+    return ' '.join(str(text or '').split()).lower()
+
+
+def frustration_streaks(prompts):
+    """Runs of >= STREAK_MIN consecutive friction-classified prompts.
+
+    A cluster of back-to-back overrides/additions/denials is a stronger signal
+    than the same count scattered across a long session: the user is
+    re-explaining the same expectation, not raising unrelated points, and no
+    existing measurement (a flat per-prompt score, or a session total) tells
+    the two apart. Adjacent prompts with identical text are collapsed to one
+    occurrence first — Claude Code redelivers a queued message on each Stop
+    until it is actually consumed, and that redelivery must not read as the
+    user repeating a correction they never made.
+    """
+    collapsed = []
+    for p in prompts:
+        text = _normalised(p.get('prompt_text'))
+        if collapsed and collapsed[-1][1] == text:
+            continue
+        collapsed.append((p, text))
+
+    streaks = []
+    i, n = 0, len(collapsed)
+    while i < n:
+        if collapsed[i][0].get('classification') not in FRICTION_KINDS:
+            i += 1
+            continue
+        j = i
+        while j + 1 < n and collapsed[j + 1][0].get('classification') in FRICTION_KINDS:
+            j += 1
+        length = j - i + 1
+        if length >= STREAK_MIN:
+            streaks.append({
+                'length': length,
+                'start_ts': collapsed[i][0].get('ts'),
+                'end_ts': collapsed[j][0].get('ts'),
+                'kinds': [collapsed[k][0].get('classification') for k in range(i, j + 1)],
+                'excerpts': [str(collapsed[k][0].get('prompt_text') or '')[:NOTE_EXCERPT]
+                             for k in range(i, j + 1)],
+            })
+        i = j + 1
+    return streaks
+
+
 def allow_suggestion(req):
     """The permission rule string that would stop this request recurring.
 
@@ -114,6 +164,7 @@ def main():
         return
 
     prompts = [e for e in events if e.get('event') == 'prompt']
+    streaks = frustration_streaks(prompts)
     perm_reqs = [e for e in events if e.get('event') == 'permission_req']
     perm_repeats = [e for e in events if e.get('event') == 'perm_req_repeat']
     tool_dones = [e for e in events if e.get('event') == 'tool_done']
@@ -236,6 +287,7 @@ def main():
         'friction_notes': notes,
         'allow_suggestions': suggestions,
         'turns': turns,
+        'frustration_streaks': streaks,
     })
 
     H.append_jsonl(os.path.join(H.TELEMETRY_DIR, 'cost-ledger.jsonl'), {

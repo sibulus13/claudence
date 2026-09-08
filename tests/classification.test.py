@@ -16,7 +16,7 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(REPO, 'telemetry', 'lib'))
 
 from classification import (   # noqa: E402
-    classify, is_addition, is_denial_context, is_override,
+    classify, is_addition, is_denial_context, is_override, is_system_notification,
 )
 
 PASS = 0
@@ -210,6 +210,39 @@ check('classify: last prompt after last stop -> mid-run', classify(
         event('stop', '2026-01-01T09:01:00Z'),
         event('prompt', '2026-01-01T10:00:00Z'),
     ]), 'addition')
+
+# ── is_system_notification / system_notification classification ─────────────
+# A background-agent completion or a peer session's message routinely contains
+# words ("instead", "forget", "also") that would otherwise misread as user
+# override/addition friction — this is the regression `ES-1358`-class bug
+# named repeatedly in improve/LEDGER.md and never previously fixed.
+
+check('system notification: task-notification tag',
+      is_system_notification('<task-notification>Agent "audit" finished</task-notification>'),
+      True)
+check('system notification: cross-session-message tag with attributes',
+      is_system_notification('<cross-session-message from="e-tech">Status update</cross-session-message>'),
+      True)
+check('system notification: leading whitespace before the tag',
+      is_system_notification('   <task-notification>done</task-notification>'), True)
+check('system notification: case-insensitive tag match',
+      is_system_notification('<TASK-NOTIFICATION>done</TASK-NOTIFICATION>'), True)
+check('system notification: ordinary text is not a notification',
+      is_system_notification("Let's implement the goals screen next"), False)
+check('system notification: empty/None', is_system_notification(''), False)
+check('system notification: empty/None (None)', is_system_notification(None), False)
+
+check('classify: task-notification body wins over override language',
+      classify('<task-notification>Actually, forget that — cancel this instead</task-notification>',
+                STOPPED),
+      'system_notification')
+check('classify: cross-session-message wins over additive language, mid-run',
+      classify('<cross-session-message from="e-tech">Also, this also broke something</cross-session-message>',
+                MID_RUN),
+      'system_notification')
+check('classify: task-notification as the very first event is still system_notification',
+      classify('<task-notification>Agent finished</task-notification>', []),
+      'system_notification')
 
 # ── Timestamp shapes (not covered by the Pester suite) ───────────────────────
 # The real logs are written by Python's isoformat (offset, 6-digit fraction), the

@@ -6,15 +6,17 @@ tests/classification.test.py exercises it directly, so the tested logic IS the
 runtime logic.
 
 Classifications:
-  first_prompt    — no prior events in session
-  followup        — Claude had stopped; prompt is a clean next step (including
-                    post-stop additive language)
-  override        — Claude had stopped; user explicitly redirects the direction
-  addition        — Claude is running; user queues context or a parallel task
-  denial_context  — Claude is running; user denied a tool call and is explaining
+  first_prompt        — no prior events in session
+  followup            — Claude had stopped; prompt is a clean next step (including
+                        post-stop additive language)
+  override            — Claude had stopped; user explicitly redirects the direction
+  addition            — Claude is running; user queues context or a parallel task
+  denial_context      — Claude is running; user denied a tool call and is explaining
+  system_notification — a `<task-notification>`/`<cross-session-message>` delivery;
+                        not something the user typed, scored as zero friction
 
 Friction scores (applied in analyze-session.py):
-  override +3    addition +1    denial_context +1    followup/first_prompt 0
+  override +3    addition +1    denial_context +1    followup/first_prompt/system_notification 0
 """
 
 import os
@@ -23,6 +25,21 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from hooklib import parse_ts   # noqa: E402  (needs the path fix above)
+
+# A background-agent completion or a peer session's message arrives through the
+# same UserPromptSubmit path as real user text, tagged at the start of the body.
+# Their content routinely contains everyday words ("instead", "forget", "also")
+# that the override/addition regexes below would otherwise misread as user
+# friction — so this must be checked, and short-circuit, before any of them run.
+_SYSTEM_NOTIFICATION = re.compile(r'^\s*<(task-notification|cross-session-message)\b',
+                                   re.IGNORECASE)
+
+
+def is_system_notification(text):
+    """True when the prompt is a system-injected delivery, not user-typed text."""
+    if not text or not str(text).strip():
+        return False
+    return bool(_SYSTEM_NOTIFICATION.match(str(text)))
 
 # Start-anchored: these words redirect meaning only when they lead the prompt,
 # so "There's no issue with that" must not read as an override.
@@ -142,6 +159,8 @@ def is_denial_context(prior_events):
 
 def classify(prompt_text, prior_events):
     """The classification for a prompt, given the session's events so far."""
+    if is_system_notification(prompt_text):
+        return 'system_notification'
     if not prior_events:
         return 'first_prompt'
 
