@@ -38,6 +38,16 @@ not to rush to recommendations. Ask for, in this order:
    not a summary. Get concrete enough to know, per step, whether it's fully automated, fully
    manual, or tool-assisted-but-still-requires-a-person. This is the raw material for the current
    half of the pipeline diagram (§2–3).
+4a. **Explicitly ask, and verify from the transcript independent of how it was narrated: is this
+    actually linear, or does it fan out, fan in, loop, or draw from multiple concurrent sources?**
+    Do not accept a flat "first, then, then" account as the final shape — ask directly: "does
+    anything here run in parallel, get triggered by more than one source, feed back into an
+    earlier step, or converge from two paths into one?" A transcript's narrative order reads as
+    linear even when the underlying process isn't (found 2026-09-02: a workflow was first modeled
+    as a flat step list and only revealed its real fan-in/fan-out on a second, deliberately
+    structural re-read, prompted by a direct question, not by anything this elicitation asked).
+    Run this check **before** building the §2 pipeline — catching it after the fact means the
+    elicitation phase failed to ask the right question the first time.
 5. **Explicitly ask which parts are already automated vs. hand-done**, per step. **If a step's
    status is unclear even to them, write it down as unclear — do not guess or invent a plausible
    mechanism.** An honestly-flagged gap is more useful than a confident wrong answer, and it tells
@@ -69,6 +79,21 @@ workspace/semantic search, or a personal daily-log entry written around the same
 Drive search comes up empty — and label whichever source you actually used: a full transcript is
 primary-source strength, a paraphrased note is secondary and should be flagged as such, not
 presented with the same confidence.
+
+**Disambiguate candidates by title, attendees, and timeline — never grab the first hit.** A
+`search_files`/`list_recent_files` call on "Notes by Gemini" returns every recent meeting, not just
+the one being asked about. Narrow to the right one, in this order: (1) **title** — does it name the
+right people or subject; (2) **attendees** — the doc's own "Invited" line (or, for a 1:1, the doc
+owner) must include the domain expert being interviewed; (3) **timeline** — `createdTime` must land
+on the day the meeting is claimed to have happened. **A stated "today" is a lead, not a fact** — a
+Calendar/Drive search run before the transcript was shared can correctly find nothing yet
+(observed 2026-09-02: a 1:1 owned by the interviewee wasn't shared to the interviewer's Drive until
+~7 hours after the meeting ended) — re-search rather than concluding the meeting didn't happen.
+
+**If disambiguation still can't settle it — nothing found, or two candidates tie — stop and ask the
+user for the meeting note/transcript URL directly, as a prerequisite, rather than guessing or
+drafting from the wrong source.** Owner instruction, 2026-09-02: proceeding on an unconfirmed match
+risks building the whole document on someone else's meeting.
 
 **A primary-source transcript is worth re-reading even after a document already exists** — it
 routinely contains material corrections a relayed summary smoothed over (a step attributed to the
@@ -181,7 +206,36 @@ whole calculator. A sourced estimate is still unconfirmed and still gets the sam
 but it is a materially better placeholder than an arbitrary one, and § 1's meeting-notes check is
 exactly where this kind of number turns up.
 
-## 6 · Recommend alternatives — research first, then compare, then order
+## 6 · Recommend alternatives — four phases, not one research pass
+
+**Owner instruction, 2026-09-02, after the first Jamie draft came back too shallow**: tool
+research had collapsed into "recap what the domain expert already named in the meeting," which is
+not research — it's a transcript summary wearing a tools section. **Four phases, in order, each
+with its own deliverable — do not skip from Phase 1 straight to a tools table:**
+
+| Phase | Deliverable | Where it lives |
+|---|---|---|
+| **1 · Understand** | The current pipeline + named pain points, each tagged by cause | §1–4 above |
+| **2 · Research, wide** | Every named gap grouped into capability SEGMENTS, each segment researched independently and broadly — not just the tools the domain expert already mentioned | New requirement below |
+| **3 · Consolidate** | A trade-off analysis per segment, THEN filtered against this specific person's context (role, experience, stated capability) — two separate filters, not one | Extends the tiering below |
+| **4 · Escalate or self-serve** | One explicit, capability-reasoned verdict per lever: can THIS person self-build/self-discover this, or does it need a technical hand-off | §10, amended |
+
+**Phase 2 — research wide, by segment, independent of what was already said.** Before any tool
+list: group the open gaps into capability segments (e.g. "signal-finding/discovery" and
+"structured research-note generation" are two different segments, not one "automation" bucket),
+then research EACH segment on its own — real web/vendor research, not a recap of whatever tools
+the domain expert or a colleague happened to name in conversation. **A tools section built only
+from names already in the transcript has not researched anything — it has transcribed.** Cast the
+net wide enough that a genuinely better, previously-unmentioned option has a chance to surface;
+narrow to a shortlist only in Phase 3, not before.
+
+**Phase 3 — two filters, applied in order, not one.** First, a trade-off analysis per segment
+(cost, effort, quality risk, maturity — the tiering below). Second, and separately: **filter
+against this specific person's context** — their stated experience level, their role, how they
+described their own relationship to the tooling (a self-reported "I haven't touched agentic AI
+yet" is load-bearing context, not colour). The same trade-off table can point to a different top
+pick for two different people if their capability differs — that's the filter doing its job, not
+an inconsistency to resolve away.
 
 **Before recommending, research what actually exists** — this is a required step, not
 background colour:
@@ -224,6 +278,16 @@ background colour:
    aspirational when the document was written can graduate to `done` within days, and the
    pipeline's own "X becomes Y" framing stays useful even after the swap is live, as the record of
    what changed and when (don't delete the before-state once it's real; that's the changelog).
+   **This re-check is not only reactive.** A companion document describing a live,
+   independently-editable surface (a colleague's actual process, a vendor's actual product, a
+   published form or tool someone else can change without telling you) goes stale silently — don't
+   wait for the domain expert to volunteer that something moved. Before resuming work on, or
+   citing, a previously-elicited document, re-open the live thing it describes and diff against it
+   directly rather than trusting the last elicitation (found 2026-09-02: a companion document
+   describing a live Google Form drifted — two questions added, one wording claim removed — with
+   zero record anywhere, because nothing prompted a re-check). Carry a `last-verified` date on any
+   such document; log found drift in §11's sources table as a correction (`type: secondary` →
+   re-verified `primary`), not a silent overwrite of the old claim.
 6. **Recommend at MOST TWO "top picks" total, chosen for consolidation impact — not one per
    tier.** Added 2026-09-02: a flat list where every tier reads equally viable leaves the reader to
    guess which one is actually the recommendation. Pick the tool(s) that close the most/biggest
@@ -298,6 +362,56 @@ should become a standard, shared capability:
   human to open that menu and choose it — there is no bulk API and no default-visible setting. Say
   this plainly rather than implying a toggle exists.
 
+**This skill IS directly portable to claude.ai/Cowork for non-CLI users — confirmed 2026-09-02,
+re-checked against live Anthropic docs, not assumed from the Claude-Code-only mechanism above.**
+Two separate distribution paths exist; don't conflate them:
+
+| | Claude Code (`.claude/settings.json` managed push) | claude.ai / Cowork (Organization settings → Skills) |
+|---|---|---|
+| **Tier gate** | Team/Enterprise | **Team is sufficient — not Enterprise-gated**, corrected 2026-09-02 (this section previously implied otherwise by only naming the Claude Code path) |
+| **Mechanism** | Push to `.claude/settings.json` on every seat | Admin uploads a `.zip` of this skill's folder in Organization settings → Skills; it's on by default for every seat, individually toggleable |
+| **What a non-technical user needs installed** | The Claude Code CLI | Nothing beyond a claude.ai account — this is the actual answer to "can a sales rep with no CLI use this" |
+
+**What does NOT carry over to claude.ai/Cowork, and the concrete workaround:**
+- **`Agent`/`Workflow` parallel dispatch (§6's Phase 2 wide-research fan-out) does not exist
+  outside Claude Code.** On claude.ai/Cowork, Phase 2's research still has to happen — cast the
+  same wide net per segment — just sequentially within one conversation rather than as parallel
+  subagents. The requirement (real research, not a transcript recap) doesn't relax; only the
+  mechanism does.
+- **`ToolSearch`'s deferred-tool-loading pattern is Claude-Code-specific.** On claude.ai/Cowork, an
+  MCP connector (Drive, Calendar, etc.) either is or isn't already connected to that session — there
+  is no separate "load the schema" step to write into the skill body.
+- **Artifact publishing itself is NOT a gap** — claude.ai has had native Artifacts since before
+  Claude Code existed, so `template.html`'s CONFIG/DATA-fill approach works identically there.
+- **The `description` field has a HARD 200-character cap on claude.ai** (vs. 1024 on the API/Claude
+  Code) — this skill's own frontmatter description is well over that. **Don't shorten the real
+  description** (Claude Code's own discovery depends on its fuller detail) — instead, package a
+  trimmed description alongside it for the claude.ai upload:
+  `"Elicit a colleague's manual workflow, map current→future, name pain points, and recommend
+  automation options with trade-offs — for non-technical domain experts."` (160 chars).
+
+**Uploading and enabling org-wide on claude.ai is an account-administration action** — the kind
+this session proposes rather than performs (see the global Autonomous Execution Contract's
+explicit-permission list: "changing account settings"). An org admin does it via Organization
+settings → Skills, not an agent.
+
+**Cowork's own "workflow" capability, checked 2026-09-02 against current docs — two distinct
+features, neither is a full match for Claude Code's `Workflow` tool:**
+- **Scheduled tasks** — real, named, on all paid plans including Team: a single prompt on a
+  recurring cadence (hourly/daily/weekly/on-demand), cloud-executed. The prompt can do multi-step
+  work internally — this is sufficient for a recurring single-domain-expert automation (e.g. a
+  weekly signal-finding digest), and is the closest non-CLI equivalent when a recommendation in
+  this skill's output calls for "something that runs on its own on a schedule."
+- **Dispatch** — fans a task into parallel subtasks, but one-shot, not schedulable — the opposite
+  trade-off from Scheduled tasks.
+- **No unified primitive exists combining both** (schedule + explicit multi-step chaining, "run A,
+  wait for it, then run B") — confirmed absent, not just unfound. Don't recommend a Cowork
+  substitute for anything this skill's own Phase 2 (§6) parallel research fan-out does; there isn't
+  one yet.
+- **Org-wide provisioning of a scheduled task is not documented for Team tier**, unlike Skills
+  (§9 above) — an admin can enable/disable Cowork org-wide, not push one specific scheduled task to
+  every seat.
+
 **Usage telemetry exists at the adoption level, not the effectiveness level — say what's missing,
 don't imply more than what's there.** An Enterprise-tier Analytics API reports per-skill adoption
 (sessions, user counts, ~1-day lag) and per-user activity (sessions, cost) — Team gets a coarser
@@ -320,6 +434,17 @@ should do with what was just produced. Pick exactly one, and say why:
 | **✅ Self-investigate** | Every open lever is 🧩 Build-tier and ✅ feasible-now, or the only remaining step is confirming a number/access the domain expert can check themselves | They can act on this document alone — try the feasibility check, request the beta access, adjust the calculator. No engineering judgment call is pending |
 | **🔬 Book a technical consultation** | A lever's feasibility genuinely depends on engineering judgment (does an API expose what's needed, is a schema constraint negotiable, is a workaround safe) that the domain expert cannot resolve by reading or asking around | Name the specific open question the consultation should resolve — not "discuss the workflow," but the exact unresolved technical fact (see `/blocker-meeting` if this repo has it, for the prep-pack discipline) |
 | **📤 Share as pre-loaded context with a named technical stakeholder** | Someone is already identified or assigned to work the gap (an engineer already in the source meeting's action items, a named owner) | Say who, and what in this document they need before their own work starts — this document becomes their briefing, not a thing they discover mid-task |
+
+**This is Phase 4 of §6, and the tier alone does not decide it — this specific person's stated
+capability does.** Owner instruction, 2026-09-02: a 🧩 Build-tier, ✅ feasible-now lever is not
+automatically self-investigate. Ask, concretely, before picking a verdict: has this person said
+anything about their own experience with the tooling involved (self-reported novice with agentic
+AI, already building their own automations, somewhere between)? **Cite the specific words that
+settle it, the same way any other claim in this document is sourced** — "self-investigate" earned
+by a domain expert's own "I've been scripting this for years" reads differently than one earned by
+silence. Where the transcript gives no signal either way, say that explicitly rather than
+defaulting to self-investigate because the tier allows it — an unstated capability is a gap in the
+elicitation (§1), not a reason to assume competence.
 
 **These aren't mutually exclusive across levers within one document** — one lever can be
 self-investigate while another needs a consultation. State the verdict per lever if they diverge,
@@ -344,6 +469,71 @@ one table, folded behind a toggle like the full tool comparison:
   time estimates.
 - `template.html`'s `references[]` + the folded `sec-refs` table implement this; fill it in rather
   than leaving citations only in prose.
+
+## 12 · Audit-status tags — idealized vs. AI-reviewed vs. engineer-reviewed
+
+**Added 2026-09-02, on request, after an engineering-recommendation section shipped a real
+contradiction its own prose had already caught** (a proposed schema and the paragraph beneath it
+disagreed, and only the schema is what a builder works from). This skill's own Design→adversarial
+Review pattern (§6 Phase 2/3, done via two independent agent dispatches) is real and worth
+something — but it is not the same thing as a human engineer's sign-off, and conflating the two is
+how a reviewed-sounding recommendation gets built without anyone actually checking it.
+
+**Three tags, and every recommendation this skill produces carries exactly one, visibly:**
+
+| Tag | Means | Who checked it |
+|---|---|---|
+| 💭 **Idealized** | Not yet checked by anyone beyond the author | Nobody |
+| 🔍 **AI-reviewed** | Passed through a designer→adversarial-reviewer pass — real research and real refutation, but not a human sign-off | An agent, adversarially |
+| 🛠️ **Engineer-reviewed** | A human engineer has read it and signed off | A person, before any build starts |
+
+**A tag is not a formality — it gates what happens next.** 🔍 AI-reviewed is good enough to hand to
+a domain expert as a recommendation (§10's verdicts still apply) but is NOT good enough to start
+building from, especially for anything touching a schema, an integration, or a stage that overrides
+a domain expert's own stated boundary (see the stage-4 example above — the adversarial pass exists
+precisely to catch that class of error before a human engineer's time is spent on it, not instead
+of their review).
+
+**When this skill's own two-agent pattern finds a blocking issue, fix it in the document, don't
+just note it.** A findings list appended below a still-broken table is not corrected. Fold every
+fix into the actual recommendation — the design/review agents' names never appear in the output;
+only the corrected content and an honest tag do.
+
+**Retroactively apply this to a document's existing content when the tagging convention is adopted
+partway through** — don't leave earlier sections untagged while new ones carry the label; an
+untagged claim reads as unaudited-and-forgotten, not as audited-before-the-convention-existed.
+
+## 13 · An engineering-recommendation section is a FLOW, cross-linked, never a side-by-side overlay
+
+**Added 2026-09-02, on request, after a first version presented as a data table instead of a
+diagram.** When §6's research surfaces a longer-term engineering pipeline (not just a tactical
+tool pick), it gets the SAME treatment as the main pipeline in §2–3, not a different one:
+
+- **Render it as one linear flow, top-down, in the same visual grammar as the main pipeline** —
+  reuse the `.flow`/`.flownode`/`.flowinto` pattern, not a wide table. A stage-by-stage table is
+  fine as the markdown source's working format, but the Artifact reader gets a diagram.
+- **Never a literal overlay or side-by-side column against the main pipeline.** §2–3's own
+  hard-won lesson (pixel-aligning variable-height cards across two panels is a known drift bug)
+  applies here exactly as it does to a current/future split — an engineering flow layered visually
+  on top of the tactical flow has the identical failure mode. Instead: **cross-link with a small
+  chip at the tactical node** ("🔗 See the engineering-tier path in §N") pointing to the
+  corresponding stage in the engineering flow, and open the engineering section with a compact
+  three-tier caption — *current (manual) → tactical (today's self-serve recommendation) →
+  engineering (this section)* — so the relationship is stated, not spatially implied.
+- **Every stage gets a plain-language "try it yourself" prompt, not just a schema.** A non-technical
+  reader cannot act on `Signal{signal_id, source_url, signal_type: enum[...], ...}` — but can act on
+  "ask a Claude Project to remember a short list of websites, and once a week tell you what changed
+  on each one and which site it came from." Translate every stage's schema into one copy-pasteable,
+  plain-English prompt a domain expert could try in an existing self-serve surface (a Claude
+  Project, a Cowork scheduled task) — **this is a genuinely different tier from both "self-serve"
+  and "technical build"**: a lightweight, ungoverned experiment a non-technical person can run
+  themselves, distinct from the production/audited version an engineer would build. Label it as
+  such — an experiment is not a shipped capability, and don't let the two blur.
+- **Say plainly when a stage has no honest DIY version yet.** A validation/scoring stage that
+  depends on measuring an earlier stage's error rate genuinely has no "try it yourself" prompt worth
+  giving — state that directly ("this one isn't ready to experiment with alone yet — it depends on
+  the earlier stage running for a while first") rather than manufacturing a toy version that would
+  teach the wrong lesson.
 
 ## What this skill does not do
 

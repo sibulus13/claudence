@@ -118,6 +118,10 @@
   /* Heading-to-body gap. Never let these collide. */
   .card li em { font-style:normal; color:var(--ink-3); display:block; font-size:12.5px; margin-top:3px; line-height:1.45; }
   .glyphdemo { font-family:var(--font-mono); font-size:13px; color:var(--ink-2); text-align:center; padding-top:1px; }
+  /* A pill is wider than the 26px glyph column, so the status card gets its own
+     track sizing. Without this the pill text overlaps its own label. */
+  .card.pills li { grid-template-columns:auto minmax(0,1fr); }
+  .card.pills .glyphdemo { text-align:left; padding-top:2px; }
 
   /* ---------- toolbar ---------- */
   .toolbar {
@@ -427,7 +431,7 @@
   c2.appendChild(u2); legend.appendChild(c2);
 
   if (Object.keys(CONFIG.statuses).length) {
-    var c3 = el("div", "card"); c3.appendChild(el("h3", null, "Pill — status"));
+    var c3 = el("div", "card pills"); c3.appendChild(el("h3", null, "Pill — status"));
     var u3 = el("ul");
     Object.keys(CONFIG.statuses).forEach(function (k) {
       var s = CONFIG.statuses[k], li = el("li");

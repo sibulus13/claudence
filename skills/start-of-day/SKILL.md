@@ -20,6 +20,28 @@ agreed the night before.
 - **If today's entry already exists, do not recreate it.** Read it, and reconcile rather than
   overwrite.
 
+## 1a · Check for other relevant sessions before finalizing anything
+
+**A peer session's work doesn't stop when yours does, and yesterday's `Next` can be stale by
+morning in a way only that peer knows.** Call `ListAgents` early — before Goals, Notes, or the
+brief are written — and for any peer whose track overlaps today's work:
+
+| Peer state | What to do |
+|---|---|
+| **`busy`** | It's already working. Send a short alignment message: what you're picking up today, and ask (a) their plan, (b) whether anything they've changed should reshape what you're about to do — don't wait for the reply to proceed, but don't finalize a claim they could have already overturned |
+| **`idle`** | No urgency, but still worth a one-line FYI if today's work touches their track |
+| Its own recent commits/decisions disagree with what yesterday's `Next` assumed | **Reconcile before writing Goals, not after.** Read its repo's recent commits/decision rows directly — don't wait for a reply — and correct the stale item in place |
+
+**Observed 2026-08-31**: a peer track (`e-tech`) kept working ~4 hours past its own stated
+close, and resolved 2 of 3 open items from the prior EOD handoff overnight. Reading `TODO.md`
+alone without checking peer commits would have opened the day citing a caveat that was already
+fixed. **The fix is cheap — a commit-log check plus one `SendMessage` — and it belongs in this
+phase, not discovered mid-morning.**
+
+This is a check, not a blocking wait: send the alignment message and move on to § 2; the reply
+lands later and gets folded in when it arrives, the same way any other cross-session message
+does.
+
 ## 2 · Carry the Next into today's Goals
 
 - **The carry is a DISTILLATION, not a copy — every `Next` item is accounted for, and only two
@@ -44,6 +66,8 @@ agreed the night before.
 
 | Failure | What to do |
 |---|---|
+| **The title is a DATE MENTION, not text** — the database has a default template whose title is `Work log - ` plus a Notion date mention, which is why existing rows read `@Tuesday` / `@Yesterday`. Writing `Work log - 2026-08-21` as plain text looks right and **breaks the relative-date rendering every other row has** | **Set the title as `Work log - <mention-date start="YYYY-MM-DD"/>`.** Fetch the data source's `default_page_template` and copy its shape rather than inventing one — the template also carries `For me today:` under Goals and checkboxes in `Next`, both of which a hand-written entry loses |
+| **A multi-edit content update can apply only some of its edits and still report success** — observed 2026-08-21, when one of two replacements landed silently | **Re-fetch and confirm each edit individually.** Prefer several small exact anchors over one large blob; a long multi-line anchor fails on invisible whitespace |
 | **Notion auto-links anything resembling a filename** — `ARCHITECTURE.md` becomes a markdown link, which breaks an exact-match edit | **Re-read the live content before editing.** An anchor copied from what you wrote is not what the page now holds |
 | **A completed item carried as OPEN** — the template copies a checked `Next` item into `Goals` unchecked | **Re-check it.** The carry was correct; **the lost state is the bug.** Never delete it — a finished goal in today's list is the cadence working |
 | **Two entries created for the same day**, seconds apart, one blank | **Report it; do not delete.** Notion pages are the user's data — say which is populated and let them remove the other |
@@ -92,16 +116,17 @@ that order was agreed. **Re-order only on an explicit instruction**, and when on
 
 ## 3 · Reconcile against the repo
 
-**Notion is the day-to-day record; the repo holds the durable analysis. Reconcile toward Notion
-when they disagree, and say where they did.**
+**The repo's `TODO.md` is the grounding source of truth; Notion is a minimized reference —
+revised 2026-08-27, reversing the earlier direction. Reconcile toward the repo when they
+disagree, and say where they did.**
 
 - Read the repo's `docs/TODO.md` **`Now`** and the task list.
 - **Three checks, and each disagreement is a finding:**
 
 | Check | What a mismatch means |
 |---|---|
-| A Notion `Next` item with no task | **Work agreed and untracked** — create the task |
-| A task in flight with no Notion counterpart | Either it is invisible to the record, or it is not really in flight |
+| A Notion `Next` item with no task | **Work agreed and untracked** — create the task, in `TODO.md` |
+| A task in flight with no Notion counterpart | Normal — `TODO.md` is complete on its own; Notion need not mirror every task |
 | A task whose premise changed overnight | **Rewrite it before working it** — a task read as current when it is superseded invites redoing work under an obsolete design |
 
 ## 3a · Align the two lists, reprioritise the rest, and carry the roadmap forward
@@ -135,15 +160,36 @@ skipped, and skipping it is what makes the next session expensive.
 Sections, in the order the existing entries use: **`Goals` · `Notes` · `Accomplished` · `Next`**.
 
 - `Goals` — **two or three**, distilled from yesterday's `Next` per § 2b, plus anything the user
-  adds.
+  adds. **One sentence or less each** — the objective named, not argued; `TODO.md` carries why.
 - `Notes` · `Accomplished` — **left empty by default.** They are filled as the day happens, not
   predicted. **Anything an agent does write into ANY section is nested under the
   `## Claude-generated · <programme> — detail: <path>` heading that `/end-of-day` defines** —
   one convention across both ends of the day, not two. **The owner writes their own bullets in
-  the same sections, and unseparated nobody can tell which commitments were theirs.**
+  the same sections, and unseparated nobody can tell which commitments were theirs.** **When an
+  agent does fill one, the same cap as `Goals` applies** — one theme, one sentence, a backlink
+  for the rest. See `/end-of-day` § 5 for the full minimization rule, defined once there.
 - `Next` — **left empty.** It is written at close, by `/end-of-day`.
 
 **Ask before writing if today's entry already has content.**
+
+## 4b · The opening brief — three things, in this order
+
+**Added 2026-08-25 by the owner.** A session that opens on task state makes the reader assemble the
+picture themselves. **Open with the picture, then the tasks.**
+
+| # | What | Shape |
+|---|---|---|
+| **1** | **Yesterday's arc, BY THEME** | **One sentence per theme, or less — tightened 2026-08-27 to match the Notion cap in `/end-of-day` § 5, one rule instead of two.** Themes are the project's own faculties — business · technical · programme — not a list of everything that happened. **A theme with nothing to say is omitted, not padded.** `TODO.md` carries the detail; this line is the pointer |
+| **2** | **Today's most critical to-dos** | **Two or three, and each says what it unblocks.** Not the whole `Now` — the rows that other rows are waiting on |
+| **3** | **The overall objective, as it stands today** | **One or two lines.** Not the programme's mission — *what this phase is trying to establish*, which changes and should be restated when it does |
+
+**Why the order.** The arc says where we are, the to-dos say what moves, the objective says what they
+move toward. **Reversing it makes the reader hold the tasks in their head while looking for the
+reason.** And a themed arc is what makes yesterday legible today — a chronological list of a busy day
+reads as noise a week later.
+
+**Keep it terse.** The detail is in the repo and the brief points at it. **If a theme needs four
+sentences, the fourth belongs in a file.**
 
 ## 5 · Report
 
@@ -151,6 +197,31 @@ Sections, in the order the existing entries use: **`Goals` · `Notes` · `Accomp
 repo disagreed, and the single thing worth starting with.
 
 **Name the one thing to start with.** A list of six is a list nobody starts.
+
+## 5a · After the owner actually aligns on today's priority, close the loop
+
+**Owner instruction, 2026-09-02 — the report in § 5 is a proposal, not alignment.** The brief this
+skill produces is a draft the owner reacts to; real alignment happens in the conversation that
+follows, sometimes over several turns (a redirected goal, a sharpened scope, a new item added).
+**Only once that conversation settles** — the owner confirms, redirects to something final, or
+otherwise signals "that's the day" — do the next three things, in the same turn:
+
+1. **Notify every other terminal/session with ITS OWN specific ask for the day**, not a copy of
+   this session's brief. `ListAgents` names them; each gets what its own track needs to know —
+   what changed overnight that affects it, and what today's priority means for its scope
+   specifically. A peer working a different track does not need this session's Goals restated at
+   it.
+2. **Realign Notion's `Next`/reprioritization to the settled outcome.** If the conversation
+   changed what was carried in § 2 (sharpened a goal, added an item, dropped one), the live
+   Notion entry's `Goals` section is updated to match — the page written during § 4 was a draft
+   too, and an unrevised draft next to a settled conversation is the same staleness § 3a exists to
+   catch, just one level higher up (a page vs. a task list).
+3. **Say what changed and why**, in the terminal — a silent post-alignment edit to Notion or a
+   silent message to a peer is unauditable; the owner sees the same delta either way.
+
+**This is now standing, every session that reaches real alignment with the owner** — not a
+one-off. A session that produces § 5's brief and stops there, with the owner still actively
+discussing scope, has not finished opening the day.
 
 ## What this skill will not do
 

@@ -9,7 +9,10 @@ reappearing turn over turn, because nothing checked for it — a human read-thro
 caught some, missed others. This script makes the check mechanical instead of
 relying on memory.
 
-Usage: python3 check-design-tokens.py <deck.html>
+Usage: python3 check-design-tokens.py [--profile deck|report] <file.html>
+Profile defaults to "deck" (var(--text-*) tokens) when omitted. Pass
+"--profile report" for a report-artifact file (var(--r-text-*) tokens) — see
+PROFILES below and the report-artifact skill for what that profile allows.
 Exit 0 = clean. Exit 1 = at least one un-allow-listed raw value found, printed
 with its line number and content so it can be fixed or explicitly allow-listed.
 
@@ -21,21 +24,53 @@ value without tripping the gate — but grep the output either way; if a
 import re
 import sys
 
-# Raw values that are allowed WITHOUT a token reference, and why. Add to this
-# list only for a genuine, deliberate exception — not to silence a real miss.
-ALLOWLIST = {
-    ".8rem": "rail nav-dot UI chrome (tiny circular buttons, not reading content) — exempt by design",
-    ".75rem": "collapsed-detail table header, reference-tier text — exempt, smaller than the floor on purpose",
-    "1.9rem": "cost-step big stat number — a display figure, not body/caption text, not on the small-text scale",
-    "1.4rem": "hero-meta stat value / stepper icon size — a display figure or icon, not body text",
-    "clamp(2rem, 3.4vw, 3.1rem)": "h2 — a responsive display heading, not on the small-text scale",
-    "clamp(2.8rem, 6.5vw, 5.2rem)": "hero h1 — a responsive display heading, not on the small-text scale",
-    "1.5rem": "hero lede — a deliberately larger opening statement, not on the small-text scale",
-    "1.1rem": "lede — a deliberately larger intro line, not on the small-text scale",
-    "1.2rem": "quote-card font-size override — a deliberately larger illustrated-quote treatment",
+# Two profiles share this one script rather than forking a second copy — the check (every
+# font-size resolves to a token or a reasoned exception) is identical; only the token prefix
+# and the allow-list of deliberate raw values differ per artifact shape. See report-artifact's
+# SKILL.md for why the report profile is px-based (--r-text-*) while the deck is rem-based
+# (--text-*): the report never set a custom `html` font-size, so rem there would silently
+# scale off the browser default, not off the report's own 17px body — the same rem-is-root-
+# relative trap presentation-artifact's own SKILL.md documents hitting once already.
+PROFILES = {
+    "deck": {
+        "token_prefix": "var(--text-",
+        "allowlist": {
+            "19px": "body base font-size — the root unit every rem token scales FROM, not itself reading content",
+            ".68rem": "rail nav-dot UI chrome, shrunk from .8rem when a deck grew past ~10 sections — tiny circular buttons, not reading content",
+            ".75rem": "collapsed-detail table header, reference-tier text — exempt, smaller than the floor on purpose",
+            "1.9rem": "cost-step big stat number — a display figure, not body/caption text, not on the small-text scale",
+            "1.4rem": "prev/next stepper chevron icon size — an icon, not body text",
+            "1.8rem": "hero-meta stat value — a display figure, deliberately bigger than --text-md so it reads as a headline number",
+            "clamp(2rem, 3.4vw, 3.1rem)": "h2 — a responsive display heading, not on the small-text scale",
+            "clamp(2.8rem, 6.5vw, 5.2rem)": "hero h1 — a responsive display heading, not on the small-text scale",
+            "2rem": "hero lede — a deliberately larger opening statement, bigger than --text-sm on purpose",
+            "1.6rem": "lede — a deliberately larger intro line, bigger than --text-sm on purpose",
+            "2.2rem": "closing-beat prompt line — a deliberately large one-off call-to-action, bigger than any card heading",
+            "1.5rem": "closing-beat response pills (Approve/Redirect/Pivot) — deliberately oversized touch-target-style pills, not ordinary body pills",
+        },
+    },
+    "report": {
+        "token_prefix": "var(--r-text-",
+        "allowlist": {
+            "clamp(30px,5vw,50px)": "h1 — a responsive display heading, not on the small-text scale",
+            "clamp(23px,3vw,31px)": "h2.sh — section headline, a responsive display heading",
+            "clamp(19px,2.2vw,23px)": "recommendation-cell big stat number — a display figure, not body/caption text",
+            "clamp(17px,2vw,20px)": "the dek (subtitle under h1) — a responsive display line, bigger than any body token on purpose",
+        },
+    },
 }
 
-TOKEN_PREFIX = "var(--text-"
+# Back-compat module-level names — existing callers (and the selftest below) that import
+# ALLOWLIST/TOKEN_PREFIX directly keep working against the deck profile, the original default.
+ALLOWLIST = PROFILES["deck"]["allowlist"]
+TOKEN_PREFIX = PROFILES["deck"]["token_prefix"]
+
+# Raw SVG font-size="N" attributes are a distinct check from CSS font-size — SVG text isn't on
+# the rem-based token scale, it's viewBox px scaled by the diagram's own rendered width, so there
+# is no var(--text-*) to point it at. Instead: a floor, in raw attribute px. Below this, text in
+# a diagram meant to be read (not a collapsed appendix) is illegible on a big screen at typical
+# render scale — closed 2026-08-31 after finding un-caught 9px/10px SVG labels in a shipped deck.
+SVG_FONT_SIZE_FLOOR = 11
 
 
 def find_details_ranges(text):
@@ -51,11 +86,29 @@ def in_any_range(pos, ranges):
 
 
 def main():
-    if len(sys.argv) != 2:
-        print("usage: check-design-tokens.py <deck.html>", file=sys.stderr)
+    args = [a for a in sys.argv[1:] if not a.startswith("--profile")]
+    profile_name = "deck"
+    for a in sys.argv[1:]:
+        if a.startswith("--profile="):
+            profile_name = a.split("=", 1)[1]
+    if "--profile" in sys.argv:
+        idx = sys.argv.index("--profile")
+        if idx + 1 < len(sys.argv):
+            profile_name = sys.argv[idx + 1]
+            args = [a for a in args if a != sys.argv[idx + 1]]
+
+    if profile_name not in PROFILES:
+        print("unknown --profile %r — choices: %s" % (profile_name, ", ".join(PROFILES)), file=sys.stderr)
+        sys.exit(2)
+    if len(args) != 1:
+        print("usage: check-design-tokens.py [--profile deck|report] <file.html>", file=sys.stderr)
         sys.exit(2)
 
-    path = sys.argv[1]
+    profile = PROFILES[profile_name]
+    token_prefix = profile["token_prefix"]
+    allowlist = profile["allowlist"]
+
+    path = args[0]
     with open(path, "r", encoding="utf-8") as f:
         text = f.read()
 
@@ -81,20 +134,36 @@ def main():
     for m in re.finditer(r"font-size:\s*([^;\"']+)", text):
         value = m.group(1).strip()
         pos = m.start()
-        if value.startswith(TOKEN_PREFIX):
+        if value.startswith(token_prefix):
             continue
-        if value in ALLOWLIST:
+        if value in allowlist:
             continue
         if in_any_range(pos, details_ranges):
             continue  # collapsed reference tier — exempt from the strict gate, not silently ignored
         violations.append((line_number_for(pos), "font-size", value))
 
-    if violations:
-        print(f"FAIL — {len(violations)} un-tokenized font-size value(s):")
-        for ln, prop, val in violations:
-            print(f"  line {ln}: {prop}: {val}  (not a var(--text-*) token, not allow-listed)")
-        print("\nFix: use a var(--text-*) token, or add the exact value to ALLOWLIST in this")
-        print("script with a one-line reason — never silence by widening the regex.")
+    svg_violations = []
+    for m in re.finditer(r'font-size="(\d+(?:\.\d+)?)"', text):
+        value = float(m.group(1))
+        pos = m.start()
+        if value >= SVG_FONT_SIZE_FLOOR:
+            continue
+        if in_any_range(pos, details_ranges):
+            continue  # collapsed reference tier — exempt, same as the CSS check
+        svg_violations.append((line_number_for(pos), m.group(1)))
+
+    if violations or svg_violations:
+        if violations:
+            print(f"FAIL — {len(violations)} un-tokenized CSS font-size value(s):")
+            for ln, prop, val in violations:
+                print(f"  line {ln}: {prop}: {val}  (not a var(--text-*) token, not allow-listed)")
+        if svg_violations:
+            print(f"FAIL — {len(svg_violations)} SVG font-size attribute(s) under the {SVG_FONT_SIZE_FLOOR}px floor:")
+            for ln, val in svg_violations:
+                print(f"  line {ln}: font-size=\"{val}\"  (below {SVG_FONT_SIZE_FLOOR}px, outside a <details>)")
+        print("\nFix: use a var(--text-*) token for CSS, raise SVG font-size attributes to at")
+        print(f"least {SVG_FONT_SIZE_FLOOR}px (or move the text into a collapsed <details>) — never")
+        print("silence by widening the regex or lowering the floor to match what's already there.")
         sys.exit(1)
 
     print(f"OK — every font-size in {path} is a token or an explicit, reasoned exception.")
@@ -108,8 +177,11 @@ def _selftest():
     sample = (
         '<p style="font-size:.85rem">a</p>'
         '<p style="font-size:var(--text-xs)">b</p>'
-        '<p style="font-size:.8rem">c</p>'  # allow-listed
+        '<p style="font-size:.68rem">c</p>'  # allow-listed
         '<details><p style="font-size:.63rem">d</p></details>'
+        '<svg><text font-size="9">e</text></svg>'
+        '<svg><text font-size="13">f</text></svg>'
+        '<details><svg><text font-size="9">g</text></svg></details>'
     )
     with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False) as f:
         f.write(sample)
@@ -128,6 +200,12 @@ def _selftest():
         assert vals[2] in ALLOWLIST
         # d: inside <details> -> exempt regardless of value
         assert in_any_range(offs[3], details_ranges)
+        # e/f/g: SVG font-size — e (9, visible) flagged, f (13, visible) exempt, g (9, in <details>) exempt
+        svg_offs = [m.start() for m in re.finditer(r'font-size="(\d+(?:\.\d+)?)"', text)]
+        svg_vals = [float(m.group(1)) for m in re.finditer(r'font-size="(\d+(?:\.\d+)?)"', text)]
+        assert svg_vals[0] == 9 and svg_vals[0] < SVG_FONT_SIZE_FLOOR and not in_any_range(svg_offs[0], details_ranges)
+        assert svg_vals[1] == 13 and svg_vals[1] >= SVG_FONT_SIZE_FLOOR
+        assert svg_vals[2] == 9 and in_any_range(svg_offs[2], details_ranges)
         print("selftest OK")
     finally:
         os.unlink(tmp_path)

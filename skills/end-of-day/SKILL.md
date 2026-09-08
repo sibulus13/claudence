@@ -11,7 +11,28 @@ decided.
 
 **Run the phases in order.** Later phases depend on earlier ones being true.
 
-## 1 · Drain the day log
+## 0 · Check peer sessions before finalizing anything
+
+**Owner instruction, 2026-09-01 — the mirror of `/start-of-day` §1a, at the other end of the
+day.** A peer session's work does not stop when yours does, and a `TODO.md`/`DECISIONS.md` read
+taken before checking is a read that misses whatever they landed in the last hour.
+
+- Call `ListAgents` before touching `Now`/`Next`. For any peer whose track overlaps today's work,
+  send a short, non-blocking end-of-day check: what they closed that isn't reflected in the
+  shared registers yet, what they're carrying into tomorrow, anything blocked on the owner, and
+  any lane/file they're still actively holding.
+- **Do not block on the reply.** Finalize with what you have; fold in anything that arrives after
+  — a peer's reply is itself new information to fold into `Now`/`Next`, not a formality.
+- A peer's reply naming a real finding (a stale register, a convention violated) is surfaced back
+  to them directly, not silently fixed — they have context you don't on their own recent work.
+
+## 1 · Keep a day file DURING the day, not just at close
+
+**Owner instruction, 2026-09-01: write to `docs/journal/DAY-<date>.md` at each major task
+completion or pivot point AS IT HAPPENS, not compose one retroactively when closing.** A day file
+built only at close is a memory exercise; one kept live is a running ledger that makes closing
+cheap. If no day file exists for today when this phase runs, that absence is itself a finding —
+the practice lapsed — not something to backfill by inventing one now.
 
 **A day file that grows without shrinking is the signal that draining is being skipped.**
 
@@ -21,6 +42,8 @@ decided.
 - Rewrite the day file to record *where each finding went*, not what it said. **It should get
   shorter.**
 - If a finding has no home, that is the finding: it means no register owns that concern.
+- **Once everything in it has a home, remove the day file** — its content now lives in the
+  registers it was drained into; keeping it around duplicates what those registers already say.
 
 ## 2 · Update the state documents
 
@@ -34,6 +57,34 @@ decided.
 
 **Do not restate.** If a finding is in a decision row, the journal cites it rather than repeating
 it.
+
+**Owner instruction, 2026-09-02 — cross-check today's actual work against every register that
+mentions it, before writing anything new.** Closing is not just adding a fresh row; it is
+checking whether today's work made an EXISTING row wrong. Concretely: for each thing accomplished
+today, grep `TODO.md`'s `Now`/`Next`/`Backlog` and today's Notion `Accomplished`/`Next` for any
+row describing it in its PRE-today state (still-open, not-yet-built, shortened-to-N, etc.) and
+either prune it (if the file's own convention prunes done rows) or rewrite it to the current
+state — never leave both the old row and a new one standing, silently disagreeing. **Found
+2026-09-02**: `TODO.md`'s Next section still read "AI Fluency Pulse... not yet built in any
+tool" the same night the form was built AND published — the stale row would have sat there
+indefinitely if nobody had thought to check it, because adding the new accomplishment row was the
+easy half and pruning the outdated one is the half that gets skipped.
+
+## 2a · Run the friction retrospective
+
+**Every close runs it — not gated on the score threshold.** The Stop-hook suggestion
+(`analyze-session.py`'s `sessions_since_review >= 3 AND total_score >= 6`) is a mid-session nudge;
+it can go unmet for days on a quiet session while real friction — including a sustained,
+multi-prompt frustration streak — sits unreviewed in `~/.claude/telemetry/reports/`. Invoke the
+`retrospect` skill directly as part of closing the day, whether or not the threshold has fired.
+If there is nothing to review (empty `reports/`, or every report scores 0), it says so and there
+is nothing further to do — that is a valid, cheap outcome, not a wasted step.
+
+**Read `frustration_streaks[]` specifically, not just the flat score.** A streak means the same
+expectation went unmet across consecutive turns, not once — check whether it is already captured
+as a memory or `CLAUDE.md` rule before writing a new one. A correction that recurred without ever
+being captured is the clearest sign a rule is missing, and it is exactly the kind of finding a
+flat per-session score buries.
 
 ## 3 · Reconcile the task list
 
@@ -84,32 +135,68 @@ gate script errors, that is a failure, not silence.
 
 ## 5 · Sync the Notion work log
 
-**Notion is the day-to-day source of truth; the repo is the durable analysis.** Reconcile toward
-Notion when they disagree.
+**The repo's `TODO.md` and task registers are the GROUNDING source of truth; Notion is a
+minimized reference — reversed 2026-08-27, on the owner's instruction, from the earlier
+direction (Notion primary, repo durable). Reconcile toward the repo when they disagree, and say
+where they did.** Consolidated with `/start-of-day`, which now cites this section rather than
+carrying its own copy of the cap.
 
-**The Notion log is PUBLISHABLE, and agent-written content is marked as such.** Two rules,
-both stated by the owner 2026-08-18:
+**The Notion log is PUBLISHABLE, and agent-written content is marked as such.**
 
 | Rule | Why |
 |---|---|
+| **ONE SENTENCE OR LESS PER THEME — the hard cap, added 2026-08-27** | Notion carries a high-level architectural overview of what was found, never the finding itself. A theme is the project's own faculty (business · technical · programme), not a per-decision bullet — **if it takes a second sentence, it is detail, and detail belongs in `TODO.md`/`DECISIONS.md` with Notion pointing at it.** This applies to every section an agent writes into: `Goals`, `Accomplished`, `Next` alike |
 | **No PII in `Accomplished`** — no person names, no customer organisation names | **It is publicly publishable.** This is stricter than the working tier, where colleagues may be named. Describe the person's ROLE or the shape of the finding, never the individual |
 | **Agent-written bullets go under a `## Claude-generated · <programme> — detail: <path>` heading** | The owner writes their own entries in the same sections. **Unseparated, nobody can tell which decisions were theirs** — and an agent's summary read as a person's commitment is the failure. **Same heading in every section and at both ends of the day** — `/start-of-day` defers to this one |
 | **Touch `.dayflow/<YYYY-MM-DD>.end` before finishing** | The reminder to close a day cannot be a memory, because memory is what kept skipping it. **`freshness.py`'s `F8` reports a day that opened and never closed after 16:00** — the marker is what makes that visible, and it proves the skill ran, nothing more |
 | **Re-align the three registers before writing `Next`** | Notion's top goal, the task list's top item and `TODO.md`'s first `Now` row **name the same thing**, or the priority is not decided. Everything below the top two or three is written to `TODO.md` and **deleted from the task list** — see `/start-of-day` § 3a, which owns this rule |
-| **`Next` is HIGH-LEVEL, nested, and short** | Three top-level items at most. **Nesting is permission to omit, not permission to add** — a nested item is one short line or it does not belong |
-| **Every section BACKLINKS to the local file that holds the detail** — `` `docs/TODO.md` § Now `` | **The repo is the durable record; Notion is the summary.** A session must be able to restart from local context alone, so anything repeated in both lives locally and is *pointed at* from Notion |
+| **`Next` is HIGH-LEVEL, nested, and short** | Three top-level items at most, one sentence each. **Nesting is permission to omit, not permission to add** — a nested item is one short line or it does not belong |
+| **Every section BACKLINKS to the local file that holds the detail** — `` `docs/TODO.md` § Now `` | **The repo is the grounding record; Notion is the pointer.** A session must be able to restart from local context alone, so anything repeated in both lives locally and Notion links to it rather than restating it |
 | **Separate *what only the owner can decide* from *what is ready to build*** | A decision waiting on a person and a task waiting on effort read identically in a flat list, so the blocked ones silently become the excuse |
 
-- Find today's entry in the work-log database named in `CLAUDE.local.md`.
-- **Update its `Next` section** from the repo's `TODO.md` `Now` — the two must agree.
-- Add anything from today that belongs in the record: stakeholder conversations, decisions taken,
-  blockers raised.
+- **Fetch today's entry FIRST and read it in full** — the owner may have added Goals/Notes/Next
+  content directly during the day. Reconcile against what is actually there, not against what you
+  expect to be there; a repo-side `Now`/`Next` write that ignores an owner-added Notion item is a
+  consolidation that missed half its inputs.
+- **Update its `Next` section** from the repo's `TODO.md` `Now` — the two must agree, and `TODO.md`
+  wins on conflict.
+- **Owner instruction, 2026-09-02 — ANY edit to a register during this close re-triggers this
+  reconciliation, not just the first pass.** Found live: `TODO.md`'s Next section got pruned and
+  a new row added mid-close (in response to the owner's own consolidation feedback), but Notion's
+  `Next` was never re-diffed against it — it sat stale until the owner asked why. **The fix isn't
+  "remember to sync Notion once" — it's treating every subsequent register edit in the same
+  closing conversation as reopening this step.** Concretely: before declaring the close finished,
+  re-read whichever register was touched last and confirm every OTHER register describing the same
+  fact (Notion `Next`, `TODO.md`, a theme's own README, wherever else the fact is mirrored) says
+  the same thing. An edit made reactively, after the first report went out, is not exempt.
+- Add anything from today that belongs in the record, **one sentence per theme**: stakeholder
+  conversations, decisions taken, blockers raised. Not a list of what happened — the architectural
+  headline, with the local file carrying the rest.
+- **Any session with something to add writes it in directly** — routing an already-agreed
+  accomplishment through another session first is a round trip the entry does not need.
 - **Ask before writing to Notion** if the entry already has content that would be overwritten.
 
 ## 6 · Report
 
 **Terse nested bullets, one line each** — what closed, what is blocked on a person, where
 tomorrow starts. **The detail lives in `TODO.md`; the terminal gets the summary.**
+
+**Owner instruction, 2026-09-02 — every close also reports two things the terse bullets above
+don't carry on their own:**
+
+- **Accomplished vs. set-out.** Line up what today's Goals (this morning's `/start-of-day`
+  carry, or the session's own stated objective if no `/start-of-day` ran today) actually
+  resolved to: done as stated, done differently, dropped, or added mid-day and done instead.
+  **Say which is which** — a goal quietly swapped for a different one is a finding, not a wash.
+  If no goal was ever stated today, say that plainly rather than reconstructing one after the
+  fact.
+- **A session focus score (the "ADHD score")** — light-touch, not clinical, not a comment on the
+  person. Start at 10 and subtract one point per **topic pivot** (a switch to a materially
+  different task, not a sub-step of the current one) and one point per **mid-turn interruption**
+  (the user cutting in before a reply finished), floor of 1. State the raw counts alongside the
+  number so it's checkable, not vibes: e.g. "Focus 6/10 — 2 topic pivots, 2 mid-turn
+  interruptions." A low score is informational, not a verdict — some days are legitimately
+  multi-threaded.
 
 ## What this skill will not do
 
