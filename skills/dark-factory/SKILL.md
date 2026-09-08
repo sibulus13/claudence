@@ -252,6 +252,17 @@ the prompt never stated the account's real content domain). **Schema validity an
 suite are necessary, never sufficient, for a probabilistic or creative-output feature** — this is
 the standing lesson, not a one-off fix.
 
+**Every claim about a dependency's behavior needs a verification pointer, or it doesn't go in.**
+Added 2026-09-08 after the SAME failure recurred 4 times across rounds 1/4/4→5 of one feature's
+review (`~/.claude/docs/SPEC-GAP-LEDGER.md`'s `asserted-not-verified-claim` row): an FR/NFR stated
+a dependency persists to disk, that a mechanism is extensible, that a field list is exhaustive, that
+N calls can run in parallel — each stated as plain fact, none checked against the real function
+signature/schema/execution model it described. A claim about what an EXISTING piece of code, schema,
+or system actually does (not what you intend to build) must name the specific file/line/function it
+was verified against — "`_store` persists (`m3_service.py:12`, in-memory dict)" not "`_store`
+persists." A claim with no verification pointer is the smell Phase 2.5's reviewers now check for
+by name, not just something they might happen to notice.
+
 **Extension points, named explicitly.** For each, state the seam and how a future addition plugs
 in without editing existing logic:
 
