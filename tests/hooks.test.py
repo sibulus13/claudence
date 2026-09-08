@@ -116,10 +116,12 @@ try:
     state = box.json_at('telemetry', 'state-%s.json' % SID)
     check('log-prompt: state prompts=1', state.get('prompts'), 1)
     check('log-prompt: state overrides=0', state.get('overrides'), 0)
-    # The label is a condensed topic, not the prompt verbatim: filler is dropped and a
-    # leading verb becomes a category, so the status bar reads as a subject not a quote.
+    # The label is a condensed topic, not the prompt verbatim: a leading verb becomes
+    # a category (and is dropped from the body so it isn't said twice), but the rest
+    # of the sentence keeps its own words and order — a readable clause, not word
+    # salad reassembled from filtered keywords.
     check('log-prompt: theme condensed to a categorised topic',
-          state['themes'][0]['label'], 'build: goals screen')
+          state['themes'][0]['label'], 'build: the goals screen')
     check_true('log-prompt: running flag written',
                os.path.exists(box.path('telemetry', 'running-%s.flag' % SID)))
     check_true('log-prompt: turn-start stamp written (per-session, not shared)',
@@ -156,8 +158,11 @@ try:
                        'reflective of what we have been working on'})
     state = box.json_at('telemetry', 'state-%s.json' % SID)
     check('log-prompt: scaffolding is not subject — a new topic splits', len(state['themes']), 2)
-    check('log-prompt: label carries the subject, not the scaffolding',
-          state['themes'][0]['label'], 'status bar summary section reflective working')
+    # The label is now a truncated real clause, not reassembled keywords — it still
+    # must not be the OTHER theme's clause, which is what a filler-inflated Jaccard
+    # score used to produce (the two prompts share only "taking"/"look", filler).
+    check('log-prompt: label carries this prompt\'s own subject, not the prior theme\'s',
+          state['themes'][0]['label'].startswith('Also taking a look at the status bar'), True)
 finally:
     box.close()
 

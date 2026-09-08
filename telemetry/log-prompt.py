@@ -11,6 +11,8 @@ JSONL, and updates the per-session KPI file the status bar reads.
 """
 
 import os
+import re
+import subprocess
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lib'))
@@ -22,6 +24,7 @@ MAX_PROMPT_EXCERPT = 1000
 MAX_THEME_LABEL = 60
 MAX_THEMES = 3
 THEME_SHIFT_JACCARD = 0.2   # below this overlap with the current theme, call it a new one
+REFRESH_INTERVAL_TURNS = 5  # re-summarize at turn 1, then every 5th — bounds model-call cost
 
 
 def load_state(path, session_id):
@@ -40,25 +43,9 @@ def load_state(path, session_id):
     return state
 
 
-# Conversational scaffolding. Stripping it matters twice over: the label reads as a
-# topic instead of a quote, and the Jaccard shift check below compares subject words
-# instead of filler — three differently-phrased prompts about one subject used to
-# score as three separate themes.
-FILLER = frozenset("""
-a an and are as at be been but by can cant could did do does doesnt doing done dont
-for from get gets got had has have having how i id ill im in into is isnt it its ive
-just let lets like make makes making may me might much must my need needs no nope not
-now of off on once one only or other our out over own please put said same see seem
-seems shall she should since so some still such sure take than that thats the their
-them then there these they this those though through thus to too try under until up
-upon us use used using very via want wants was we well were what when where which
-while who why will with within would yes yet you your yours
-also actually anything else given premise regard regarding rather really something
-come each more right because seem seems back here there thing things way ways
-ensure likewise moving forward currently current default one two both either
-look looks looking taking took keep keeps seeing bit lets
-whats theres heres weve youve wasnt arent couldnt wouldnt didnt havent hasnt wont
-""".split())
+# Conversational scaffolding, shared via hooklib.FILLER — used here to pick the
+# category prefix and to keep the Jaccard shift check comparing subject words
+# instead of filler, never to decide what's actually shown (see theme_label below).
 
 # Leading verb → a coarse category, so the row says what kind of work it is before
 # it says what it is about. Deliberately small; a taxonomy nobody maintains is worse
@@ -79,7 +66,11 @@ CATEGORIES = (
 
 
 def _salient(text):
-    """Content words in order, filler and punctuation dropped, duplicates collapsed."""
+    """Content words in order, filler and punctuation dropped, duplicates collapsed.
+
+    Used only to pick theme_category()'s prefix — never to build the displayed label,
+    which needs the original words in their original order to read as a sentence.
+    """
     # Drop apostrophes rather than splitting on them, so "don't" becomes "dont" and is
     # caught by FILLER instead of surviving as a stray "don".
     text = text.replace("'", '').replace('’', '')
@@ -87,7 +78,7 @@ def _salient(text):
     for raw in ''.join(c if (c.isalnum() or c == '-') else ' ' for c in text).split():
         w = raw.strip('-')
         low = w.lower()
-        if len(low) < 3 or low in FILLER or low in seen:
+        if len(low) < 3 or low in H.FILLER or low in seen:
             continue
         seen.add(low)
         out.append(w)
@@ -104,46 +95,69 @@ def theme_category(words):
 
 
 def theme_label(prompt_text):
-    """A condensed topic for the prompt, not the prompt itself.
+    """A condensed topic for the prompt — a truncated, readable clause, not word salad.
 
-    Was the verbatim first line, which read as a quote and — because the shift check
-    below is a Jaccard over the label — let phrasing differences split one subject
-    into several themes.
+    Used to strip filler and rejoin only the salient words in whatever order they
+    survived filtering ("mind probably skipping session start reusing"), which reads
+    as scrambled keywords rather than a sentence a person can parse at a glance. Now
+    keeps the prompt's own words and order intact — filler-stripping still decides the
+    category prefix (via _salient/theme_category) and the Jaccard shift check's
+    vocabulary (via _words), but never what actually gets displayed.
     """
     first = next((ln.strip() for ln in prompt_text.split('\n') if ln.strip()), '')
     if not first:
         return ''
     words = _salient(first)
-    if not words:
-        # All filler ("ok, do it then") — keep something rather than lose the theme.
-        return first[:MAX_THEME_LABEL].rstrip()
-    category = theme_category(words)
-    # "build: Build goals screen" says it twice — drop the word the category came from.
-    if category and words and words[0].lower().startswith(category):
-        words = words[1:] or words
+    category = theme_category(words) if words else ''
     prefix = ('%s: ' % category) if category else ''
-    # Drop whole words rather than cutting one in half — a label ending "categorizati…"
-    # is harder to read than one word shorter.
-    body = []
-    for w in words[:6]:
-        if len(prefix) + len(' '.join(body + [w])) > MAX_THEME_LABEL:
-            break
-        body.append(w)
-    return prefix + ' '.join(body) if body else (prefix + words[0])[:MAX_THEME_LABEL]
+
+    body = first
+    # "build: Build the goals screen" says it twice — drop the leading word the
+    # category came from so the prefix carries that meaning instead. Natural casing
+    # is kept rather than forced, so "build: the goals screen" reads as a phrase
+    # rather than a sentence restarting mid-label.
+    if category:
+        m = re.match(r'^(\W*)(\w+)(.*)$', body, re.DOTALL)
+        if m and m.group(2).lower().startswith(category):
+            rest = m.group(3).lstrip(' ,:;-')
+            if rest:
+                body = rest
+
+    budget = MAX_THEME_LABEL - len(prefix)
+    if len(body) > budget:
+        # Cut at the last whole word inside the budget — a label ending "categorizati…"
+        # reads worse than one word shorter, and a half-word ending is not a sentence.
+        cut = body[:budget]
+        cut = cut.rsplit(' ', 1)[0] if ' ' in cut else cut
+        body = cut.rstrip(' .,;:!?') + '…'
+    return prefix + body if body else first[:MAX_THEME_LABEL].rstrip()
 
 
 def _words(text):
-    return {w for w in ''.join(c if c.isalnum() else ' ' for c in text.lower()).split()
-            if len(w) > 2}
+    """Salient words only, for the Jaccard shift check — never for display.
+
+    Without filler exclusion, two unrelated sentences already share several length>2
+    filler words ("the", "and", "for"), which would inflate their apparent overlap and
+    make the shift check less sensitive exactly when theme_label() started keeping
+    filler words in the DISPLAYED text. The comparison must stay on subject words
+    regardless of what the label looks like.
+    """
+    return H.salient_words(text)
 
 
-def update_themes(state, classification, label):
+def update_themes(state, classification, label, event_ts):
     """Keep a reverse-chronological list of the last few distinct topics.
 
     Zero-token: a direction change is exactly what the classifier already calls
     'override' (and a session's first prompt), so those push a new theme and
     everything else continues the current one. The Jaccard check is the safety
     net for a genuine new scope the classifier did not label as an override.
+
+    `event_ts` is the SAME timestamp already written for this prompt's own JSONL
+    event, not a fresh H.now_iso() call — summarize-theme.py gathers every prompt
+    at or after a theme's 'ts', so a brand-new theme's start time must exactly
+    match its own first prompt's event time or that prompt gets excluded from its
+    own summary.
     """
     themes = [t for t in (state.get('themes') or []) if t]
 
@@ -159,12 +173,42 @@ def update_themes(state, classification, label):
                 is_new = True
 
     if is_new and label:
-        themes.insert(0, {'label': label, 'ts': H.now_iso(), 'turns': 1})
+        themes.insert(0, {'label': label, 'ts': event_ts, 'turns': 1})
         del themes[MAX_THEMES:]
     elif themes:
         themes[0]['turns'] = int(themes[0].get('turns', 0)) + 1
 
     state['themes'] = themes
+
+    if not themes:
+        return None
+    turns = int(themes[0].get('turns', 0))
+    if turns == 1 or turns % REFRESH_INTERVAL_TURNS == 0:
+        return themes[0].get('ts')
+    return None
+
+
+def spawn_theme_summary(session_id, theme_ts):
+    """Fire the async semantic-intent summarizer, detached, never waited on.
+
+    A few ms to fork+exec — nothing here can slow this synchronous hook down.
+    The child does the actual (multi-second) model call and writes its result
+    back into state-<session_id>.json on its own schedule.
+
+    CLAUDENCE_SILENT=1 (the test suite's existing "no external/audible side
+    effects" convention, already used by hooklib.play_sound) skips this too —
+    a test run must never make a real `claude` API call.
+    """
+    if not theme_ts or os.environ.get('CLAUDENCE_SILENT') == '1':
+        return
+    script = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'summarize-theme.py')
+    try:
+        subprocess.Popen(
+            [sys.executable or 'python3', script, session_id, theme_ts],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL,
+            start_new_session=True)
+    except Exception:
+        pass
 
 
 def cleanup_stale():
@@ -215,8 +259,14 @@ def main():
     if len(excerpt) > MAX_PROMPT_EXCERPT:
         excerpt = excerpt[:MAX_PROMPT_EXCERPT] + '...'
 
+    # Captured once and reused for both the JSONL event and a brand-new theme's own
+    # 'ts' below — two separate H.now_iso() calls a few lines apart would otherwise
+    # make the theme's start time strictly LATER than its own first prompt's event
+    # time, so summarize-theme.py's "events at or after theme_ts" filter excluded
+    # exactly the one prompt that started the theme. Same instant, same string.
+    event_ts = H.now_iso()
     H.append_jsonl(session_path, {
-        'ts': H.now_iso(),
+        'ts': event_ts,
         'session_id': session_id,
         'event': 'prompt',
         'classification': classification,
@@ -226,14 +276,23 @@ def main():
     })
 
     state = load_state(state_path, session_id)
-    state['prompts'] = int(state.get('prompts', 0)) + 1
-    counter = {'override': 'overrides', 'addition': 'additions',
-               'denial_context': 'denial_contexts'}.get(classification)
-    if counter:
-        state[counter] = int(state.get(counter, 0)) + 1
+    # A task-notification/cross-session-message delivery is logged for provenance
+    # above, but it is not a user prompt: it must not inflate the visible prompt
+    # count, score as override/addition friction, or overwrite the status bar's
+    # topic rows with notification body text instead of the real conversation.
+    refresh_ts = None
+    if classification != 'system_notification':
+        state['prompts'] = int(state.get('prompts', 0)) + 1
+        counter = {'override': 'overrides', 'addition': 'additions',
+                   'denial_context': 'denial_contexts'}.get(classification)
+        if counter:
+            state[counter] = int(state.get(counter, 0)) + 1
+        refresh_ts = update_themes(state, classification, theme_label(prompt_text), event_ts)
     state['cwd'] = cwd
-    update_themes(state, classification, theme_label(prompt_text))
     H.write_json(state_path, state)
+
+    if refresh_ts:
+        spawn_theme_summary(session_id, refresh_ts)
 
     # Claude is now running — the status bar spinner reads this flag.
     try:

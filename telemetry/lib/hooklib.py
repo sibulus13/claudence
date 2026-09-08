@@ -29,6 +29,34 @@ SESSIONS_DIR = os.path.join(TELEMETRY_DIR, 'sessions')
 REPORTS_DIR = os.path.join(TELEMETRY_DIR, 'reports')
 WORKSPACES_DIR = os.path.join(CLAUDE_DIR, 'workspaces')
 
+# Conversational scaffolding, shared by anything comparing two pieces of text for
+# subject overlap (log-prompt.py's theme-shift check, statusline.py's pane-title
+# vs. tracked-label check). Moved here from log-prompt.py so both agree on what
+# counts as a filler word instead of drifting into two definitions of "the same".
+FILLER = frozenset("""
+a an and are as at be been but by can cant could did do does doesnt doing done dont
+for from get gets got had has have having how i id ill im in into is isnt it its ive
+just let lets like make makes making may me might much must my need needs no nope not
+now of off on once one only or other our out over own please put said same see seem
+seems shall she should since so some still such sure take than that thats the their
+them then there these they this those though through thus to too try under until up
+upon us use used using very via want wants was we well were what when where which
+while who why will with within would yes yet you your yours
+also actually anything else given premise regard regarding rather really something
+come each more right because seem seems back here there thing things way ways
+ensure likewise moving forward currently current default one two both either
+look looks looking taking took keep keeps seeing bit lets
+whats theres heres weve youve wasnt arent couldnt wouldnt didnt havent hasnt wont
+""".split())
+
+
+def salient_words(text):
+    """Content words only — filler and short tokens dropped, for subject-overlap
+    comparisons. Not for display: this drops word order and articles, which reads
+    as word salad if shown directly."""
+    return {w for w in ''.join(c if c.isalnum() else ' ' for c in str(text).lower()).split()
+            if len(w) > 2 and w not in FILLER}
+
 # Logical sound names (kept from the Windows build so settings.json hook args and
 # analyze-session read the same way on both platforms) -> macOS system sounds.
 # A file dropped in ~/.claude/sounds/ with the same stem overrides the mapping,

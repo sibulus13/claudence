@@ -201,10 +201,10 @@ def pane_title():
 
 
 def topic_words(text):
-    """Subject words of a label. Mirrors log-prompt.py's own shift check, so the
-    two agree about when a title and a theme are talking about the same thing."""
-    return {w for w in ''.join(c if c.isalnum() else ' ' for c in str(text).lower()).split()
-            if len(w) > 2}
+    """Subject words of a label, filler dropped. Shares hooklib.FILLER with
+    log-prompt.py's own shift check, so the two agree about when a title and a
+    theme are talking about the same thing rather than merely sharing "the"/"and"."""
+    return H.salient_words(text)
 
 
 def theme_rows(state):
