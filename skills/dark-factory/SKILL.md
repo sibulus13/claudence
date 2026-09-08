@@ -79,6 +79,28 @@ blockers: []
 Update this block at the end of **every** phase, in every mode — it is the single source both
 the pipeline's own resumption logic and Catwalk (below) read from.
 
+**Also append one line to `docs/PHASE-LOG.jsonl`** at the end of every phase, in every mode —
+added 2026-09-08 (FR-D3/D5, `D:/repo/AI/foreman/docs/VISUALIZATION-REQUIREMENTS.md`) after a
+real dispatch made clear that STATE.md's single phase number can't answer "what did this phase
+actually produce" or "is this really sequential or does it fan out into parallel components."
+One JSON object per line (same convention as this codebase's other JSONL logs —
+`corrections.jsonl`, `reasoner_failures.jsonl`):
+
+```json
+{"phase": "<id>", "completedAt": "<ISO>", "summary": "<one sentence, what actually happened>", "artifacts": [{"label": "<name>", "path": "<repo-relative>"} , {"label": "<name>", "url": "<link>"}], "graph": {"nodes": [{"id": "<component key>", "label": "<short>", "status": "done|live|queued|pending|failed", "dependsOn": ["<other component key>"], "satisfies": ["FR-1"]}]}}
+```
+
+`summary` + `artifacts` are a pointer, never a duplicate of the real content (the same
+"backlink instead of explaining" principle the Terse-Output Contract applies to chat, applied
+here for a machine/UI consumer) — link to the real spec section, build output, or PR, don't
+paste it. `graph` is populated **only** for phase 3 (from the decomposition table you already
+wrote — `id`/`dependsOn`/`satisfies` map directly onto its Component/Depends-on/Satisfies
+columns) and phase 4 (same nodes, `status` updated as each component's build/review/audit/fix
+cycle actually progresses) — every other phase omits `graph` entirely. **Only write what
+actually happened** — an artifact that doesn't exist yet (e.g. a build-record file a sub-step
+was supposed to produce but didn't) does not get a fabricated entry; note the gap in `summary`
+honestly instead.
+
 ---
 
 ## Visualizing build status — Catwalk, reuse not a new dashboard
