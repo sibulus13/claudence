@@ -77,6 +77,12 @@ blockers: []
 definitionOfDone:
   shippedMeans: <one sentence, decided in Phase 2 — see "Definition of done" below>
   happyPathDemo: <null, or a short name/ID for this project's standing demo scenario>
+backlogItems:
+  - id: <e.g. "D102", the DECISIONS.md entry this came from, or a short slug if there isn't one>
+    summary: <one sentence, imperative — becomes the GitHub issue title verbatim>
+    source: <repo-relative path + anchor, e.g. "docs/DECISIONS.md#d102">
+    addedAt: <ISO timestamp>
+    opened: false   # flips to true (never removed) once Foreman opens the issue — idempotency guard
 featureHistory:
   - name: <short feature-slice name, e.g. "Correction & Personalization Layer">
     kind: new-product | feature-add | pivot | correction
@@ -157,6 +163,46 @@ cycle actually progresses) — every other phase omits `graph` entirely. **Only 
 actually happened** — an artifact that doesn't exist yet (e.g. a build-record file a sub-step
 was supposed to produce but didn't) does not get a fabricated entry; note the gap in `summary`
 honestly instead.
+
+**`backlogItems` — ready-to-build-now work, distinct from both `blockers` and a `DECISIONS.md`
+revisit-when.** Added 2026-09-09, direct response to a real gap: Foreman's own event loop only
+ever dispatches GitHub issues that already exist and carry `factory:approved` — it has zero
+awareness of dark-factory pipeline state, so a project could sit with real, already-diagnosed,
+ready-to-fix follow-ups (a missing test, a named regression, a skipped pipeline phase) for
+sessions at a time, with nothing ever turning that into a dispatched issue until a human happened
+to notice and open one by hand. `backlogItems` is the structured, machine-actionable list Foreman
+(`core/scheduler.js`'s backlog-discovery step, D25) actually consumes — this is why it's a
+separate field from the other two, not a rename:
+
+- **A `DECISIONS.md` revisit-when is gated on a future condition** ("if this pattern recurs a
+  third time", "if a real OOM happens in this exact window") — it names something to watch for,
+  not something ready to build today. **Never** auto-convert a revisit-when into a `backlogItems`
+  entry; that conflates "relevant later, under condition X" with "buildable right now," and would
+  turn Foreman's full-auto pre-traffic mode into an issue-storm the instant a project accumulates
+  a normal number of deferred hardening notes.
+- **`blockers` (and a phase's `needsAttention`) are about THIS project's own next step** — something
+  the very next phase run must not silently skip. `backlogItems` is broader: a queue of
+  independently-buildable follow-ups that may sit for a while, each dispatched as its own scoped
+  issue whenever Foreman gets to it.
+- **Add an entry the moment a phase (typically 7 or 7.5) names a real, ungated, ready-to-fix
+  follow-up it is deliberately NOT fixing in scope** — the same moment you would write the
+  `DECISIONS.md` row anyway. Write both: the `DECISIONS.md` entry is the durable rationale a
+  human reads later; the `backlogItems` entry is what makes it independently dispatchable without
+  a human re-deriving "is this actually actionable" from prose.
+- **`opened` is a one-way idempotency flag, never unset.** Foreman's discovery step sets it `true`
+  in the same commit it opens the GitHub issue, so the same item is never queued twice. If the
+  resulting issue is later closed without fixing the item (a real rejection, not a merge), that is
+  itself a `DECISIONS.md`-worthy event — add a FRESH `backlogItems` entry with a new `id` rather
+  than flipping `opened` back to `false` on the old one.
+- **Tier-gated, matching the existing pre-traffic/live governance split** (global CLAUDE.md
+  "Production Application Governance"): Foreman only auto-opens **and** auto-approves
+  (`factory:approved`) items for `deploymentTier: pre-traffic` repos. A `live`-tier repo's
+  `backlogItems` entries still get discovered and opened, but labeled for human review, never
+  self-approved — the human-approval hard blocker is not something a backlog scanner gets to
+  route around.
+- **Rate-limited per tick** (Foreman-side, `D25`) so a large backlog dump (e.g. backfilling
+  several existing `DECISIONS.md` follow-ups into `backlogItems` at once) opens a trickle of
+  issues over several dispatcher ticks, not a burst.
 
 ---
 
