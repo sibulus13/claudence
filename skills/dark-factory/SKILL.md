@@ -770,6 +770,31 @@ Spec-Gap Ledger row (if the category should be checked on every future project) 
 project `docs/DECISIONS.md` entry with a revisit-when trigger (if it's local to this one) — do not
 let a real finding evaporate into "looked fine."
 
+**"Watched clean" means the scenario's OWN named checklist passed — not the demo harness's raw
+aggregate verdict.** Refined 2026-09-09, direct fix for a real recurrence: nuwa's demo harness
+correctly found and fixed D106 (a real regression on the checklist), but its OVERALL boolean
+verdict stayed `FAIL` afterward anyway — solely because of D101, an unrelated, already-tracked,
+pre-existing environmental gap (a secondary feature probe unrelated to the scenario's own D90/D97
+checklist) that happened to also run inside the same harness script. Auto-promote correctly
+withheld `shipped` the first time, but then kept withholding it on every SUBSEQUENT clean run too,
+since nothing distinguished "the thing this demo exists to check" from "everything this script
+happens to touch." A project could ship real, unrelated fixes forever and never reach `shipped`
+because of one already-filed, unrelated issue. Fixed:
+- **A project's `happyPathDemo` grounding names its own checklist explicitly** (already the
+  convention — see nuwa's "what to watch for, from precedent": D90's clamp, D97's domain
+  anchoring). "Watched clean" means every item on THAT checklist passed, checked and stated one by
+  one — never a single harness-wide pass/fail flag taken at face value.
+- **A failure the harness surfaces that is NOT on the checklist** is triaged, not treated as a
+  blocker by default: if it already has its own `docs/DECISIONS.md` entry (pre-existing, already
+  tracked — like D101), it does not gate promotion, full stop — re-stating an already-filed,
+  already-scoped problem as a fresh blocker is exactly the "asserted-not-verified-claim" pattern
+  this skill exists to catch on the OTHER side of the ledger. If it's genuinely NEW, it gates
+  promotion (this is the D106 case) and gets its own entry the same way.
+- **State the checklist result explicitly in `docs/STATE.md`**, item by item, not as a single
+  derived boolean — e.g. `D90: pass, D97: pass, [overall harness flag: FAIL, solely D101, already
+  tracked, not a gate]` — so a future reader (or the auto-promote logic itself) never has to
+  re-derive which failure is which from prose.
+
 ---
 
 ## The Feature Decision Record — written at every gate, not at the end
