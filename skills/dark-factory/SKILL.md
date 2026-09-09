@@ -74,6 +74,9 @@ phasesRun: [ "-1", "0", "1", "2", "2.5" ]
 lastCompletedPhase: "2.5"
 updatedAt: <ISO timestamp>
 blockers: []
+definitionOfDone:
+  shippedMeans: <one sentence, decided in Phase 2 — see "Definition of done" below>
+  happyPathDemo: <null, or a short name/ID for this project's standing demo scenario>
 featureHistory:
   - name: <short feature-slice name, e.g. "Correction & Personalization Layer">
     kind: new-product | feature-add | pivot | correction
@@ -279,6 +282,36 @@ miss from recurring project after project.
 see the schema block above. This is the project-level iteration counter (spec additions, feature
 additions, pivots); it is not optional bookkeeping, and it is not the same as the phase 2.5
 review-round count (that's tracked separately, per-slice, once its review chain locks).
+
+**"Definition of done," including what `shipped` means for THIS project, is decided here — not
+debated after the fact.** Added 2026-09-08 after being asked directly why a merged, fully
+integration-checked feature still wasn't `status: shipped`, with no defined answer for what would
+make it so. `docs/STATE.md`'s YAML header gains a `definitionOfDone` block, written once per
+project (not per feature-slice) and revisited only when the project's own nature changes:
+
+```yaml
+definitionOfDone:
+  shippedMeans: <one sentence — e.g. "merged to master and running locally" for a no-deploy personal
+    tool; "deployed to production and traffic-serving" for a hosted app; state it explicitly, per
+    project, never assumed>
+  happyPathDemo: <null, or a short name/ID for a standing, REUSABLE demo scenario this project
+    replays at Phase 7/7.5 — see below>
+```
+
+- **A no-deploy personal tool** (this session's own precedent: nuwa, Foreman, Catwalk) has no
+  further step after "merged and integration-checked" — for these, `shippedMeans` should say so
+  explicitly, and Phase 7.5 passing auto-promotes `status: shipped` in the SAME commit, not a
+  separate human click. A hosted product with a real deploy step keeps them distinct.
+- **`happyPathDemo`, when the project has one, is a STANDING, NAMED, REUSABLE scenario** — not
+  invented fresh per feature. The precedent this convention formalizes: nuwa's own "casual speeder
+  vs competitive speeder" story premise (`docs/DECISIONS.md` D90, D97) was reused across multiple
+  real builds, unplanned, simply because it was a good real-content example someone kept reaching
+  for — and caught two real, otherwise-missed bugs (a highlight-window trim clamp, D90; a reasoner
+  domain-anchoring miss, D97) purely because a HUMAN watched the actual rendered output. Naming and
+  storing the scenario once (real inputs, expected shape, where its output artifact lives) turns
+  that into a repeatable Phase 7 check instead of a lucky one-off. A project with no natural
+  "watch it happen" surface (a headless daemon like Foreman) sets `happyPathDemo: null` — Phase 7's
+  recorded-demo requirement (below) only applies where one exists.
 
 **Every FR and NFR gets a stable ID** (`FR-1`, `FR-2`, …, `NFR-1`, …), assigned here and never
 reused or renumbered for the life of the project. These IDs are the traceability spine: phase 3
@@ -612,23 +645,42 @@ project's manifest — the pipeline does not change.
    else in this pipeline) — a real duplication is an R, a naming inconsistency with no functional
    cost may be an F or H. Route every R back for a fix before this phase is considered done; do
    not let "it works" substitute for "it doesn't duplicate or diverge."
-6. **A feature with a UI gets its happy path recorded, not just run.** Added 2026-09-08 — this
-   is finding #2 (the real smoke test) made replayable instead of ephemeral: "green tests are not
-   evidence" already established that a passing suite isn't proof; this closes the matching gap
-   on the human side — a text summary of what was checked isn't a substitute for actually seeing
-   it happen either. Drive the exact happy path the feature promises (the phase-1 persona use
-   case, end to end) through Playwright with video capture on (`use: { video: "on" }`, or an
-   explicit `page.video()` save), not a headless run that discards its own output. Save the
-   recording to `docs/build-records/<component>-demo.webm` (or the project's existing
-   build-record convention) and reference it from that component's `docs/PHASE-LOG.jsonl` entry
-   as a real artifact (`{"label": "demo recording", "path": "..."}`), same as any other build
-   evidence. **This artifact does double duty, named explicitly so neither purpose gets
-   shortchanged:** it IS the definition-of-done verification (a reviewer or the user can watch
-   the actual product do the actual thing, not read a claim about it) AND it is the demo the
-   feature already needed to exist somewhere — recorded once, serving both, rather than a
-   separate unrecorded smoke test plus a separate demo-recording task later. Skip only when the
-   feature genuinely has no UI (a pure backend/library change) — name that explicitly rather than
-   silently omitting the recording.
+6. **A feature with a UI gets its happy path recorded, not just run — using the project's
+   STANDING `happyPathDemo` scenario (`docs/STATE.md`'s `definitionOfDone`) when one exists,
+   never a fresh one invented per feature.** Added 2026-09-08, refined the same day after a real
+   precedent surfaced: nuwa's own "casual speeder vs competitive speeder" story premise
+   (`docs/DECISIONS.md` D90, D97) had been reused, unplanned, across multiple builds simply
+   because it was a good real-content example — and caught two real, otherwise-missed bugs
+   purely because a human watched the actual rendered output (a highlight-window trim clamp,
+   D90; a reasoner domain-anchoring miss where "speeder" resolved to speedcubing instead of
+   motorcycle riding, D97). This finding is that precedent formalized: a project defines its
+   `happyPathDemo` ONCE in Phase 2 (real inputs, expected output shape, where its artifacts live
+   — for nuwa, the real 116-clip pool + the D97-fixed domain-anchored reasoner), and every Phase 7
+   from then on replays THAT SAME scenario rather than a novel one, so results are comparable
+   build over build and a regression in the happy path itself is visible, not just a regression
+   in whatever the current feature happens to touch.
+   - This is finding #2 (the real smoke test) made replayable instead of ephemeral: "green tests
+     are not evidence" already established that a passing suite isn't proof; this closes the
+     matching gap on the human side — a text summary of what was checked isn't a substitute for
+     actually seeing it happen.
+   - Drive the standing scenario through Playwright with video capture on (`use: { video: "on" }`,
+     or an explicit `page.video()` save), not a headless run that discards its own output. Save the
+     recording to `docs/build-records/<component>-demo.webm` and reference it from
+     `docs/PHASE-LOG.jsonl` as a real artifact, same as any other build evidence.
+   - **This artifact does double duty, named explicitly so neither purpose gets shortchanged:** it
+     IS the definition-of-done verification AND the demo the feature already needed to exist
+     somewhere — recorded once, serving both.
+   - **Watch it, don't just save it — the review step is not optional.** Per the same closing-the-
+     loop instruction this convention was built from: after recording, actually watch the output
+     and name any real shortcoming found (not just "it ran without crashing"). A shortcoming found
+     this way is filed the SAME way any other post-ship follow-up is — as a Spec-Gap Ledger row if
+     it's a category of miss worth checking for on every future project, or a project-specific
+     `docs/DECISIONS.md` entry with a revisit-when trigger if it's local to this one. This is what
+     "front-load it into the design phase for next time" means concretely — the demo's own
+     shortcomings become next time's Phase 2 checklist items, not a one-off note that evaporates.
+   - Skip only when the feature genuinely has no UI (a pure backend/library change), or the
+     project's own `happyPathDemo` is `null` (no natural "watch it happen" surface, e.g. a headless
+     daemon) — name that explicitly rather than silently omitting the recording.
 
 ---
 
@@ -651,6 +703,26 @@ first, instead of re-deriving it from scratch. Refresh `TRACE.md` on every futur
 (a re-run after a fix, or a scheduled re-check), not just the first one.
 
 Update `docs/STATE.md`'s build-status visualization to match reality at the same time.
+
+**Auto-promote to `shipped`, per the project's own `definitionOfDone.shippedMeans`
+(Phase 2).** Added 2026-09-08 — closes the gap this convention was built to fix: a project sitting
+fully `TRACE.md`-green, with no open R-findings and no unresolved `blockers`, still read as
+"in progress" on the dashboard because nothing ever flipped `status: shipped`, and the alignment
+question ("does 7.5-passing count as shipped for a no-deploy tool?") got re-litigated ad hoc
+instead of resolved once in the spec. Now: if every `TRACE.md` row is `met` (or the `partial`/
+`failed` rows are explicitly named, already-accepted deferrals — not silent gaps), and
+`shippedMeans` says this tier's bar is "phase 7.5 green," set `status: shipped` in this same
+commit, no separate promotion step and no re-asking. If `shippedMeans` names a bar 7.5 alone can't
+attest to (e.g. `live`-tier "deployed to prod and serving real traffic"), leave `status` at
+`integration-checked` and name the remaining gap in `blockers` instead of guessing.
+
+**When the project names a `happyPathDemo`, this is the phase that replays and watches it** — see
+Phase 7 item 6 above for the recording mechanics. A fresh `TRACE.md` pass without watching that
+recording is a claim, not a check, for exactly the reason D90/D97 exist: both were schema-valid,
+green-suite states that were still wrong. If the recording surfaces a shortcoming, name it as a
+Spec-Gap Ledger row (if the category should be checked on every future project) or a
+project `docs/DECISIONS.md` entry with a revisit-when trigger (if it's local to this one) — do not
+let a real finding evaporate into "looked fine."
 
 ---
 
