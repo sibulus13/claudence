@@ -47,6 +47,7 @@ existing project reads as `feature-add`, a bare idea with nothing built yet read
 | **`integration-check`** | 7.5 only | everything else | Periodic health check on an already-shipped project — re-verify it still matches its spec, refresh `docs/TRACE.md` |
 | **`gap-log`** | nothing — appends one row to the Spec-Gap Ledger | everything | A follow-up just revealed a spec miss; record it without running the pipeline |
 | **`consolidate`** | nothing from the phase chain — diffs a spec range, harvests recurring patterns | everything | A feature slice is done (spec-locked, built, or at a natural pause) and it's time to check what review actually changed, and whether any of it is a recurring pattern worth pushing into the Spec-Gap Ledger / this skill itself |
+| **`research`** | -1 → a new R1-R4 chain (below) → feeds Phase 2 as informed input, not code | 3-4's "delegate to `/orchestrate`" build model, until R4 hands off | The deliverable isn't buildable yet because the requirements themselves depend on findings that don't exist — a corpus needs collecting/analyzing, a heuristic needs deriving, before Phase 2 can write a testable FR |
 
 Record which mode ran and which phases it covered in `docs/STATE.md`'s `pipelineMode` /
 `phasesRun` fields (schema below) — this is what makes a later `build-only` or
@@ -83,6 +84,18 @@ backlogItems:
     source: <repo-relative path + anchor, e.g. "docs/DECISIONS.md#d102">
     addedAt: <ISO timestamp>
     opened: false   # flips to true (never removed) once Foreman opens the issue — idempotency guard
+roadmap:   # optional — only projects with a long-horizon, multi-phase-type initiative carry this.
+           # See "Long-horizon roadmap" below. A normal single-feature project has no roadmap block.
+  - id: <stable id, e.g. "R1-corpus-analysis" — referenced by other nodes' prerequisites/enables>
+    type: research | build | experiment | data-collection | integration
+    title: <short name>
+    spec: <what this node does — inline if short, a doc pointer if long>
+    prerequisites: [<upstream node ids>]
+    enables: [<downstream node ids — what depends on this finishing>]
+    expectedOutcome: <one sentence, concrete and checkable — not "improve X">
+    quantitativeGates: [<deterministic, measurable pass/fail criteria>]
+    qualitativeScoring: <the rubric — dimensions + how judged, for whatever a gate can't reduce to a number>
+    status: not-started | in-progress | blocked | done
 featureHistory:
   - name: <short feature-slice name, e.g. "Correction & Personalization Layer">
     kind: new-product | feature-add | pivot | correction
@@ -203,6 +216,82 @@ separate field from the other two, not a rename:
 - **Rate-limited per tick** (Foreman-side, `D25`) so a large backlog dump (e.g. backfilling
   several existing `DECISIONS.md` follow-ups into `backlogItems` at once) opens a trickle of
   issues over several dispatcher ticks, not a burst.
+
+---
+
+## `research` mode — when the requirements don't exist yet, only the questions do
+
+Added 2026-09-09, direct response to a real case: a feature request (analyze a corpus of viral
+short-form video for structural patterns, derive a template) couldn't get a real Phase 2 FR/NFR
+written yet — not because the idea was vague, but because the actual requirement depends on
+findings nobody has yet (what patterns are real, what threshold counts as "viral," which corpus
+is even legally obtainable). Phase 4's normal build model ("delegate to `/orchestrate`, which
+assumes the deliverable is code") doesn't fit a phase whose deliverable is a *dataset* or a
+*document*. `research` mode inserts a chain BEFORE Phase 2 that produces the missing input,
+instead of Phase 2 guessing at requirements a human will revise from scratch once real findings
+exist anyway:
+
+```mermaid
+flowchart TD
+    N1["-1 · Idea intake<br/>(existing, unchanged)"] --> R1["R1 · Research plan<br/>method + data source(s) +<br/>compliance stance, stated explicitly"]
+    R1 --> R2["R2 · Data collection<br/>the corpus itself — not code"]
+    R2 --> R3["R3 · Analysis<br/>(a coded pipeline → normal<br/>Phase 3/4 build, if that's the shape)"]
+    R3 --> R4["R4 · Findings doc<br/>patterns/template derived — not code"]
+    R4 --> P2["Phase 2 (existing)<br/>NOW informed by real findings"]
+```
+
+- **R1 is a real, named gate — not a formality.** State explicitly: what data, what method,
+  and — whenever the data involves a third party's platform/content — the compliance/legal
+  stance, with its reasoning, not just a conclusion. This is where the corpus-sourcing decision
+  for the viral-video example was made (D114-equivalent: Apify, logged-out/public-only, citing
+  *Meta v. Bright Data*'s "public access ≠ restricted 'use'" holding as the reasoning, not just
+  "we picked Apify"). **A `research` mode run that skips stating this explicitly hasn't actually
+  done R1**, regardless of whether R2 technically produced data.
+- **R2's deliverable is the corpus itself, not code** — no Phase 6 gate manifest, no Phase 7
+  adversarial code review. Its own definition of done is closer to `research`-mode-specific:
+  "N items collected, from source X, under compliance stance Y, stored at Z."
+- **R3 CAN be a normal software build** (if the analysis is a coded pipeline — e.g. a script that
+  runs frame extraction + classification across the corpus) — reuse Phase 3/4 for that slice
+  rather than inventing a parallel build path. Only R1/R2/R4 are structurally different from
+  normal dark-factory phases; R3 often isn't.
+- **R4's deliverable is a findings document** (patterns found, a derived template/heuristic, each
+  with real supporting examples — never asserted without evidence, same "asserted-not-verified"
+  gate this skill already applies elsewhere) that becomes the actual INPUT to a normal Phase 2 run
+  — the FR/NFR Phase 2 writes next cites R4's findings directly ("the story designer anchors on
+  hook-template X, derived from N real examples"), not a hunch.
+- **Skip `research` mode entirely when the requirements are already knowable** — most feature work
+  still starts at `new-product`/`feature-add`'s normal Phase 2. This mode exists for the narrower
+  case where Phase 1's own kill-gate question ("what measured evidence says this is real") can't
+  be answered without first going and finding the evidence.
+
+## Long-horizon roadmap — the abstraction layer above one build loop
+
+Added 2026-09-09, direct response to a real ask: Foreman's dispatch loop already handles *one*
+build iteration well (an approved issue → a worktree → a PR → a gate → a merge), but a real
+initiative (research → build → integration, spanning weeks, mixing node *types*) has no
+persistent representation above that — nothing shows the whole shape, what blocks what, or what
+"done" means for a research node versus a build node. `docs/STATE.md`'s new `roadmap` field
+(schema above) is that layer: **it generalizes Phase 3's own decomposition table** (component ·
+interface · dependencies · satisfies) from "the components of one feature" to "the phases of a
+whole initiative," adding the two things a same-feature decomposition table doesn't need: a
+**`type`** per node (Phase 3 components are implicitly always `build`; a roadmap node might be
+`research`, `experiment`, or `data-collection` instead) and **`qualitativeScoring`** alongside the
+deterministic gates (not everything a research/experiment node produces reduces to a pass/fail
+check).
+
+- **Every node states all seven fields — this is not optional shorthand.** `prerequisites` and
+  `enables` are BOTH required (not just upstream) so a reader can walk the graph in either
+  direction without cross-referencing every other node's `prerequisites` by hand.
+  `quantitativeGates` and `qualitativeScoring` are both required too — a node with only one or the
+  other is under-specified: a pure metric misses "is this actually good," a pure judgment call
+  gives nothing checkable.
+- **Only projects with a real long-horizon initiative carry a `roadmap` block** — a normal
+  single-feature project has none; don't add one speculatively.
+- **Catwalk renders this as a dedicated Roadmap view** — separate from the existing per-project
+  pipeline flowchart (which shows dark-factory's own -1→7.5 phases for the CURRENT build), showing
+  the dependency graph across node types, each node expandable to its full spec/gates/scoring —
+  see `D:/repo/AI/foreman/docs/VISUALIZATION-REQUIREMENTS.md` for how Catwalk's existing
+  requirements doc should grow to cover this, rather than a second, competing requirements doc.
 
 ---
 
