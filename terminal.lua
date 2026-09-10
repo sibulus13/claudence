@@ -1403,12 +1403,21 @@ table.insert(config.hyperlink_rules, {
 -- of that cwd, reusing discover_repos' own directory-exclusion list so it
 -- can't wander into node_modules/.git/build output. A miss returns nil —
 -- silent no-op, never a wrong-file open or an error popup.
+-- Second well-known root, distinct from whatever repo the clicking pane
+-- happens to sit in: the harness config tree itself. A huge share of real
+-- citations (terminal.lua, pathlink.lua, CLAUDE.md, this whole feature's own
+-- source) live here, not under REPO_DIR at all — discovered live 2026-09-09
+-- clicking a `terminal.lua` citation from a D:/repo/... pane: the earlier
+-- version of this function only ever searched REPO_DIR's tree, so a file
+-- that genuinely exists but lives outside it was structurally unreachable,
+-- not just a fuzzy-match miss.
+local CLAUDE_DIR = wezterm.home_dir .. '/.claude'
+
 local function resolve_relative_ref(pane, ref)
   local path_part, suffix = PL.split_suffix(ref)
   local cwd_obj = pane and pane:get_current_working_dir()
   local cwd = cwd_obj and cwd_obj.file_path
-  if not cwd then return nil end
-  if cwd:match('^/[A-Za-z]:') then cwd = cwd:sub(2) end
+  if cwd and cwd:match('^/[A-Za-z]:') then cwd = cwd:sub(2) end
 
   local function exists(p)
     local f = io.open(p, 'r')
@@ -1416,37 +1425,55 @@ local function resolve_relative_ref(pane, ref)
     return false
   end
 
-  for _, dir in ipairs(PL.ancestor_dirs(cwd, REPO_DIR)) do
-    local candidate = dir .. '/' .. path_part
-    if exists(candidate) then return candidate:gsub('\\', '/') .. suffix end
+  if cwd then
+    for _, dir in ipairs(PL.ancestor_dirs(cwd, REPO_DIR)) do
+      local candidate = dir .. '/' .. path_part
+      if exists(candidate) then return candidate:gsub('\\', '/') .. suffix end
+    end
   end
+  local claude_candidate = CLAUDE_DIR .. '/' .. path_part
+  if exists(claude_candidate) then return claude_candidate:gsub('\\', '/') .. suffix end
 
+  -- Bounded fuzzy filename search, tried against every plausible root in
+  -- turn (the nearest git-repo ancestor of the pane's cwd, if any, and
+  -- CLAUDE_DIR) and merged before picking the closest — it doesn't matter
+  -- which tree the file actually lives in, PL.pick_closest already handles
+  -- "which of these hits is the real one" regardless of root.
   local basename = path_part:match('([^/\\]+)$') or path_part
-  local search_root = cwd:gsub('\\', '/'):gsub('/+$', '')
-  for _, dir in ipairs(PL.ancestor_dirs(cwd, REPO_DIR)) do
-    if exists(dir .. '/.git') then search_root = dir; break end
+  local roots = {}
+  if cwd then
+    local git_root = cwd:gsub('\\', '/'):gsub('/+$', '')
+    for _, dir in ipairs(PL.ancestor_dirs(cwd, REPO_DIR)) do
+      if exists(dir .. '/.git') then git_root = dir; break end
+    end
+    roots[#roots + 1] = git_root
   end
-  local ps =
-    "$r='" .. search_root:gsub('/', '\\') .. "';$b='" .. basename:gsub("'", "''") .. "';$md=6;" ..
-    "$p=@{'node_modules'=1;'.git'=1;'dist'=1;'.next'=1;'build'=1;'out'=1;" ..
-    "'.worktrees'=1;'.venv'=1;'venv'=1;'__pycache__'=1;'target'=1;'obj'=1;" ..
-    "'.turbo'=1;'.cache'=1};" ..
-    "$o=New-Object System.Collections.Generic.List[string];" ..
-    "$s=New-Object System.Collections.Generic.Stack[object];$s.Push(@{P=$r;D=0});" ..
-    "while($s.Count -and $o.Count -lt 6){$c=$s.Pop();" ..
-    "try{foreach($f2 in [System.IO.Directory]::EnumerateFiles($c.P,$b)){$o.Add($f2)}}catch{};" ..
-    "if($c.D -ge $md){continue};" ..
-    "try{foreach($d in [System.IO.Directory]::EnumerateDirectories($c.P)){" ..
-    "$n=[System.IO.Path]::GetFileName($d);if($p.ContainsKey($n)){continue};" ..
-    "$s.Push(@{P=$d;D=$c.D+1})}}catch{}};$o"
-  local ok, stdout = wezterm.run_child_process({
-    'powershell.exe', '-NoProfile', '-NoLogo', '-NonInteractive', '-Command', ps,
-  })
-  if not ok then return nil end
+  roots[#roots + 1] = CLAUDE_DIR
+
   local hits = {}
-  for line in stdout:gmatch('[^\r\n]+') do
-    line = line:match('^%s*(.-)%s*$')
-    if line ~= '' then hits[#hits + 1] = line:gsub('\\', '/') end
+  for _, root in ipairs(roots) do
+    local ps =
+      "$r='" .. root:gsub('/', '\\') .. "';$b='" .. basename:gsub("'", "''") .. "';$md=6;" ..
+      "$p=@{'node_modules'=1;'.git'=1;'dist'=1;'.next'=1;'build'=1;'out'=1;" ..
+      "'.worktrees'=1;'.venv'=1;'venv'=1;'__pycache__'=1;'target'=1;'obj'=1;" ..
+      "'.turbo'=1;'.cache'=1};" ..
+      "$o=New-Object System.Collections.Generic.List[string];" ..
+      "$s=New-Object System.Collections.Generic.Stack[object];$s.Push(@{P=$r;D=0});" ..
+      "while($s.Count -and $o.Count -lt 6){$c=$s.Pop();" ..
+      "try{foreach($f2 in [System.IO.Directory]::EnumerateFiles($c.P,$b)){$o.Add($f2)}}catch{};" ..
+      "if($c.D -ge $md){continue};" ..
+      "try{foreach($d in [System.IO.Directory]::EnumerateDirectories($c.P)){" ..
+      "$n=[System.IO.Path]::GetFileName($d);if($p.ContainsKey($n)){continue};" ..
+      "$s.Push(@{P=$d;D=$c.D+1})}}catch{}};$o"
+    local ok, stdout = wezterm.run_child_process({
+      'powershell.exe', '-NoProfile', '-NoLogo', '-NonInteractive', '-Command', ps,
+    })
+    if ok then
+      for line in stdout:gmatch('[^\r\n]+') do
+        line = line:match('^%s*(.-)%s*$')
+        if line ~= '' then hits[#hits + 1] = line:gsub('\\', '/') end
+      end
+    end
   end
   local best = PL.pick_closest(hits)
   return best and (best .. suffix)
