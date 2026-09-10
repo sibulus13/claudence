@@ -68,6 +68,7 @@ chrome/
 
 # Test run cache
 tests/.last-results.txt
+tests/.last-results-pathlink.txt
 
 # Session planning artifacts — transient, per-session working docs
 plans/

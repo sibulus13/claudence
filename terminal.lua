@@ -7,6 +7,12 @@ local act     = wezterm.action
 -- the tested logic IS the runtime logic.
 local A = dofile(wezterm.home_dir .. '/.claude/attention.lua')
 
+-- Pure relative-hyperlink resolution logic (unit-tested in tests/pathlink.test.lua).
+-- Same split as A above: terminal.lua does only the impure I/O (pane cwd, file
+-- existence, the fuzzy filesystem search); the classification/path-candidate
+-- logic lives in this module.
+local PL = dofile(wezterm.home_dir .. '/.claude/pathlink.lua')
+
 -- Auto-reload on file save — no Ctrl+Shift+R needed after edits.
 -- WezTerm watches the resolved symlink target, so saving terminal.lua
 -- in ~/.claude/ triggers the reload directly.
@@ -1318,20 +1324,124 @@ table.insert(config.hyperlink_rules, {
   regex  = [[[A-Za-z]:[\\/](?:[^\s"'<>|:*?]+[\\/])*[^\s"'<>|:*?]+\.[A-Za-z0-9]+(?::\d+(?::\d+)?)?]],
   format = '$0',
 })
+-- SECOND rule: paths inside backtick code-spans. The bare-path rule above excludes
+-- whitespace from every segment ([^\s...]), so a repo with a SPACE in its own path
+-- (e.g. "D:/repo/Stock/Research 2026/...", this machine's own algo-trading repo) can
+-- never match — the regex stops at the space and the link is silently never formed,
+-- even though Claude Code still colors the text blue on its own. Discovered live
+-- 2026-09-09: paths in that repo's session showed blue but were never clickable.
+-- A backtick boundary sidesteps the whole class of problem: since Claude Code (and
+-- this repo's own CLAUDE.md convention) always wraps cited paths in single
+-- backticks, the closing backtick is an unambiguous stop that lets the middle allow
+-- spaces freely, with no risk of swallowing trailing prose the way a bare-path rule
+-- would if it also allowed spaces.
+table.insert(config.hyperlink_rules, {
+  regex  = [[`([A-Za-z]:[\\/][^`]*\.[A-Za-z0-9]+(?::\d+(?::\d+)?)?)`]],
+  format = '$1',
+})
 
--- Route opened links: web/mail use the OS default (browser); anything that looks
--- like a local file opens in VS Code at its line via open-in-vscode.ps1 (which
--- also flips markdown into preview mode).
-wezterm.on('open-uri', function(_window, _pane, uri)
-  if not (uri:match('^file:') or uri:match('^/?%a:[/\\]')) then
-    return  -- not a local file → let WezTerm open it (browser, etc.)
+-- THIRD rule: a BARE RELATIVE file reference — no drive letter at all. This is
+-- the common real-world shape: a citation that forgot the D:/... prefix (the
+-- CLAUDE.md rule exists precisely because this keeps happening), or raw tool
+-- output — a stack trace, a test-runner line, `git diff --stat` — that only
+-- ever prints paths relative to some cwd. Rather than requiring every source
+-- to emit an absolute path, this matches the relative shape too and open-uri
+-- resolves it below (pane cwd + ancestor walk, then a bounded fuzzy search).
+-- The regex crate WezTerm uses has no lookaround, so instead of excluding "is
+-- this really a suffix of a longer absolute path" via lookbehind, the leading
+-- boundary character is captured in $1 and simply dropped from $2 — a match
+-- can only START right after a non-path-adjacent character (space, backtick,
+-- quote, comma, start-of-line, ...), which an absolute path's own '/' or '\'
+-- separators never are, so this rule structurally can't fire on a trailing
+-- segment of "D:/repo/foo.md" (rules 1/2 above already own that whole span).
+local REL_EXT = 'md|ts|tsx|js|jsx|mjs|cjs|py|ps1|psm1|lua|json|ya?ml|toml|css|' ..
+  'scss|html|sh|bash|cs|go|rs|java|kt|cpp|cc|c|h|hpp|sql|txt|csv|env|log'
+table.insert(config.hyperlink_rules, {
+  regex  = [[(^|[^A-Za-z0-9:/\\.])([\w.-]+(?:[\\/][\w.-]+)*\.(?:]] .. REL_EXT .. [[))(:\d+(?::\d+)?)?]],
+  format = '$2$3',
+})
+
+-- Best-effort resolution for a bare relative reference (no drive letter).
+-- Tries, in order: (1) a direct join onto the CLICKING PANE's own cwd and
+-- every ancestor of it up to REPO_DIR — covers both "cited relative to right
+-- here" and "cited relative to the repo root while sitting in a subfolder";
+-- (2) a bounded fuzzy filename search rooted at the nearest git-repo ancestor
+-- of that cwd, reusing discover_repos' own directory-exclusion list so it
+-- can't wander into node_modules/.git/build output. A miss returns nil —
+-- silent no-op, never a wrong-file open or an error popup.
+local function resolve_relative_ref(pane, ref)
+  local path_part, suffix = PL.split_suffix(ref)
+  local cwd_obj = pane and pane:get_current_working_dir()
+  local cwd = cwd_obj and cwd_obj.file_path
+  if not cwd then return nil end
+  if cwd:match('^/[A-Za-z]:') then cwd = cwd:sub(2) end
+
+  local function exists(p)
+    local f = io.open(p, 'r')
+    if f then f:close(); return true end
+    return false
   end
-  local target = uri:gsub('^file://', ''):gsub('^/([A-Za-z]:)', '%1')  -- file:///D:/x → D:/x
+
+  for _, dir in ipairs(PL.ancestor_dirs(cwd, REPO_DIR)) do
+    local candidate = dir .. '/' .. path_part
+    if exists(candidate) then return candidate:gsub('\\', '/') .. suffix end
+  end
+
+  local basename = path_part:match('([^/\\]+)$') or path_part
+  local search_root = cwd:gsub('\\', '/'):gsub('/+$', '')
+  for _, dir in ipairs(PL.ancestor_dirs(cwd, REPO_DIR)) do
+    if exists(dir .. '/.git') then search_root = dir; break end
+  end
+  local ps =
+    "$r='" .. search_root:gsub('/', '\\') .. "';$b='" .. basename:gsub("'", "''") .. "';$md=6;" ..
+    "$p=@{'node_modules'=1;'.git'=1;'dist'=1;'.next'=1;'build'=1;'out'=1;" ..
+    "'.worktrees'=1;'.venv'=1;'venv'=1;'__pycache__'=1;'target'=1;'obj'=1;" ..
+    "'.turbo'=1;'.cache'=1};" ..
+    "$o=New-Object System.Collections.Generic.List[string];" ..
+    "$s=New-Object System.Collections.Generic.Stack[object];$s.Push(@{P=$r;D=0});" ..
+    "while($s.Count -and $o.Count -lt 6){$c=$s.Pop();" ..
+    "try{foreach($f2 in [System.IO.Directory]::EnumerateFiles($c.P,$b)){$o.Add($f2)}}catch{};" ..
+    "if($c.D -ge $md){continue};" ..
+    "try{foreach($d in [System.IO.Directory]::EnumerateDirectories($c.P)){" ..
+    "$n=[System.IO.Path]::GetFileName($d);if($p.ContainsKey($n)){continue};" ..
+    "$s.Push(@{P=$d;D=$c.D+1})}}catch{}};$o"
+  local ok, stdout = wezterm.run_child_process({
+    'powershell.exe', '-NoProfile', '-NoLogo', '-NonInteractive', '-Command', ps,
+  })
+  if not ok then return nil end
+  local hits = {}
+  for line in stdout:gmatch('[^\r\n]+') do
+    line = line:match('^%s*(.-)%s*$')
+    if line ~= '' then hits[#hits + 1] = line:gsub('\\', '/') end
+  end
+  local best = PL.pick_closest(hits)
+  return best and (best .. suffix)
+end
+
+local function open_in_vscode(target)
   wezterm.background_child_process({
     'powershell.exe', '-NoProfile', '-WindowStyle', 'Hidden', '-File',
     wezterm.home_dir .. '/.claude/scripts/open-in-vscode.ps1', '-Target', target,
   })
-  return false  -- handled; don't let WezTerm try to open the raw path
+end
+
+-- Route opened links: web/mail use the OS default (browser); anything that looks
+-- like a local file (absolute OR bare-relative) opens in VS Code at its line via
+-- open-in-vscode.ps1 (which also flips markdown into preview mode).
+wezterm.on('open-uri', function(_window, pane, uri)
+  local kind = PL.classify(uri)
+  if kind == 'other' then
+    return  -- not a local file reference → let WezTerm open it (browser, etc.)
+  end
+  if kind == 'absolute' then
+    local target = uri:gsub('^file://', ''):gsub('^/([A-Za-z]:)', '%1')  -- file:///D:/x → D:/x
+    open_in_vscode(target)
+    return false
+  end
+  -- kind == 'relative'
+  local resolved = resolve_relative_ref(pane, uri)
+  if resolved then open_in_vscode(resolved) end
+  return false  -- handled either way; never let WezTerm try to open a bare relative string itself
 end)
 
 config.scrollback_lines  = 10000
