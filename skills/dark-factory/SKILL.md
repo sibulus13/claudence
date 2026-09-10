@@ -504,6 +504,23 @@ tags each component with the IDs it satisfies, phase 5 tags each test with the I
 and phase 7.5 rebuilds the full requirement → component → test → status table from them. A
 requirement with no ID cannot be traced later — assign one even for a one-line NFR.
 
+**`build-only` dispatch namespaces new IDs by issue number, not a flat sequence — `D<issue>-<n>` /
+`FR<issue>-<n>` / `NFR<issue>-<n>`, e.g. `D16-1`, `FR16-1`.** Added 2026-09-09 after a real,
+repeated incident (`~/.claude/docs/HARNESS-INCIDENT-LOG.md` RCA-1): two `build-only` sessions
+dispatched the same day against the same repo each compute "next ID" from the same pre-dispatch
+high-water-mark in their own isolated worktree, independently landing on the identical number —
+happened 4 times in one session across 3 repos once concurrency was raised, always caught at merge
+time but never for free. A flat sequence has no coordination mechanism between concurrent
+worktrees; a per-issue namespace needs none, because the namespace itself (a GitHub issue number)
+is already collision-free by construction — the SAME fix shape as D28's STATE.md write race,
+applied to a second surface. **Existing flat-numbered IDs (`D1`..`D35`, `FR-1`..`FR-30`, etc.
+across every already-built project) are left exactly as they are — never mass-renumbered.** This
+governs IDs assigned from 2026-09-09 onward only; a `feature-add`/`spec-only` run against an
+existing project appends its new namespaced IDs alongside the old flat ones in the same table,
+no migration step required. Outside `build-only` (a fresh `new-product`/`spec-only` Phase 2 run,
+which is not concurrency-prone the same way — one spec author, one sitting) the flat sequence is
+still fine and simpler; don't namespace what was never racing.
+
 **Commit the freshly-written FR/NFR set BEFORE phase 2.5 touches it — never bundle spec-writing
 and review-fixing into one commit.** Added 2026-09-08 after checking: every feature slice built
 this session bundled the initial spec text and every review round's fixes into a single commit,
