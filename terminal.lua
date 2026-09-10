@@ -21,9 +21,11 @@ config.automatically_reload_config = true
 -- sees it on its own. Register it explicitly so saving terminal.lua reloads.
 if wezterm.add_to_config_reload_watch_list then
   wezterm.add_to_config_reload_watch_list(wezterm.home_dir .. '/.claude/terminal.lua')
-  -- attention.lua is dofile'd too, so watch it as well — otherwise editing the
-  -- notification logic alone wouldn't trigger a reload (stale-config trap).
+  -- attention.lua and pathlink.lua are dofile'd too, so watch them as well —
+  -- otherwise editing either module alone wouldn't trigger a reload (the same
+  -- stale-config trap this comment already flags for attention.lua).
   wezterm.add_to_config_reload_watch_list(wezterm.home_dir .. '/.claude/attention.lua')
+  wezterm.add_to_config_reload_watch_list(wezterm.home_dir .. '/.claude/pathlink.lua')
 end
 
 -- ── Appearance ────────────────────────────────────────────────────────────────
@@ -1340,24 +1342,44 @@ table.insert(config.hyperlink_rules, {
   format = '$1',
 })
 
--- THIRD rule: a BARE RELATIVE file reference — no drive letter at all. This is
--- the common real-world shape: a citation that forgot the D:/... prefix (the
--- CLAUDE.md rule exists precisely because this keeps happening), or raw tool
--- output — a stack trace, a test-runner line, `git diff --stat` — that only
--- ever prints paths relative to some cwd. Rather than requiring every source
--- to emit an absolute path, this matches the relative shape too and open-uri
--- resolves it below (pane cwd + ancestor walk, then a bounded fuzzy search).
--- The regex crate WezTerm uses has no lookaround, so instead of excluding "is
--- this really a suffix of a longer absolute path" via lookbehind, the leading
--- boundary character is captured in $1 and simply dropped from $2 — a match
--- can only START right after a non-path-adjacent character (space, backtick,
--- quote, comma, start-of-line, ...), which an absolute path's own '/' or '\'
--- separators never are, so this rule structurally can't fire on a trailing
--- segment of "D:/repo/foo.md" (rules 1/2 above already own that whole span).
+-- THIRD/FOURTH rules: a BARE RELATIVE file reference — no drive letter at
+-- all. This is the common real-world shape: a citation that forgot the
+-- D:/... prefix (the CLAUDE.md rule exists precisely because this keeps
+-- happening), or raw tool output — a stack trace, a test-runner line,
+-- `git diff --stat` — that only ever prints paths relative to some cwd.
+-- Rather than requiring every source to emit an absolute path, these match
+-- the relative shape too and open-uri resolves it below (pane cwd + ancestor
+-- walk, then a bounded fuzzy search).
 local REL_EXT = 'md|ts|tsx|js|jsx|mjs|cjs|py|ps1|psm1|lua|json|ya?ml|toml|css|' ..
   'scss|html|sh|bash|cs|go|rs|java|kt|cpp|cc|c|h|hpp|sql|txt|csv|env|log'
+
+-- THIRD rule: backtick-wrapped, mirroring rule 2's own bounded-by-backticks
+-- shape. This is declared FIRST (and is what actually fires for `terminal.lua`
+-- -style citations, since Claude Code and this repo's own CLAUDE.md convention
+-- always wrap a cited path in backticks) so it owns that span outright — a
+-- clean `([...])` capture with no leading/trailing punctuation swept in, unlike
+-- the generic rule below trying to reconstruct a boundary after the fact.
 table.insert(config.hyperlink_rules, {
-  regex  = [[(^|[^A-Za-z0-9:/\\.])([\w.-]+(?:[\\/][\w.-]+)*\.(?:]] .. REL_EXT .. [[))(:\d+(?::\d+)?)?]],
+  regex  = [[`([\w.-]+(?:[\\/][\w.-]+)*\.(?:]] .. REL_EXT .. [[))(:\d+(?::\d+)?)?`]],
+  format = '$1$2',
+})
+
+-- FOURTH rule: the true bare/no-backtick fallback, for raw tool output that
+-- was never wrapped in anything (a pasted stack trace, `git diff --stat`
+-- output, ...). The regex crate WezTerm uses has no lookaround, so instead of
+-- excluding "is this really a suffix of a longer absolute path" via
+-- lookbehind, the leading boundary character is captured in $1 and simply
+-- dropped from $2 — a match can only START right after a non-path-adjacent
+-- character (space, quote, comma, start-of-line, ...), which an absolute
+-- path's own '/' or '\' separators never are, so this rule structurally can't
+-- fire on a trailing segment of "D:/repo/foo.md" (rules 1/2 already own that
+-- whole span). Backtick is deliberately EXCLUDED from the boundary set here —
+-- the THIRD rule above owns every backtick-wrapped case on its own, so this
+-- rule never gets a chance to sweep an adjacent backtick into its own match
+-- (the bug that made a leading backtick part of the clickable/underlined
+-- span, discovered live 2026-09-09 clicking on a bare `terminal.lua` citation).
+table.insert(config.hyperlink_rules, {
+  regex  = [[(^|[^A-Za-z0-9:/\\.`])([\w.-]+(?:[\\/][\w.-]+)*\.(?:]] .. REL_EXT .. [[))(:\d+(?::\d+)?)?]],
   format = '$2$3',
 })
 
