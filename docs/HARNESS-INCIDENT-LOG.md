@@ -22,6 +22,7 @@ incomplete entry.
 | 2026-09-09 | catwalk | `vitest` had no `.git/**` exclusion — `pnpm test` from the main checkout also ran (and failed on) whatever unrelated, in-progress state existed in OTHER issues' worktrees | test-scope-leak | 1 | Added `**/.git/**` to `vitest.config.mts`'s exclude list |
 | 2026-09-09 | catwalk | `#8`'s GitHub issue body was `foreman#8`'s entire spec, not its own — wrong from the very first `gh issue create` call (confirmed via `userContentEdits`: no edit history) | cross-repo-content-mixup | 1 | Restored the correct body from the original in-session diagnosis |
 | 2026-09-09 | catwalk | `#16`'s dispatched PR said "closes #16" in its own progress narration but the actual PR body had no closing keyword — Foreman's `prClosesIssue` correctly flagged it; not a harness bug, a build-agent-output gap | pr-closing-keyword-narration-drift | 1 | Added `Closes #16` to the PR body directly; work itself was already verified complete |
+| 2026-09-10 | nuwa, catwalk, foreman | A `backlogItems` entry already resolved (opened:true or removed) reappeared as `opened:false` in `docs/STATE.md` after a later, unrelated merge — self-scheduling discovery re-opened a duplicate GitHub issue for already-shipped work (nuwa#30 dup of #19, catwalk#25 dup of D-30/#23, foreman#31/#32 dup of #33/#36) | stale-backlogitems-resurrection | 3 | Closed each duplicate with an explanatory comment; root cause not yet patched at the source (see RCA-2) |
 
 ---
 
@@ -67,3 +68,60 @@ governs new IDs going forward only.
 **Revisit-when:** After the new namespaced scheme has covered 5+ real `build-only` dispatches
 across 2+ repos with zero collisions, consider it validated and drop this RCA's "still monitoring"
 status to "resolved by convention," mirroring the Spec-Gap Ledger's own 3-consecutive-clean bar.
+
+---
+
+## RCA-2: stale `backlogItems` entries resurrected after merge, causing duplicate GitHub issues (3 occurrences, 3 repos, 2026-09-10)
+
+**Frequency:** 3 confirmed occurrences (nuwa `#30` dup of `#19`, catwalk `#25` dup of `D-30`/`#23`,
+foreman `#31`/`#32` dup of `#33`/`#36`) — the last one is actually 2 duplicate entries in a single
+incident, so 4 individual duplicate issues total. Crosses the 2-3× threshold.
+
+**Severity:** Low-medium. Each duplicate wastes one dispatch cycle (a real `claude -p` session
+re-doing already-shipped work) and one human glance to notice + close it — never silently wrong,
+always caught at the `needs-human`/status-check stage, but costs real time per occurrence and
+recurs faster as backlog-discovery + concurrency both increase (the same growth dynamic as RCA-1).
+
+**Risk if unaddressed:** Same shape as RCA-1's risk — grows with concurrency/discovery frequency,
+not shrinks. A duplicate that happens to auto-merge cleanly (a `pre-traffic` repo, `full` autonomy,
+no real conflict) would land REAL, redundant work on `master` with nobody noticing until a status
+check happens to catch it, unlike a merge-conflict-shaped duplicate which announces itself.
+
+**Root cause, traced not guessed:** All 3 occurrences trace to the SAME mechanism — a
+`docs/STATE.md`-merge-conflict resolution (mine, this same session, resolving unrelated PRs) that
+took one side's full `backlogItems` block as the base (`git show origin/master:docs/STATE.md >
+docs/STATE.md`, the exact technique used throughout tonight's merge-resolution work) without
+verifying every individual entry's `opened`/removed status was still the MOST CURRENT one across
+BOTH sides. When the branch being merged had already correctly resolved an entry (marked
+`opened:true` or removed it outright) but the chosen base's snapshot predated that fix, the stale,
+still-`opened:false` version silently came back — exactly the same class of "whole-file replacement
+without per-entry reconciliation" mistake as RCA-1's ID collisions, but on a different field
+(`backlogItems`' `opened` flag instead of a D-number/FR-number). Self-scheduling discovery
+(`backlog.js`) then did exactly what it's designed to do — opened a fresh issue for an
+`opened:false` entry — correctly, given what it read; the data it read was wrong, not its logic.
+
+**This RCA's root cause is MY OWN merge-resolution technique from this same session, not a
+pre-existing bug in Foreman/dark-factory** — worth stating plainly rather than attributing it to
+"the harness" in the abstract. Every whole-file `docs/STATE.md`/`docs/DECISIONS.md` conflict
+resolved tonight used "take one side's full snapshot, append the other side's genuinely-new
+content" — which is correct for append-only sections (`featureHistory`, `PHASE-LOG.jsonl`) but
+WRONG for `backlogItems`, a section that gets mutated in place (`opened: false → true`, or removed
+entirely), not just appended to.
+
+**Patch applied at the source:** none yet — this entry is filed with root cause established but the
+fix not yet built, per this log's own standing rule that documentation without a patch is
+incomplete; treat that rule as still open against this entry, not satisfied by it. Proposed fix,
+for whoever picks this up: a merge-conflict resolution touching `docs/STATE.md`'s `backlogItems`
+must reconcile PER-ENTRY (by `id`), preferring whichever side has the more-resolved state
+(`opened:true` or removed beats `opened:false`) rather than picking one side's whole block — the
+same per-entry-reconciliation principle RCA-1's ID-namespacing fix applies to ID assignment, applied
+here to entry status instead. A deterministic gate is harder for this one than RCA-1's (would need
+to cross-reference live GitHub issue state, not just parse the file in isolation) — likely a
+`fleet-status` skill responsibility (its duplicate-sweep step, added the same session) rather than
+a per-repo test, since detecting "this backlogItems entry's real-world issue is already closed"
+inherently needs live `gh` state, not just the file.
+
+**Revisit-when:** The next time a `docs/STATE.md` merge conflict touches `backlogItems`, apply the
+per-entry reconciliation manually and note whether it would have caught this; after 2-3 clean
+manual applications, consider whether the pattern is regular enough to script directly into the
+merge-resolution step.
