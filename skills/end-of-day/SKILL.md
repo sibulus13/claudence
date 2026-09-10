@@ -169,6 +169,22 @@ section's own grounding-source rule above.
   content directly during the day. Reconcile against what is actually there, not against what you
   expect to be there; a repo-side `Now`/`Next` write that ignores an owner-added Notion item is a
   consolidation that missed half its inputs.
+- **Found live, 2026-09-09/10 — the heading rule above was applied to `Accomplished` but skipped
+  on `Next` in the SAME close.** `Accomplished` got its `## Claude-generated · ...` wrapper;
+  `Next`'s three bullets were written bare, indistinguishable from a human addition to the same
+  block. No content was confirmed lost this time, but the risk is real and the rule already
+  existed — this was an execution gap, not a missing rule. **The fix is a verification step, not
+  a reminder to remember harder**: before declaring the close finished, re-fetch the page and
+  confirm EVERY section this close touched (`Goals`, `Notes`, `Accomplished`, `Next` — all of
+  them, not just the ones that feel agent-heavy) has its bullets under the heading. A section
+  with agent content and no heading is not "fine because it's short" — it is unrecoverable
+  ambiguity the moment a human adds one line beside it.
+- **When using `notion-update-page`'s `update_content`, scope `old_str` to ONLY the agent's own
+  prior heading block** (e.g. `## Claude-generated · ... \n- <old bullets>`), never to the whole
+  `# Next`/`# Notes` section from its header to the next `#`. A section-wide `old_str` silently
+  matches and discards any human line sitting in the same block that isn't part of the quoted
+  string — the heading convention only protects content it actually wraps at the replace
+  boundary, not the section as a whole.
 - **Update its `Next` section** from the repo's `TODO.md` `Now` — the two must agree, and `TODO.md`
   wins on conflict.
 - **Owner instruction, 2026-09-02 — ANY edit to a register during this close re-triggers this
