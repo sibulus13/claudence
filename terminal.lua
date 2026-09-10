@@ -1364,23 +1364,35 @@ table.insert(config.hyperlink_rules, {
   format = '$1$2',
 })
 
--- FOURTH rule: the true bare/no-backtick fallback, for raw tool output that
--- was never wrapped in anything (a pasted stack trace, `git diff --stat`
--- output, ...). The regex crate WezTerm uses has no lookaround, so instead of
--- excluding "is this really a suffix of a longer absolute path" via
--- lookbehind, the leading boundary character is captured in $1 and simply
--- dropped from $2 — a match can only START right after a non-path-adjacent
--- character (space, quote, comma, start-of-line, ...), which an absolute
--- path's own '/' or '\' separators never are, so this rule structurally can't
--- fire on a trailing segment of "D:/repo/foo.md" (rules 1/2 already own that
--- whole span). Backtick is deliberately EXCLUDED from the boundary set here —
--- the THIRD rule above owns every backtick-wrapped case on its own, so this
--- rule never gets a chance to sweep an adjacent backtick into its own match
--- (the bug that made a leading backtick part of the clickable/underlined
--- span, discovered live 2026-09-09 clicking on a bare `terminal.lua` citation).
+-- FOURTH rule: the true bare/no-punctuation fallback — for raw tool output
+-- that was never wrapped in anything (a pasted stack trace, `git diff --stat`
+-- output), AND, it turns out, for Claude Code's own chat citations too: its
+-- terminal renderer does NOT emit the literal backtick characters for an
+-- inline-code span — it only applies color/styling — so THIRD rule above
+-- (which requires literal backticks) never actually fires for Claude Code's
+-- own `path.ext`-style prose citations. This is the rule that has to carry
+-- that case, discovered live 2026-09-09 after the THIRD rule's fix still left
+-- a leading space swept into the underlined span for exactly this reason.
+--
+-- An earlier version of this rule tried to exclude "is this really a suffix
+-- of a longer absolute path" by consuming one boundary character before the
+-- match (no lookbehind available in the regex crate WezTerm uses) — but since
+-- almost every real citation is preceded by an ordinary space, that boundary
+-- character was ALWAYS getting swept into the visible/clickable span, which
+-- is the bug just reported. Dropped that entirely in favor of a plain \b
+-- (zero-width word-boundary, consumes nothing) so the match starts exactly
+-- at the filename's first character, always. The traded-off risk: this can
+-- now also produce a redundant, overlapping match on the TAIL of an already-
+-- absolute path (e.g. "VERIFY.md:20" inside "D:/repo/.../VERIFY.md:20") —
+-- accepted because (a) rule 1 is declared first and already owns that whole
+-- span (same declared-order precedence rules 1/2 already rely on), and (b)
+-- even in the worst case where the redundant match won instead, resolve_
+-- relative_ref's fuzzy-search fallback below still finds the right file by
+-- basename regardless of what bogus prefix came with it — the dedup/
+-- relevance logic already built handles this case without any new code.
 table.insert(config.hyperlink_rules, {
-  regex  = [[(^|[^A-Za-z0-9:/\\.`])([\w.-]+(?:[\\/][\w.-]+)*\.(?:]] .. REL_EXT .. [[))(:\d+(?::\d+)?)?]],
-  format = '$2$3',
+  regex  = [[\b([\w.-]+(?:[\\/][\w.-]+)*\.(?:]] .. REL_EXT .. [[))(:\d+(?::\d+)?)?]],
+  format = '$1$2',
 })
 
 -- Best-effort resolution for a bare relative reference (no drive letter).
