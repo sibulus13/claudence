@@ -967,16 +967,36 @@ possible, on exactly the feature slices where it's the only available check.
 ```mermaid
 flowchart LR
     A[Phase 7.5: feature is<br/>shipped/integration-checked] -->|UI-facing?| B[Reuse existing<br/>artifacts into a<br/>Review Chunk]
-    B --> C[Batched into<br/>Catwalk's Review Queue]
-    C -->|human skims| D{Matches intent?}
-    D -->|yes| E[Confirmed —<br/>one click, done]
-    D -->|no| F[Drift flagged —<br/>files the SAME way<br/>a Phase 7.5 finding does]
+    B --> C[Accumulates silently —<br/>zero interruption on landing]
+    C --> D[A Demo Session:<br/>N chunks shown together,<br/>cohesive, executive-level]
+    D -->|human skims| E{Matches intent?}
+    E -->|yes| F[Confirmed —<br/>one click, done]
+    E -->|no| G[Drift flagged —<br/>files the SAME way<br/>a Phase 7.5 finding does]
 ```
 
 **Scope — UI-facing features only.** A feature with no user-visible surface (Foreman's own
 dispatcher logic, a data-model migration with no UI) has nothing for a human to sanity-eyeball
 that the agent's own Phase 7 smoke test didn't already cover better — skip it there, same
 skip condition as Phase 7 item 6's recorded-demo requirement.
+
+**Refined 2026-09-09, direct user correction on the first version of this convention.** The
+original wording said "checked on the human's own cadence," which still reads as N individual
+review requests waiting to be clicked through one at a time. That is NOT what was asked for: a
+Review Chunk landing is a **zero-interruption event** — nothing pages the human, nothing counts
+against them, it just accumulates. What surfaces to a human is a **Demo Session**: a deliberate,
+batched, cohesive showcase of everything that's accumulated, shown together — not a queue to
+individually process. A Demo Session is triggered either by the human opening Catwalk to look
+(pull), or by `#24`'s notable-work check-in (`core/notable.js`) crossing its own coalescing window
+(a gentle push, already batched by design — see "Continuous execution" below for how the two
+compose: notable-work check-in is the SIGNAL that a session is worth having, the Demo Session view
+is what gets shown once it's opened). Never one notification per shipped feature.
+
+**Anything requiring actual verification arrives with a ready demo, never a request to go test it
+by hand.** This was already true in spirit (Phase 7 item 6's recorded-demo requirement existed
+before this checkpoint did) but is now load-bearing, not incidental: a Review Chunk with no demo
+recording is not ready to enter a Demo Session — Phase 7.5 does not mark it `shipped` without one,
+per the existing skip-condition (no UI, or `happyPathDemo: null`). The human's job in a Demo
+Session is to WATCH, never to manually drive the feature to check it themselves.
 
 **A Review Chunk reuses existing artifacts — it does not create parallel ones:**
 
@@ -1003,9 +1023,10 @@ reviewQueue:
 ```
 
 **Executive-level means batched, binary, and rare — not an interrupt.** Written into Catwalk's
-Review Queue at Phase 7.5, checked on the human's own cadence, never a blocking gate on the
-pipeline itself (the feature is already `shipped`/`integration-checked` by the time it appears
-here). Per item, the human does exactly one of two things:
+Review Queue at Phase 7.5; accumulates with zero interruption; surfaces only as a Demo Session
+(above), never a blocking gate on the pipeline itself (the feature is already
+`shipped`/`integration-checked` by the time it appears here). Per item, the human does exactly one
+of two things:
 - **Confirmed** — one click, no explanation needed, the common case.
 - **Drift flagged** — files the SAME way a Phase 7.5 finding does: a Spec-Gap Ledger row if the
   category of miss is worth checking on every future project, or a `docs/DECISIONS.md` entry with
