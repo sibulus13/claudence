@@ -88,10 +88,20 @@ roadmap:   # optional — only projects with a long-horizon, multi-phase-type in
            # See "Long-horizon roadmap" below. A normal single-feature project has no roadmap block.
   - id: <stable id, e.g. "R1-corpus-analysis" — referenced by other nodes' prerequisites/enables>
     type: research | build | experiment | data-collection | integration
+    scope: feature | component | service   # what LEVEL this node operates at — see below
     title: <short name>
     spec: <what this node does — inline if short, a doc pointer if long>
+    interface: <this node's boundary contract — the schema/API/data shape it PRODUCES for
+               whatever consumes it, schema-first, same discipline as Phase 3's "public
+               interface (schema first)" column. Omit only if this node produces nothing
+               anything else integrates with (e.g. a pure research/findings node).>
     prerequisites: [<upstream node ids>]
     enables: [<downstream node ids — what depends on this finishing>]
+    integratesWith:   # HOW this node relates to another, not just THAT it does — the
+                       # roadmap-level equivalent of Phase 3's coupling map
+      - node: <another node's id>
+        via: <the actual integration point — "consumes <id>'s REST API", "shares <id>'s
+             DB schema", "imports <id>'s Python module" — never just "related to">
     expectedOutcome: <one sentence, concrete and checkable — not "improve X">
     quantitativeGates: [<deterministic, measurable pass/fail criteria>]
     qualitativeScoring: <the rubric — dimensions + how judged, for whatever a gate can't reduce to a number>
@@ -279,7 +289,7 @@ whole initiative," adding the two things a same-feature decomposition table does
 deterministic gates (not everything a research/experiment node produces reduces to a pass/fail
 check).
 
-- **Every node states all seven fields — this is not optional shorthand.** `prerequisites` and
+- **Every node states all nine fields — this is not optional shorthand.** `prerequisites` and
   `enables` are BOTH required (not just upstream) so a reader can walk the graph in either
   direction without cross-referencing every other node's `prerequisites` by hand.
   `quantitativeGates` and `qualitativeScoring` are both required too — a node with only one or the
@@ -292,6 +302,36 @@ check).
   the dependency graph across node types, each node expandable to its full spec/gates/scoring —
   see `D:/repo/AI/foreman/docs/VISUALIZATION-REQUIREMENTS.md` for how Catwalk's existing
   requirements doc should grow to cover this, rather than a second, competing requirements doc.
+
+**What a node actually represents — `scope`, and how to decompose for real parallelism.**
+Added 2026-09-09, direct answer to a real question: a roadmap by itself doesn't say whether a
+node is a whole feature, a piece of one, or an entire service, and without that a reader can't
+tell whether two nodes are safe to build in parallel or need to be sequenced. `scope` names the
+level explicitly:
+
+| `scope` | What it means | Decompose further when... |
+|---|---|---|
+| `feature` | One user-facing capability, shippable end to end | it's small enough that Phase 3's own component decomposition (inside THIS node's own build) is enough — most roadmap nodes are this |
+| `component` | A piece of a larger feature or service, not independently shippable | the feature is big enough that its own pieces need to be built/reviewed by different agents in parallel — this is Phase 3's decomposition table PROMOTED to roadmap-node status because the pieces are big enough to track independently over time, not just within one build |
+| `service` | A whole subsystem with its own lifecycle, deployable/versioned independently of what calls it | never — a `service`-scoped node is the STOPPING point; if it's still growing, its own internal pieces are `component`-scoped children, not more `service` nodes |
+
+- **Parallel-safe decomposition is a real, checkable property, not an assumption**: two nodes are
+  safe to build in parallel exactly when neither is in the other's `prerequisites`/`enables` chain
+  AND their `interface`s don't require one to already exist to be defined (i.e. both interfaces
+  can be specified up front, Designer-persona-style, before either build starts) — this is the
+  SAME file-disjoint-and-interface-first test Phase 3's "coupling map" already applies within one
+  feature's build, just applied at roadmap granularity across MULTIPLE features/services.
+- **`interface` is what makes that test checkable instead of assumed.** State the actual boundary
+  contract (a schema, an API shape, a module's public functions) a node produces — the same
+  "public interface (schema first)" discipline Phase 3 already requires per-component, just
+  written once at the roadmap level so it doesn't have to be re-derived from inside each node's own
+  build. Two nodes whose interfaces are both stated up front can be handed to two agents/worktrees
+  at once with real confidence, not a guess.
+- **`integratesWith` names the RELATIONSHIP, not just its existence.** `prerequisites`/`enables`
+  say ordering; `integratesWith` says HOW — "consumes X's REST API" is a different, differently-risky
+  relationship than "shares X's DB schema" even though both might look like a plain arrow on a
+  graph. A reader (or a future build session) should never have to open both nodes' full specs just
+  to learn what kind of coupling connects them.
 
 ---
 
