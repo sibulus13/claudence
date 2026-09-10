@@ -89,6 +89,16 @@ roadmap:   # optional — only projects with a long-horizon, multi-phase-type in
   - id: <stable id, e.g. "R1-corpus-analysis" — referenced by other nodes' prerequisites/enables>
     type: research | build | experiment | data-collection | integration
     scope: feature | component | service   # what LEVEL this node operates at — see below
+    partOf: <optional — the id of the containing higher-scope node, e.g. a `component`
+            node's owning `service`. Added 2026-09-09 (Catwalk issue #11) so a
+            drill-down VIEW can start at the outermost scope and zoom into children —
+            distinct from prerequisites/enables, which encode ORDERING, not
+            containment. Optional and additive: a roadmap authored before this field
+            existed has no node set it, and renders exactly as before (every node at
+            the root level). A dangling, self-referencing, or cyclic `partOf` must
+            fail OPEN (treat the node as root/visible), never silently drop it —
+            found the hard way when a naive implementation let a self-reference or a
+            2-node mutual cycle make those nodes permanently unreachable.>
     title: <short name>
     spec: <what this node does — inline if short, a doc pointer if long>
     interface: <this node's boundary contract — the schema/API/data shape it PRODUCES for
@@ -923,6 +933,73 @@ because of one already-filed, unrelated issue. Fixed:
   derived boolean — e.g. `D90: pass, D97: pass, [overall harness flag: FAIL, solely D101, already
   tracked, not a gate]` — so a future reader (or the auto-promote logic itself) never has to
   re-derive which failure is which from prose.
+
+---
+
+## Executive Review Checkpoint — the human-drift check, not another correctness gate
+
+Added 2026-09-09. **Distinct from everything above, not a duplicate of it.** Phase 7's adversarial
+pass and Phase 7.5's `TRACE.md`/`happyPathDemo` checks are agent-verified correctness against a
+spec — necessary, but structurally blind to one failure mode: the agent built exactly what the
+spec said, and the spec itself was a subtly wrong reading of what the human actually meant. No
+amount of additional automated rigor closes that gap, because the automation is checking against
+the same spec that may already have drifted from intent. Only the human who held the original
+intent can catch it — so this checkpoint exists to spend that human's attention as cheaply as
+possible, on exactly the feature slices where it's the only available check.
+
+```mermaid
+flowchart LR
+    A[Phase 7.5: feature is<br/>shipped/integration-checked] -->|UI-facing?| B[Reuse existing<br/>artifacts into a<br/>Review Chunk]
+    B --> C[Batched into<br/>Catwalk's Review Queue]
+    C -->|human skims| D{Matches intent?}
+    D -->|yes| E[Confirmed —<br/>one click, done]
+    D -->|no| F[Drift flagged —<br/>files the SAME way<br/>a Phase 7.5 finding does]
+```
+
+**Scope — UI-facing features only.** A feature with no user-visible surface (Foreman's own
+dispatcher logic, a data-model migration with no UI) has nothing for a human to sanity-eyeball
+that the agent's own Phase 7 smoke test didn't already cover better — skip it there, same
+skip condition as Phase 7 item 6's recorded-demo requirement.
+
+**A Review Chunk reuses existing artifacts — it does not create parallel ones:**
+
+| Field | Source (reused, not re-authored) |
+|---|---|
+| One-line intent | The feature's own line in `docs/SPEC.md` / its Feature Decision Record entry |
+| Quick sanity checks (3-5 bullets) | Authored ONCE by whoever builds the feature (Phase 3/4), same moment the coupling map and deterministic gates are written — these are for a human to skim in seconds ("does the primary action work," "does it render with real data, not just the fixture"), a *generic* companion to Phase 7 item 6's *incident-derived* checklist (D90/D97-style), not a replacement for it |
+| Demo | The Phase 7 item 6 recording (`docs/build-records/<component>-demo.webm`) — never re-recorded for this checkpoint |
+| Checklist verdict | Phase 7.5's already-produced, item-by-item result — reused verbatim, never re-summarized |
+
+Add a `reviewQueue` array to `docs/STATE.md`'s YAML header (same place `featureHistory`/
+`blockers` already live — Catwalk already reads this file directly, so nothing new to sync):
+
+```yaml
+reviewQueue:
+  - id: <feature id, matches a featureHistory entry or FR-id>
+    title: <short name>
+    intent: <one line>
+    checks: ["<quick sanity bullet>", ...]
+    demo: <path to the Phase-7 recording>
+    checklistVerdict: <Phase 7.5's result, reused>
+    status: pending-review | confirmed | drift-flagged
+    flaggedAs: <DECISIONS.md id, once flagged>
+```
+
+**Executive-level means batched, binary, and rare — not an interrupt.** Written into Catwalk's
+Review Queue at Phase 7.5, checked on the human's own cadence, never a blocking gate on the
+pipeline itself (the feature is already `shipped`/`integration-checked` by the time it appears
+here). Per item, the human does exactly one of two things:
+- **Confirmed** — one click, no explanation needed, the common case.
+- **Drift flagged** — files the SAME way a Phase 7.5 finding does: a Spec-Gap Ledger row if the
+  category of miss is worth checking on every future project, or a `docs/DECISIONS.md` entry with
+  a revisit-when trigger if it's local to this one. **Never a bespoke tracking mechanism** — this
+  checkpoint's whole value is catching drift cheaply, which a parallel bug-tracking format would
+  undercut immediately.
+
+**This is a Catwalk surfacing concern, not a new skill mechanic to build twice** — see "Visualizing
+build status" above. Filed as `catwalk#17` (queue view, reusing the `needsAttention` pattern
+`catwalk#6`/`#8` already established, as its own clearly-labeled lane distinct from "blocked" —
+confirming/flagging a review chunk is a different action from unblocking a failed build).
 
 ---
 
