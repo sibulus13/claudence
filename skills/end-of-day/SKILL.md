@@ -141,6 +141,17 @@ direction (Notion primary, repo durable). Reconcile toward the repo when they di
 where they did.** Consolidated with `/start-of-day`, which now cites this section rather than
 carrying its own copy of the cap.
 
+**Standing rule, owner 2026-09-09: check Notion's own current-day entry for outstanding tasks
+as PART of this sync, not only push repo state INTO it.** The sync above is one-directional
+(repo → Notion); this closes the other direction. Read today's Notion entry's own `Goals`/
+`Next` for anything the owner marked as intended for today that never got picked up in the
+session (an item added directly in Notion, not routed through the repo). **Anything outstanding
+for today is queued explicitly into tomorrow's `TODO.md` `Now`, under a "first thing" heading**
+— never left to be silently rediscovered when tomorrow's session reads `Now` cold. This is a
+genuine two-way reconciliation, not a formality: an item that exists only in Notion and never
+reaches `TODO.md` is invisible to the next session, which reads the repo, not Notion, per this
+section's own grounding-source rule above.
+
 **The Notion log is PUBLISHABLE, and agent-written content is marked as such.**
 
 | Rule | Why |
