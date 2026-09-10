@@ -288,15 +288,81 @@ def estate_drift_line() -> str:
         return f"Estate: {m.get('total', '?')} documents, no drift (measured {m.get('measured_at','?')[:16]})"
     return "Estate drift — " + " · ".join(bits) + f" (measured {m.get('measured_at','?')[:16]})"
 
+
+# A compaction summary is the ONE artifact most likely to be believed durable and not be: it
+# reads like a record, but it lives only in this turn's context and is itself re-summarized
+# (lossily) at the NEXT compaction. This block answers "what did compaction just produce, and
+# how much of it is actually backed by a file on disk" so that gap is visible immediately after
+# compaction rather than discovered two compactions later when the fact is simply gone.
+def compact_receipt_lines(root: str, session_id: str, todo_now_nonempty: bool) -> list:
+    import json
+    if not session_id:
+        return []
+    sessions_dir = os.path.expanduser('~/.claude/telemetry/sessions')
+    log = os.path.join(sessions_dir, '%s.jsonl' % session_id)
+    if not os.path.isfile(log):
+        return []
+    summary = None
+    try:
+        with open(log, 'r', encoding='utf-8') as fh:
+            for line in fh:
+                try:
+                    row = json.loads(line)
+                except Exception:
+                    continue
+                if row.get('event') == 'compact':
+                    summary = row.get('summary') or ''
+    except Exception:
+        return []
+    if summary is None:
+        return []
+
+    uncommitted = 0
+    try:
+        r = subprocess.run(['git', '-C', root, 'status', '--porcelain'],
+                           capture_output=True, text=True, timeout=5)
+        if r.returncode == 0:
+            uncommitted = len([ln for ln in r.stdout.splitlines() if ln.strip()])
+    except Exception:
+        pass
+
+    lines = ['Post-compact receipt — what is durably saved right after this compaction:']
+    if todo_now_nonempty:
+        lines.append('  TODO.md "## Now" is non-empty (shown above) — that is the durable '
+                     'baseline. Anything the compaction summary you just received adds beyond '
+                     'it is NOT yet saved anywhere outside this turn\'s context.')
+    else:
+        lines.append('  TODO.md "## Now" is EMPTY — nothing from before this compaction is '
+                     'durably recorded; the summary you just received in your own context is '
+                     'the only copy of it that exists anywhere.')
+    if uncommitted:
+        lines.append('  %d tracked path(s) have uncommitted changes (git status) — file-backed '
+                     'already (safer than summary-only text) but not yet committed.' % uncommitted)
+    if not summary:
+        lines.append('  Note: this hook\'s own PostCompact log has no summary text to check '
+                     'against (Claude Code does not pass it through that channel here) — the '
+                     'only place the real compaction summary exists is what YOU were just '
+                     'handed in this turn\'s context. Read it back now.')
+    lines.append('  ACTION: before continuing the user\'s task, diff the compaction summary in '
+                 'your own context against TODO.md/DECISIONS.md — anything it states that '
+                 'neither file backs yet, write in now. One-time reconciliation per compaction, '
+                 'not a standing narration.')
+    return lines
+
 def main():
     try:
         raw = sys.stdin.read()
     except Exception:
         raw = ''
     cwd = None
+    source = None
+    session_id = None
     if raw and raw.strip():
         try:
-            cwd = (json.loads(raw) or {}).get('cwd')
+            payload = json.loads(raw) or {}
+            cwd = payload.get('cwd')
+            source = payload.get('source')
+            session_id = payload.get('session_id')
         except Exception:
             cwd = None
     root = repo_root(str(cwd) if cwd else os.getcwd())
@@ -315,9 +381,11 @@ def main():
         parts.append('  %-22s %s' % (rel, what))
 
     todo = next((rel for rel, _ in found if os.path.basename(rel).lower() in ('todo.md', 'roadmap.md', 'backlog.md')), None)
+    todo_now_nonempty = False
     if todo:
         p = os.path.join(root, todo)
         block = section(p, NOW_HEADINGS, MAX_NOW_LINES)
+        todo_now_nonempty = bool(block)
         if block:
             parts.append('')
             parts.append('Open now, from %s:' % todo)
@@ -371,6 +439,12 @@ def main():
     if drift:
         parts.append('')
         parts.append(drift)
+
+    if source == 'compact':
+        receipt = compact_receipt_lines(root, str(session_id or ''), todo_now_nonempty)
+        if receipt:
+            parts.append('')
+            parts.extend(receipt)
 
     sys.stdout.write(json.dumps({
         'hookSpecificOutput': {
