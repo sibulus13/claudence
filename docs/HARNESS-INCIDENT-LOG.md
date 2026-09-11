@@ -13,6 +13,15 @@ frequency, severity, risk, and — required, not optional — **the patch applie
 not just a description of the workaround. Documenting without patching the source is an
 incomplete entry.
 
+**Tightened 2026-09-10 (direct user instruction):** the 2-3× threshold above governs when a row
+graduates to a full RCA writeup (frequency/severity/risk analysis) — it does NOT gate whether a
+manual fix gets a deterministic check. **Every manual intervention gets its own deterministic
+gate at the time it's fixed, first occurrence, no threshold**, whenever one is feasible (a pure
+function's behavior is checkable; "verify by eye" is not a gate). Only the depth of the RCA
+scales with recurrence — the gate itself never waits for a pattern to repeat. If no gate is
+feasible for a given fix (truly one-off, no generalizable check), say so explicitly in the row
+rather than silently skipping it.
+
 | Date | Project(s) | What happened | Category | Occurrence # | Manual fix applied |
 |---|---|---|---|---|---|
 | 2026-09-09 | nuwa | D109 claimed twice (D102-fix vs D103-fix branches); D110 claimed twice (concurrent-render note vs FR-13 closure) | id-collision | 1-2 | Renumbered the less-referenced entry, merge-time |
@@ -23,6 +32,7 @@ incomplete entry.
 | 2026-09-09 | catwalk | `#8`'s GitHub issue body was `foreman#8`'s entire spec, not its own — wrong from the very first `gh issue create` call (confirmed via `userContentEdits`: no edit history) | cross-repo-content-mixup | 1 | Restored the correct body from the original in-session diagnosis |
 | 2026-09-09 | catwalk | `#16`'s dispatched PR said "closes #16" in its own progress narration but the actual PR body had no closing keyword — Foreman's `prClosesIssue` correctly flagged it; not a harness bug, a build-agent-output gap | pr-closing-keyword-narration-drift | 1 | Added `Closes #16` to the PR body directly; work itself was already verified complete |
 | 2026-09-10 | nuwa, catwalk, foreman | A `backlogItems` entry already resolved (opened:true or removed) reappeared as `opened:false` in `docs/STATE.md` after a later, unrelated merge — self-scheduling discovery re-opened a duplicate GitHub issue for already-shipped work (nuwa#30 dup of #19, catwalk#25 dup of D-30/#23, foreman#31/#32 dup of #33/#36) | stale-backlogitems-resurrection | 3 | Closed each duplicate with an explanatory comment; root cause not yet patched at the source (see RCA-2) |
+| 2026-09-10 | catwalk | `featureHistory[].specWrittenAt` (unquoted YAML timestamp, auto-cast to a native `Date`) crashed Catwalk's OWN STATE.md schema validation live on its own status page — the same bug class `updatedAt` already hit once, fixed via a dual-shape `isoString` parser, but never generalized to this sibling field | ungated-yaml-timestamp-field | 1 | Fixed the field; per the tightened convention above, ALSO added `schema-date-fields.ts`'s gate immediately (first occurrence, no threshold wait) — scans every YAML-parsed schema for any future `*At`/`*Date` field on a bare `z.string()`, not just this one instance |
 
 ---
 
