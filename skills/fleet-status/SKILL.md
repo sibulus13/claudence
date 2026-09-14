@@ -1,7 +1,7 @@
 ---
 name: fleet-status
-description: Real status check across every Foreman-managed dark-factory repo — what's done, what's actively dispatching, what's genuinely blocked vs. just queued, and a duplicate sweep. Use whenever the user asks for a status check, "what's blocked", "what's coming up", or anything about Foreman's queue/fleet state.
-version: 1.0.0
+description: Real status check across every Foreman-managed dark-factory repo — what's done, what's actively dispatching, what's genuinely blocked vs. just queued, a duplicate sweep, and an audit of ideas/gaps that were diagnosed (Spec-Gap Ledger) but never actually queued for dispatch. Use whenever the user asks for a status check, "what's blocked", "what's coming up", or anything about Foreman's queue/fleet state.
+version: 1.1.0
 ---
 
 # /fleet-status
@@ -119,7 +119,41 @@ step) — these don't show up in `blockers` necessarily, they're just known cont
 yes (queued work, pacing, a re-approval you can do yourself) — it is NOT a
 blocker, don't report it as one. If no (only the user can supply it) — it is.
 
-### 6. Report
+### 6. Spec-Gap Ledger audit — ideas diagnosed but never queued
+
+Added 2026-09-14 after a real, confirmed finding: the cross-project Spec-Gap
+Ledger (`gap-log` mode / `~/.claude/docs/SPEC-GAP-LEDGER.md`) and each repo's
+`docs/STATE.md` `backlogItems` (what `backlog.js` actually turns into a
+dispatchable GitHub issue) are **two disconnected systems**. Writing a finding
+to the Ledger — the correct move in the moment, per the dark-factory skill's own
+"gap-log" entry mode — does NOT queue it for dispatch. Two real Foreman bugs
+(a PR-lookup false-negative, a hardcoded build-only dispatch mode) sat as prose
+in the Ledger for a full session each, fully diagnosed, with zero path to ever
+getting fixed autonomously, because nobody manually promoted them. This is
+exactly the gap the user asked this skill to start catching going forward.
+
+```bash
+grep -n "<repo-name>" ~/.claude/docs/SPEC-GAP-LEDGER.md   # per managed repo
+```
+
+For each Ledger row naming a managed repo: check whether its finding has a
+corresponding `docs/STATE.md` `backlogItems` entry (grep the row's own key
+phrase — a function name, a bug shape — against that repo's STATE.md) or an
+already-closed/merged issue referencing it. **A Ledger row with neither is a
+real, actionable gap sitting idle** — not because a spec is missing (the
+Ledger row often already contains enough detail to BE the spec), but because
+the diagnose step and the queue step never got bridged. Report these, and when
+the fix is small/well-understood enough to state as one, offer to promote it to
+a `backlogItems` entry right there (matching the precedent: two real entries
+promoted this way, 2026-09-14) rather than leaving it to rot for another cycle.
+
+**This is a distinct category from `docs/STATE.md`'s own `roadmap:` nodes**
+(a `roadmap` node with `status: not-started` — a real initiative someone
+already scoped with FR/interface/gates) — a Ledger-only finding is earlier-stage
+than that: an observed defect or gap, not yet even decomposed into a roadmap
+node's shape. Report both, but don't conflate them.
+
+### 7. Report
 
 Terse-Output Contract ledger, four buckets:
 
@@ -128,8 +162,13 @@ Terse-Output Contract ledger, four buckets:
   (name what's pacing it — memory capacity, concurrency — if relevant).
 - ⛔ **Needs you** — ONLY genuine hard blockers (step 5) and genuine needs-human
   decisions (step 3's second bucket). Never list queued/transient items here.
-- 🗺️ **Roadmap** — named but not actively moving (a spec'd-but-undispatched
-  feature, a design agreed but not built).
+- 🗺️ **Roadmap** — two distinct sub-kinds, both surfaced, not merged into one
+  list: (a) an authored `roadmap:` node not yet started or in progress (a real
+  initiative already scoped — FR/interface/gates exist); (b) a step 6 finding —
+  a diagnosed gap or "we talked about doing X" idea sitting in the Spec-Gap
+  Ledger with no `backlogItems`/roadmap entry yet, i.e. genuinely pre-spec. Name
+  which kind each item is; don't let a vague idea read as equally scoped to a
+  real roadmap node, or vice versa.
 
 Note any duplicates closed and any stale-entry pattern flagged, even though
 they're not part of the four buckets — they're a process finding, say so plainly.
