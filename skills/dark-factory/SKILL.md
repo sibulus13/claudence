@@ -31,6 +31,26 @@ Phases -1, 0–3, and 5–7.5 are this skill. **Phase 4 is a delegation, not a r
 
 ---
 
+## Standing preferences — check before Phase 1, every invocation
+
+**Read `~/.claude/docs/ORCHESTRATION-PREFERENCES.md` before starting new work** —
+it is the durable, editable customization layer for exactly the kind of policy
+this skill's own Phase 2.5/7.5 sections describe in the abstract (the
+tier-based auto-advance rule, what "done" means). Concretely, as of 2026-09-14:
+an experimental preference removes the extra human-approval gate this skill's
+own sessions had been layering on top of `pre-traffic`'s already-permissive
+default for some features — Phase 2.5's auto-advance rule below now applies at
+face value for `pre-traffic` work, with no second gate, unless that file says
+otherwise for a specific project. It also clarifies the tier boundary itself
+(a project's CURRENT state — real users, real money moving NOW — never a
+stated future target) and makes Phase 7.5's `consolidate` follow-up mandatory,
+not occasional (see that file's own §3, and this doc's Phase 7.5 section below).
+Check this file fresh each invocation — it changes independently of this
+skill's own file, and a stale read is exactly the kind of policy-in-chat-history
+problem it exists to prevent.
+
+---
+
 ## Entry modes — decomposable, not all-or-nothing
 
 **The full chain above is one mode, not the only mode.** Any subset is independently invocable —
@@ -385,6 +405,18 @@ home now, per the standing Repository Organization rule — `D:\repo\<Category>\
 bare at the root. State the chosen category. `git init`. Create `docs/SPEC.md`, `docs/DESIGN.md`,
 `docs/DECISIONS.md`, `docs/STATE.md` from "Spec template" below, plus the `Repo path` +
 `CLAUDE.md` "Helm Integration" step from "Syncing to Helm's Nexus workspace" above.
+
+**Sketch-and-sign-off, before a UI/design-facing issue is ever created.** Adopted 2026-09-10
+(direct user correction, catwalk's Activity-sidebar redesign): a `feature-add` issue for
+UI/design-facing work must never be filed from a one-line idea and left for the build agent to
+interpret. Before `gh issue create`, sketch the concrete design in chat — a diagram (state/flow,
+Mermaid-first) plus, for anything with distinct states, what's observably true/shown *in each
+state* — grounded in data the system actually captures (read the real transitions from source,
+never invent a plausible-looking one), and get explicit user sign-off. **The issue body is then
+that confirmed design, verbatim** — not a restatement the build agent has to reinterpret. This is
+a lightweight version of `spec-only` mode: a chat-sketch + sign-off, not the full idea-bank/
+multi-domain-review machinery, which is overkill at this scale. Skip this step only for a change
+with no meaningful design surface (a copy fix, a one-line bugfix).
 
 ---
 
@@ -905,6 +937,20 @@ first, instead of re-deriving it from scratch. Refresh `TRACE.md` on every futur
 (a re-run after a fix, or a scheduled re-check), not just the first one.
 
 Update `docs/STATE.md`'s build-status visualization to match reality at the same time.
+
+**Mandatory, added 2026-09-14 (`~/.claude/docs/ORCHESTRATION-PREFERENCES.md` §3):
+the moment this phase sets `status: shipped` (or `integration-checked`), invoke
+`consolidate` mode against this feature's own spec range in the SAME session,
+not as a separately-remembered follow-up.** This is what turns Phase 2.5's
+auto-advance (no extra human click, per that same preferences file's §1) into a
+monitored process instead of a one-way door — every completed feature gets
+checked for what actually shipped vs. what the spec imagined, and any recurring
+pattern found feeds `docs/SPEC-GAP-LEDGER.md`, which `fleet-status` now audits
+for anything that never got promoted to real dispatchable work. Skip only when
+`consolidate`'s own preconditions genuinely don't apply (no `Spec-Baseline`
+commit exists AND this is the project's very first-ever feature, so there is no
+prior state to diff against) — state that explicitly, don't silently omit the
+step.
 
 **Auto-promote to `shipped`, per the project's own `definitionOfDone.shippedMeans`
 (Phase 2).** Added 2026-09-08 — closes the gap this convention was built to fix: a project sitting
