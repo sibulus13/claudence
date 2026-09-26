@@ -61,7 +61,7 @@ existing project reads as `feature-add`, a bare idea with nothing built yet read
 |---|---|---|---|
 | **`new-product`** (default) | -1 → 7.5, full chain | nothing | Building something from zero |
 | **`feature-add`** | 0 → 7.5; kill gate (1) scoped to the increment; phase 2's FR/NFR are appended to the existing `SPEC.md` with new IDs, not a fresh document; phase 2.5 reviews only the diff | -1 (idea intake), repo scaffold | Iterating a new feature onto a product this pipeline (or anything else) already built |
-| **`spec-only`** | -1 → 2.5 | 3 onward | Want a validated, reviewed, locked spec, not ready to build yet — e.g. queuing work, or handing the spec to a human |
+| **`spec-only`** | -1 → 2.5 (under Foreman: -1 → 2 only; 2.5 runs as a separate `review-only` session, never the author's own, per the independent-spec-review work item in Foreman's `docs/work/independent-spec-review/`) | 3 onward | Want a validated, reviewed, locked spec, not ready to build yet — e.g. queuing work, or handing the spec to a human |
 | **`review-only`** | 2.5 only, against an already-written doc suite | everything else | Retrofitting the multi-domain review onto a spec authored outside this pipeline |
 | **`build-only`** | 3 → 7.5 | -1, 0, 1, 2, 2.5 | Spec already locked (by a prior `spec-only` run, or by hand); resume straight into decomposition |
 | **`integration-check`** | 7.5 only | everything else | Periodic health check on an already-shipped project — re-verify it still matches its spec, refresh `docs/TRACE.md` |
