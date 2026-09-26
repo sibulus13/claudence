@@ -637,6 +637,8 @@ in without editing existing logic:
 
 ---
 
+**Ask upfront, measured: the assumptions ledger (added 2026-09-26).** Phase 2 ends by writing `assumptions:` into the work item's README frontmatter, one row each: `{id, assumption, confidence: high|medium|low, reversible: bool}`. Any row that is **low confidence AND not reversible** is a real clarification. Set `needsAttention: true` with `attentionClass: hard-to-reverse-choice` and ask before locking. This is the only upfront question the Attention budget allows. Everything else proceeds on its assumption. Foreman's factory scorecard compares clarifications asked at spec against drift found after ship, so "did we ask enough upfront" is a number rather than a feeling.
+
 ## 2.5 · Multi-domain adversarial review of the spec itself — the lock gate
 
 **This runs on the doc suite (SPEC/DESIGN/DECISIONS), before any component is decomposed or

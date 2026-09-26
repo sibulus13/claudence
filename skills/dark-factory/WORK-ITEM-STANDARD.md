@@ -74,3 +74,15 @@ Why experiments differ: an experiment is allowed to be wrong. It records a hypot
 ## Roll-up (what "add up each hierarchy level" means)
 
 At every C4 level, Catwalk aggregates the work items whose `touches` fall under that node. It shows counts by `status` and a per-layer change badge (A/C/F/D). Clicking in narrows the view, and the breadcrumb climbs back out. The fleet level rolls up across projects.
+
+## Project `docs/DESIGN.md` diagram contract (added 2026-09-26)
+
+Catwalk renders each project's design from these exact headings, so each repo must use them. The contract applies where the project has the concern; where it does not, write the heading with "n/a: <reason>".
+
+| Heading | Shows | Mermaid |
+|---|---|---|
+| `## Architecture` + `### <container-id>` | C1/C2 system and containers, plus C3 components per container | flowchart |
+| `## User flows` | the user's core branching paths | flowchart / stateDiagram |
+| `## Call chains` | runtime sequence of each key operation | sequenceDiagram |
+| `## Data schema` | entities and relations the project owns | erDiagram / classDiagram |
+| `## State machines` | lifecycles of the key entities | stateDiagram |
