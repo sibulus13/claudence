@@ -229,7 +229,12 @@ Before classifying a missing credential as a hard blocker, check whether an agen
 Do NOT pause for: build warnings, lint noise, test scaffolding gaps, "should I continue?", cosmetic decisions, **reversible/adjustable decisions (pick a sensible default, log it in the decision journal with a revisit-trigger, and proceed)**, or anything resolvable by reading existing code. Do NOT pause for credentials that have MCP or CLI paths.
 
 ### Testing contract
-Tests alongside implementation, never after. Unit (Vitest/pytest) on every function and handler; Integration (Vitest+MSW / pytest fixtures) at external boundaries; E2E (Playwright) for critical journeys. Priority: correctness → regression surface → happy path. Mock all external services in CI.
+**Minimal tests, three kinds only (owner rule, 2026-09-26; replaces "unit test every function").** A test exists only when it is one of:
+1. **Sanity/smoke**: the thing starts, the happy path runs, and the gate command is meaningful.
+2. **Requirement / acceptance criterion**: one test per AC. It **freezes the intent** ("what we meant"), not the implementation, and names its AC/FR id.
+3. **Regression, written test-first when a regression actually happens**: reproduce the bug as a failing test, then fix it (TDD). The test names the incident.
+
+No speculative edge-case tests, no coverage-chasing, and no tests that pin implementation details. A found caveat is a regression (kind 3). Integration tests live only at real external boundaries, with external services mocked in CI. The cycle's design step writes this as the gate plan (`~/.claude/skills/dark-factory/CYCLE.md`).
 
 ### Run summary / checkpoint
 At loop completion OR any natural stop not caused by user interruption, emit: **Accomplished** · **Trade-offs** · **Decisions** · **Requires manual validation** · **Blocked**. Keep it compact — this is the handoff that lets the next session start without re-deriving context.

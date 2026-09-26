@@ -80,6 +80,7 @@ The **Design** step writes `## Gate plan` into the work item README and returns 
 | UI, visual output, generated text or media, "does it feel right" | **qualitative**: rubric-scored judgement, demo video, before/after | advisory, as review evidence (Attention budget) |
 | UI behavior | both: a deterministic behavior test **and** qualitative evidence | blocking + advisory |
 
+- **Only three kinds exist:** sanity/smoke · one per acceptance criterion (it freezes intent) · regression written test-first when a regression actually happens. Anything else is padding (global CLAUDE.md, Testing contract).
 - **Minimum, not maximum.** Add one check per real regression risk (an acceptance criterion, a coupling point, a known caveat). The design reviewer flags gaps **and** padding.
 - **Caveat → test.** Every review finding, discovered caveat or production bug gets a pinning regression test in the same fix. The reviewer rejects a fix that has none. This is how the suite grows: from real failures, not from speculation.
 - The integration cycle's gate plan becomes the project's standing regression gate (the deploy blocker, per the global test-gate rule).
