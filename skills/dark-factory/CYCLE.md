@@ -91,3 +91,6 @@ The **Design** step writes `## Gate plan` into the work item README and returns 
 2. **Create the worktree from the latest `origin/<default>` immediately before the call**, and **do not edit the work item's files elsewhere while the cycle runs.** In pilot 1, redesign docs committed to master mid-cycle made the reviewer's worktree stale, which it rightly flagged as critical.
 3. **Reviewers first check that the item actually changed** (`git status` / `diff`). An unchanged item gets exactly one finding ("no changes produced") instead of a re-review of stale content.
 4. After the cycle, **commit its `cycles/<cycleId>/` trace with the work**. The trace is part of the evidence.
+5. **Only R findings block** (from pilot 2: budget-exhausted on a 25-AC spec whose round-3 findings were precision polish). Each finding is rated R/F/H (Real-now / Future / Hardening, the rating from the old §2.5 review). The script passes a review with no R findings; F and H are recorded as `deferred` on the step. Reviewers get the earlier round's findings and must first mark each resolved or still open.
+6. **Budget = the larger of the caller's size and the designer's own estimate** (pilot 2 was capped at M while its designer sized it L).
+7. **`startAt: "review"` + `priorFindings`** re-verifies an existing design without redesigning it.

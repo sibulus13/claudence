@@ -36,8 +36,10 @@ const FINDING = {
     where: { type: 'string', description: 'absolute path:line, or doc section' },
     what: { type: 'string' },
     fix: { type: 'string' },
+    rating: { type: 'string', enum: ['R', 'F', 'H'], description: 'R = real now: blocks, the item would be built wrong or is untestable. F = future: valid but deferrable. H = hardening: polish. Only R blocks.' },
+    priorId: { type: 'string', description: 'id of the earlier-round finding this repeats, if it is unresolved' },
   },
-  required: ['id', 'severity', 'class', 'where', 'what', 'fix'],
+  required: ['id', 'severity', 'class', 'where', 'what', 'fix', 'rating'],
 }
 const DESIGN_OUT = {
   type: 'object',
@@ -130,7 +132,7 @@ UI work usually needs both, a deterministic behavior test plus before/after or d
   return out
 }
 
-async function review(kind, iteration) {
+async function review(kind, iteration, priorFindings) {
   const isDesign = kind === 'design-review'
   const out = await agent(
     `${AUTHORITY}
@@ -139,11 +141,18 @@ You did not write this. Your job is to find what does NOT meet the intent in ${W
 First run \`git -C ${a.repo} status --short\` and \`git -C ${a.repo} diff --stat\`. If nothing under ${WORK_DIR} changed since the step you are reviewing, the only finding is "no changes produced" (critical, class design). Do not review stale content.
 ${isDesign ? `Review the design files under ${WORK_DIR}/: contradictions, missing edge cases, contract gaps, overlapping owns globs, and untestable criteria.` : `Review the implementation within owns (${owns}). Run the test command yourself: cd ${a.repo} && ${a.testCommand}. Report the REAL last line. Check spec fidelity, contract adherence, edge cases, and edits outside the owned files.`}
 ${isDesign ? 'Check the gate plan: is each real regression risk covered by exactly one check of the right kind? Flag both gaps and padding (tests that pin nothing at risk).' : 'Check that every blocking gate-plan check exists and runs inside the test command, and that every previously fixed finding has its pinning regression test. A caveat you discover now needs a finding whose fix names the test to add.'}
+${priorFindings && priorFindings.length ? `Earlier rounds raised these. FIRST check each: resolved, or still open (re-list it with priorId). Add a NEW finding only if it is genuinely blocking (R):
+${findingsText(priorFindings)}
+` : ''}Rate every finding R/F/H: R only if the item would be built WRONG or a criterion is UNTESTABLE. Missing polish, precision or nice-to-have is F or H, and F/H never block.
 Classify each finding by where the ROOT CAUSE lives: design / implementation / test / spec. Verdict: "pass" only when there are zero critical findings and (for code) green tests. Otherwise choose "fix-design" if any critical root cause is in design or spec, else "fix-implementation".`,
     { label: `${kind}:${a.workItem}#${iteration}`, phase: isDesign ? 'Design review' : 'Review', schema: REVIEW_OUT, agentType: 'reviewer', effort: 'high' },
   )
   const safe = out || { verdict: 'fix-implementation', testResult: 'reviewer returned nothing', findings: [] }
-  record(kind, iteration, safe)
+  const blocking = (safe.findings || []).filter((f) => f.rating === 'R')
+  // Only R blocks: an adversarial reviewer on a large item never runs out of F/H
+  // polish (pilot 2 ran out of budget on "state the minimum font size as a number").
+  if (safe.verdict !== 'pass' && blocking.length === 0 && !(kind === 'review' && /fail|error/i.test(safe.testResult || ''))) safe.verdict = 'pass'
+  record(kind, iteration, { ...safe, blocking: blocking.length, deferred: (safe.findings || []).filter((f) => f.rating !== 'R').map((f) => f.id) })
   return safe
 }
 
@@ -162,12 +171,16 @@ Run: cd ${a.repo} && ${a.testCommand}. Get it green, then report the REAL final 
 
 // ---- the cycle ----
 let iteration = 1
-let d = await design(iteration, null)
-const size = a.size || d?.size || 'M'
+// startAt: 'review' re-checks a design that already exists in the worktree (cheap re-verify).
+let d = a.startAt === 'review' ? { size: a.size || 'M' } : await design(iteration, null)
+const RANK = { S: 1, M: 2, L: 3 }
+// The larger of the caller's size and the designer's own estimate: pilot 2 was
+// capped at M while its designer (correctly) sized the spec L.
+const size = [a.size, d?.size].filter((x) => RANK[x]).sort((x, y) => RANK[y] - RANK[x])[0] || 'M'
 const budget = Math.min(MAX_BUDGET, a.budget || BUDGET_BY_SIZE[size] || 2)
 log(`cycle ${a.cycleId}: scope=${a.scope} size=${size} fix-budget=${budget}`)
 
-let dr = await review('design-review', iteration)
+let dr = await review('design-review', iteration, a.priorFindings || null)
 let verdict = dr.verdict === 'pass' ? 'pass' : 'fix-design'
 let lastFindings = dr.findings
 let fixRounds = 0
@@ -176,26 +189,26 @@ let fixRounds = 0
 while (verdict === 'fix-design' && fixRounds < budget) {
   fixRounds++; iteration++
   d = await design(iteration, lastFindings)
-  dr = await review('design-review', iteration)
+  dr = await review('design-review', iteration, lastFindings)
   verdict = dr.verdict === 'pass' ? 'pass' : 'fix-design'
   lastFindings = dr.findings
 }
 
 if (verdict === 'pass' && a.scope !== 'spec') {
   await implement(iteration, null)
-  let r = await review('review', iteration)
+  let r = await review('review', iteration, null)
   verdict = r.verdict; lastFindings = r.findings
   while (verdict !== 'pass' && fixRounds < budget) {
     fixRounds++; iteration++
     if (verdict === 'fix-design') {
       d = await design(iteration, lastFindings)
-      const dr2 = await review('design-review', iteration)
+      const dr2 = await review('design-review', iteration, lastFindings)
       if (dr2.verdict !== 'pass') { verdict = 'fix-design'; lastFindings = dr2.findings; continue }
       await implement(iteration, null)
     } else {
       await implement(iteration, lastFindings)
     }
-    r = await review('review', iteration)
+    r = await review('review', iteration, lastFindings)
     verdict = r.verdict; lastFindings = r.findings
   }
 }
