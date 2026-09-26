@@ -64,7 +64,7 @@ A layer declared `none` has no file. A layer declared changed with no file fails
 | **feature** | required (may be `none`) | required | **required** | required (may be `none`) | acceptance criteria | demo video **or** before/after |
 | **experiment** | forbidden on main until promoted | optional | optional | optional | hypothesis · metric · control vs variant · kill/adopt threshold · timebox · **result** | result table or chart. On adopt, status becomes `promoted` and a **new feature item** is opened carrying the real layer deltas |
 | **research** | none | none | none | none | question · sources · findings · recommendation | findings doc (not a review item) |
-| **bugfix** | only if the root cause is structural | the layer that held the bug | observed vs expected | only if the data was wrong | root cause (mechanism, not instance) | failing → passing regression test |
+| **bugfix** | only if the root cause is structural | the layer that held the bug | observed vs expected | only if the data was wrong | root cause (mechanism, not instance) · `introducedBy: <repo>#<issue>@<mergeSha>` (from the work ledger, when the causing build is known) | failing → passing regression test |
 | **refactor** | **required** before/after | **required** before/after | must be `none` (behaviour-preserving, asserted by unchanged tests) | `none` or migration | motivation · what got simpler (measured) | before/after diagrams |
 | **integration** | **required** (a new external edge) | required | required | **required** (the contract) | the external system's contract and failure mode | contract test + demo |
 | **data-collection** | none | optional | optional | **required** (collected schema, source, retention) | sample size · stopping rule | sample + row count |
