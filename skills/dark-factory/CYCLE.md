@@ -69,3 +69,17 @@ flowchart TD
 - A small slice skips the contract cycle and runs a single component cycle.
 - The kill gate and reuse check (REFERENCE §0–§1) run once, before the spec cycle.
 - A budget-exhausted cycle sets `attentionClass: repair-budget-exhausted`, which is the only way a cycle reaches the owner (the Attention budget).
+
+## Gate plan: tests are designed, minimal, and grow from caveats (owner rule, 2026-09-26)
+
+The **Design** step writes `## Gate plan` into the work item README and returns it as `gatePlan[]`. Each entry is `{risk, kind, check, gate}`:
+
+| Scope / change | kind | gate |
+|---|---|---|
+| logic, schemas and contracts, data transforms, state machines, APIs | **deterministic**: unit / golden / contract / integration assertion | blocking (inside `testCommand`) |
+| UI, visual output, generated text or media, "does it feel right" | **qualitative**: rubric-scored judgement, demo video, before/after | advisory, as review evidence (Attention budget) |
+| UI behavior | both: a deterministic behavior test **and** qualitative evidence | blocking + advisory |
+
+- **Minimum, not maximum.** Add one check per real regression risk (an acceptance criterion, a coupling point, a known caveat). The design reviewer flags gaps **and** padding.
+- **Caveat → test.** Every review finding, discovered caveat or production bug gets a pinning regression test in the same fix. The reviewer rejects a fix that has none. This is how the suite grows: from real failures, not from speculation.
+- The integration cycle's gate plan becomes the project's standing regression gate (the deploy blocker, per the global test-gate rule).

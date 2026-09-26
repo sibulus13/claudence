@@ -400,10 +400,10 @@ A project may still keep its own domain-specific personas alongside these (e.g. 
 `quant-gate.md` — a stock-research statistical gate, not a general persona) in its own
 `.claude/agents/`; project-level and global agent files compose rather than conflict — the specific
 one wins for its own repo, per the existing "most specific wins" rule for scoped tools/skills. The
-canonical fan-out shape that dispatches these (Design → Design Review → Build → Build Review +
-Adversarial Audit → Fix, looped until converged) is saved as a reusable template at
-`~/.claude/workflows/fanout-design-build-audit.js` — invoke it via `Workflow({scriptPath: ...})`
-with a `components` list rather than re-authoring the shape from scratch each time.
+canonical unit that dispatches these is the **cycle** (Design → Design review → Implement → Review, size-scaled
+fix budget 1–3, UUID-traced steps; superseded fanout-design-build-audit 2026-09-26) at
+`~/.claude/workflows/cycle.js` (spec: `~/.claude/skills/dark-factory/CYCLE.md`) — invoke it via `Workflow({scriptPath: ...})`
+with per-scope args (one call per spec / contract / component / integration) rather than re-authoring the shape.
 
 **How to sequence personas on a non-trivial task:**
 1. Questioner → surface unknowns (skip if requirements are clear)

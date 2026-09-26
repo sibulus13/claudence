@@ -46,6 +46,8 @@ layers:                    # EVERY layer declared, including "none"; silence is 
 evidence: { demo: evidence/demo.webm, before: evidence/before.png, after: evidence/after.png }
 ```
 
+The README also carries `## Gate plan` (risk · deterministic|qualitative · check · blocking|advisory), which the design step of the cycle writes. See CYCLE.md.
+
 ### Each layer file = before → after, visual-first
 
 | File | C4 level | Must show |

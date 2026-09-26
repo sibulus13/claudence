@@ -46,8 +46,22 @@ const DESIGN_OUT = {
     filesWritten: { type: 'array', items: { type: 'string' } },
     size: { type: 'string', enum: ['S', 'M', 'L'], description: 'S <= 2 files and <= 3 requirements; M <= 6 files; L otherwise' },
     assumptions: { type: 'array', items: { type: 'object', properties: { assumption: { type: 'string' }, confidence: { type: 'string', enum: ['high', 'medium', 'low'] }, reversible: { type: 'boolean' } }, required: ['assumption', 'confidence', 'reversible'] } },
+    gatePlan: {
+      type: 'array',
+      description: 'MINIMUM set: one check per real regression risk (an acceptance criterion, a coupling point, a known caveat), never coverage for its own sake',
+      items: {
+        type: 'object',
+        properties: {
+          risk: { type: 'string', description: 'the behavior that must not regress' },
+          kind: { type: 'string', enum: ['deterministic', 'qualitative'], description: 'deterministic = unit/golden/contract/integration/e2e with an exact assertion; qualitative = rubric-scored judgement, demo, or before/after review' },
+          check: { type: 'string', description: 'the exact test file + case, or the rubric and evidence artifact' },
+          gate: { type: 'string', enum: ['blocking', 'advisory'], description: 'blocking = part of testCommand, fails the merge; advisory = recorded evidence only' },
+        },
+        required: ['risk', 'kind', 'check', 'gate'],
+      },
+    },
   },
-  required: ['summary', 'filesWritten', 'size', 'assumptions'],
+  required: ['summary', 'filesWritten', 'size', 'assumptions', 'gatePlan'],
 }
 const REVIEW_OUT = {
   type: 'object',
@@ -88,7 +102,11 @@ async function design(iteration, priorFindings) {
 Brief: ${a.brief || '(read it from ' + WORK_DIR + '/README.md)'}
 Produce ${WHAT[a.scope]} under ${WORK_DIR}/. Follow C:/Users/Michael/.claude/skills/dark-factory/WORK-ITEM-STANDARD.md. Contract to honor: ${contract}. Owned files: ${owns}.
 ${priorFindings ? `REVISE the design to resolve these review findings (the root cause is in design):\n${findingsText(priorFindings)}` : ''}
-Design only: write no implementation code. Estimate the size honestly. List every assumption, and mark low-confidence irreversible ones truthfully.`,
+Design only: write no implementation code. Estimate the size honestly. List every assumption, and mark low-confidence irreversible ones truthfully.
+Write the GATE PLAN into ${WORK_DIR}/README.md under "## Gate plan" and return it. Keep it to the MINIMUM number of checks that catch regression risk: one per acceptance criterion or coupling point that could actually break. Choose per risk:
+- deterministic: exact assertion, blocking. Use it for logic, schemas and contracts, data transforms and state machines.
+- qualitative: rubric or evidence, advisory unless the owner's review gates it. Use it for UX/visual output, generated text or media, and "does it feel right".
+UI work usually needs both, a deterministic behavior test plus before/after or demo evidence. Pure logic is deterministic only. Every caveat or finding already known for this item MUST appear as a risk with its own pinning check.`,
     { label: `design:${a.workItem}#${iteration}`, phase: 'Design', schema: DESIGN_OUT, agentType: 'designer' },
   )
   record('design', iteration, out || { summary: 'designer returned nothing', filesWritten: [], size: 'M', assumptions: [] })
@@ -101,6 +119,7 @@ async function review(kind, iteration) {
     `You are an INDEPENDENT ADVERSARIAL REVIEWER (${kind}) for cycle ${a.cycleId}, iteration ${iteration}, scope "${a.scope}", work item ${a.workItem} in ${a.repo}.
 You did not write this. Your job is to find what does NOT meet the intent in ${WORK_DIR}/README.md and the contract (${contract}), not to confirm that it is fine.
 ${isDesign ? `Review the design files under ${WORK_DIR}/: contradictions, missing edge cases, contract gaps, overlapping owns globs, and untestable criteria.` : `Review the implementation within owns (${owns}). Run the test command yourself: cd ${a.repo} && ${a.testCommand}. Report the REAL last line. Check spec fidelity, contract adherence, edge cases, and edits outside the owned files.`}
+${isDesign ? 'Check the gate plan: is each real regression risk covered by exactly one check of the right kind? Flag both gaps and padding (tests that pin nothing at risk).' : 'Check that every blocking gate-plan check exists and runs inside the test command, and that every previously fixed finding has its pinning regression test. A caveat you discover now needs a finding whose fix names the test to add.'}
 Classify each finding by where the ROOT CAUSE lives: design / implementation / test / spec. Verdict: "pass" only when there are zero critical findings and (for code) green tests. Otherwise choose "fix-design" if any critical root cause is in design or spec, else "fix-implementation".`,
     { label: `${kind}:${a.workItem}#${iteration}`, phase: isDesign ? 'Design review' : 'Review', schema: REVIEW_OUT, agentType: 'reviewer', effort: 'high' },
   )
