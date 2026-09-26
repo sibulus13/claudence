@@ -173,7 +173,7 @@ One JSON object per line (same convention as this codebase's other JSONL logs �
 `corrections.jsonl`, `reasoner_failures.jsonl`):
 
 ```json
-{"phase": "<id>", "completedAt": "<ISO>", "summary": "<one sentence, what actually happened>", "needsAttention": false, "attentionReason": "<required if needsAttention is true, else omit>", "artifacts": [{"label": "<name>", "path": "<repo-relative>"} , {"label": "<name>", "url": "<link>"}], "graph": {"nodes": [{"id": "<component key>", "label": "<short>", "status": "done|live|queued|pending|failed", "dependsOn": ["<other component key>"], "satisfies": ["FR-1"]}]}}
+{"phase": "<id>", "completedAt": "<ISO>", "summary": "<one sentence, what actually happened>", "needsAttention": false, "attentionReason": "<required if needsAttention is true, else omit>", "attentionClass": "<required if needsAttention is true: credentials-no-agentic-path | irreversible-approval | repair-budget-exhausted | hard-to-reverse-choice | self-healing>", "artifacts": [{"label": "<name>", "path": "<repo-relative>"} , {"label": "<name>", "url": "<link>"}], "graph": {"nodes": [{"id": "<component key>", "label": "<short>", "status": "done|live|queued|pending|failed", "dependsOn": ["<other component key>"], "satisfies": ["FR-1"]}]}}
 ```
 
 **`needsAttention` — the handoff signal between steps, not just a historical log.** Added
@@ -689,6 +689,10 @@ human's yes/redirect on *that*, not on the prose. This is the human's actual rev
 the written spec stays the reviewers' and phase 7.5's. A redirect at this point (something looks
 wrong, missing, or not what was pictured) routes back into phase 2 like any other R finding —
 cheaper here than after phase 4 has already spent build effort against the wrong shape.
+**Tier-scoped (2026-09-25, global CLAUDE.md "Attention budget"):** on `live` the wireframe is a
+blocking yes/redirect. On `pre-traffic` it is **published and non-blocking**: the pipeline
+continues. The human's gate for a pre-traffic feature is the Review Queue's evidence (a demo video
+or a before/after screenshot pair), not the wireframe.
 
 **Every review round gets a durable record — the same idea as D15's build-records,
 applied to review instead of build.** Added 2026-09-08 after a spec went 12 rounds deep
@@ -1064,6 +1068,8 @@ reviewQueue:
     intent: <one line>
     checks: ["<quick sanity bullet>", ...]
     demo: <path to the Phase-7 recording>
+    before: <repo-relative screenshot of the surface BEFORE this change, when it changed an existing one>
+    after: <repo-relative screenshot of the same surface AFTER — pair with `before`>
     checklistVerdict: <Phase 7.5's result, reused>
     status: pending-review | confirmed | drift-flagged
     flaggedAs: <DECISIONS.md id, once flagged>

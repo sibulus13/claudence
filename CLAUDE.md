@@ -42,6 +42,11 @@ For any **production-grade application**, enforce this phased gate *before* writ
 
 The human-approval-before-code blocker (item 3) is **tier-`live` only**. For tier-`pre-traffic`, proceed autonomously; the build+test gate is still a deploy blocker. Prototypes/spikes/one-offs run lighter still, but must say so explicitly. When a `pre-traffic` app gains real users, **promote it to `live`** and re-instate the full gate.
 
+**Attention budget — pre-traffic / pre-revenue (adopted 2026-09-25, global).** Everything is pre-revenue, so the user's attention is the scarcest resource in the fleet. A `pre-traffic` project may ask for the user in exactly two cases:
+1. **A genuine hard blocker**, using a typed class (never free text alone): `credentials-no-agentic-path` · `irreversible-approval` (schema drop, billing, outreach, data migration) · `repair-budget-exhausted` (the factory retried and cannot converge) · `hard-to-reverse-choice`.
+2. **Review-ready evidence** that gates a feature or improvement: a **demo video** of the functionality, or a **before/after screenshot pair**. No evidence means not review-ready. A review is batched and passive (Catwalk Review Queue), never an interrupt.
+Everything else (a failed gate the factory can retry, a wireframe, a deferred finding, an informational notable) is **self-healing**: log it and keep going, and never count it toward a "needs you" badge. On a `pre-traffic` project the wireframe checkpoint is published but does not block.
+
 ## Domain Literacy (Global)
 
 - When the user describes a concept in lay/informal language, proactively surface the correct technical term **inline, in the same response** — not as a footnote or end-of-response glossary entry. Applies across every domain a task touches: engineering, finance, PM, marketing, sales, business strategy.
