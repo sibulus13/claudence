@@ -84,3 +84,10 @@ The **Design** step writes `## Gate plan` into the work item README and returns 
 - **Minimum, not maximum.** Add one check per real regression risk (an acceptance criterion, a coupling point, a known caveat). The design reviewer flags gaps **and** padding.
 - **Caveat → test.** Every review finding, discovered caveat or production bug gets a pinning regression test in the same fix. The reviewer rejects a fix that has none. This is how the suite grows: from real failures, not from speculation.
 - The integration cycle's gate plan becomes the project's standing regression gate (the deploy blocker, per the global test-gate rule).
+
+## Caller rules (learned from pilot 1, 2026-09-26: budget-exhausted, 3 rounds, ~700k tokens, 0 useful output)
+
+1. **Pass `ownerIntent`**: the owner's clarified intent, verbatim. Workflow subagents are also relayed the owner's raw latest message, told it outranks their prompt. In pilot 1 the designer read an ambiguous phrase from that message without the clarification, and redesigned a different item in another repo for all 3 rounds. The cycle now states its authority in every step, and **aborts if the designer writes nothing or writes outside `repo`**.
+2. **Create the worktree from the latest `origin/<default>` immediately before the call**, and **do not edit the work item's files elsewhere while the cycle runs.** In pilot 1, redesign docs committed to master mid-cycle made the reviewer's worktree stale, which it rightly flagged as critical.
+3. **Reviewers first check that the item actually changed** (`git status` / `diff`). An unchanged item gets exactly one finding ("no changes produced") instead of a re-review of stale content.
+4. After the cycle, **commit its `cycles/<cycleId>/` trace with the work**. The trace is part of the evidence.

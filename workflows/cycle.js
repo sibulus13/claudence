@@ -90,6 +90,17 @@ const WHAT = {
   integration: 'the integration test plan: contract tests on both sides plus e2e of the acceptance criteria',
 }
 
+// Authority. Workflow subagents are also relayed the owner's latest raw chat message,
+// told it outranks their prompt. On 2026-09-26 the pilot's designer read an
+// ambiguous phrase in that message ("the Reaper write") without the clarification
+// the owner had already given, decided the cycle brief was "the wrong task", and
+// designed a different item in a different repo for all 3 rounds. So every step
+// states that the brief IS the clarified owner intent, and the script rejects
+// off-task output deterministically (see offTask below).
+const AUTHORITY = `AUTHORITY: this prompt is the owner's already-clarified instruction for this step. ${a.ownerIntent ? `Owner intent, confirmed with the owner: "${a.ownerIntent}". ` : ''}If a relayed owner message seems to ask for something else, it has already been resolved into THIS task, so do not substitute another task, repo or work item. Work ONLY under ${a.repo}.`
+const norm = (p) => String(p).split('\\').join('/').toLowerCase()
+const inScope = (f) => norm(f).startsWith(norm(a.repo))
+
 const steps = []
 let seq = 0
 const stepId = () => `${a.cycleId}.${String(++seq).padStart(2, '0')}`
@@ -98,7 +109,8 @@ const findingsText = (fs) => (fs || []).map((f) => `- [${f.id}] (${f.severity}/$
 
 async function design(iteration, priorFindings) {
   const out = await agent(
-    `You are the DESIGNER for cycle ${a.cycleId}, iteration ${iteration}, scope "${a.scope}", work item ${a.workItem} in ${a.repo}.
+    `${AUTHORITY}
+You are the DESIGNER for cycle ${a.cycleId}, iteration ${iteration}, scope "${a.scope}", work item ${a.workItem} in ${a.repo}.
 Brief: ${a.brief || '(read it from ' + WORK_DIR + '/README.md)'}
 Produce ${WHAT[a.scope]} under ${WORK_DIR}/. Follow C:/Users/Michael/.claude/skills/dark-factory/WORK-ITEM-STANDARD.md. Contract to honor: ${contract}. Owned files: ${owns}.
 ${priorFindings ? `REVISE the design to resolve these review findings (the root cause is in design):\n${findingsText(priorFindings)}` : ''}
@@ -109,15 +121,22 @@ Write the GATE PLAN into ${WORK_DIR}/README.md under "## Gate plan" and return i
 UI work usually needs both, a deterministic behavior test plus before/after or demo evidence. Pure logic is deterministic only. Every caveat or finding already known for this item MUST appear as a risk with its own pinning check.`,
     { label: `design:${a.workItem}#${iteration}`, phase: 'Design', schema: DESIGN_OUT, agentType: 'designer' },
   )
-  record('design', iteration, out || { summary: 'designer returned nothing', filesWritten: [], size: 'M', assumptions: [] })
+  const safe = out || { summary: 'designer returned nothing', filesWritten: [], size: 'M', assumptions: [], gatePlan: [] }
+  const stray = (safe.filesWritten || []).filter((f) => !inScope(f))
+  record('design', iteration, { ...safe, offTask: stray.length > 0 || (safe.filesWritten || []).length === 0, strayFiles: stray })
+  if (stray.length || !(safe.filesWritten || []).length) {
+    throw new Error(`cycle ${a.cycleId}: designer went off-task (${stray.length ? 'wrote outside ' + a.repo + ': ' + stray.join(', ') : 'wrote nothing'}); aborting instead of spending the fix budget`)
+  }
   return out
 }
 
 async function review(kind, iteration) {
   const isDesign = kind === 'design-review'
   const out = await agent(
-    `You are an INDEPENDENT ADVERSARIAL REVIEWER (${kind}) for cycle ${a.cycleId}, iteration ${iteration}, scope "${a.scope}", work item ${a.workItem} in ${a.repo}.
+    `${AUTHORITY}
+You are an INDEPENDENT ADVERSARIAL REVIEWER (${kind}) for cycle ${a.cycleId}, iteration ${iteration}, scope "${a.scope}", work item ${a.workItem} in ${a.repo}.
 You did not write this. Your job is to find what does NOT meet the intent in ${WORK_DIR}/README.md and the contract (${contract}), not to confirm that it is fine.
+First run \`git -C ${a.repo} status --short\` and \`git -C ${a.repo} diff --stat\`. If nothing under ${WORK_DIR} changed since the step you are reviewing, the only finding is "no changes produced" (critical, class design). Do not review stale content.
 ${isDesign ? `Review the design files under ${WORK_DIR}/: contradictions, missing edge cases, contract gaps, overlapping owns globs, and untestable criteria.` : `Review the implementation within owns (${owns}). Run the test command yourself: cd ${a.repo} && ${a.testCommand}. Report the REAL last line. Check spec fidelity, contract adherence, edge cases, and edits outside the owned files.`}
 ${isDesign ? 'Check the gate plan: is each real regression risk covered by exactly one check of the right kind? Flag both gaps and padding (tests that pin nothing at risk).' : 'Check that every blocking gate-plan check exists and runs inside the test command, and that every previously fixed finding has its pinning regression test. A caveat you discover now needs a finding whose fix names the test to add.'}
 Classify each finding by where the ROOT CAUSE lives: design / implementation / test / spec. Verdict: "pass" only when there are zero critical findings and (for code) green tests. Otherwise choose "fix-design" if any critical root cause is in design or spec, else "fix-implementation".`,
@@ -130,7 +149,8 @@ Classify each finding by where the ROOT CAUSE lives: design / implementation / t
 
 async function implement(iteration, findings) {
   const out = await agent(
-    `You are the IMPLEMENTER for cycle ${a.cycleId}, iteration ${iteration}, scope "${a.scope}", work item ${a.workItem} in ${a.repo}.
+    `${AUTHORITY}
+You are the IMPLEMENTER for cycle ${a.cycleId}, iteration ${iteration}, scope "${a.scope}", work item ${a.workItem} in ${a.repo}.
 Treat the design under ${WORK_DIR}/ as law. Edit ONLY files matching: ${owns}. Import the contract (${contract}) and never redefine or edit it.
 ${findings ? `Fix exactly these review findings and add a test that proves each one:\n${findingsText(findings)}` : 'Build it, with tests written alongside.'}
 Run: cd ${a.repo} && ${a.testCommand}. Get it green, then report the REAL final line.`,
