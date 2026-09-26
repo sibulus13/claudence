@@ -176,6 +176,8 @@ One JSON object per line (same convention as this codebase's other JSONL logs â€
 {"phase": "<id>", "completedAt": "<ISO>", "summary": "<one sentence, what actually happened>", "needsAttention": false, "attentionReason": "<required if needsAttention is true, else omit>", "attentionClass": "<required if needsAttention is true: credentials-no-agentic-path | irreversible-approval | repair-budget-exhausted | hard-to-reverse-choice | self-healing>", "artifacts": [{"label": "<name>", "path": "<repo-relative>"} , {"label": "<name>", "url": "<link>"}], "graph": {"nodes": [{"id": "<component key>", "label": "<short>", "status": "done|live|queued|pending|failed", "dependsOn": ["<other component key>"], "satisfies": ["FR-1"]}]}}
 ```
 
+**`completedAt` must be a real clock reading** (run `date -u +%Y-%m-%dT%H:%M:%SZ` and paste its output), never a rounded or estimated time. Found 2026-09-25: 139/143 Catwalk entries ended in `:00Z`. Foreman stamps its own `observedAt` for stage metrics (pipeline-metrics-producer), and this field still has to be honest.
+
 **`needsAttention` â€” the handoff signal between steps, not just a historical log.** Added
 2026-09-08, the direct fix for a real gap: a build session was killed mid-Phase-7 by a system
 OOM event, and nothing in the pipeline itself carried forward "the last step was interrupted,
