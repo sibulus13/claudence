@@ -1096,8 +1096,12 @@ confirming/flagging a review chunk is a different action from unblocking a faile
 
 ## The Feature Decision Record — written at every gate, not at the end
 
-**Every run of this skill produces a persistent document in the repo**, at
-`docs/features/<feature>.md` (or the project's equivalent — check before creating a new home).
+**Every run of this skill produces a persistent document in the repo.** **Since 2026-09-25 that
+is a work-item folder `docs/work/<id>/`**, with a README (frontmatter plus the sections below) and
+one before→after file per changed C4 layer (architecture / components / functional / data). Each
+work type (feature, experiment, research, bugfix, refactor, integration, data-collection) has its
+own required-layer profile. **Follow `WORK-ITEM-STANDARD.md` in this skill's folder.** Legacy
+`docs/features/<feature>.md` records stay as history and are not migrated.
 It is written **incrementally as gates are passed**, not reconstructed afterwards.
 
 **Why it must be attached to the codebase and not left in a chat log or a chronological
