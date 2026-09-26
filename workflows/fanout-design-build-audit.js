@@ -1,3 +1,5 @@
+// SUPERSEDED 2026-09-26 by ~/.claude/workflows/cycle.js (stack-agnostic, size-scaled budget, cycle UUID trace,
+// findings classified by root cause). Kept for reference; new work calls cycle.js. See skills/dark-factory/CYCLE.md.
 export const meta = {
   name: 'fanout-design-build-audit',
   description: 'Design -> Design Review -> Build -> (Build Review + Adversarial Audit -> Fix)* until converged, per component. The canonical fan-out template.',
