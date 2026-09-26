@@ -86,3 +86,5 @@ Catwalk renders each project's design from these exact headings, so each repo mu
 | `## Call chains` | runtime sequence of each key operation | sequenceDiagram |
 | `## Data schema` | entities and relations the project owns | erDiagram / classDiagram |
 | `## State machines` | lifecycles of the key entities | stateDiagram |
+
+Every component node in a `### <container-id>` sub-diagram is followed by an **owned-files line** in the same section, `- <node-id>: owns src/foo/**, src/bar.ts`. That line is what lets Catwalk map a live agent's `filesTouched` onto the diagram, lets Foreman check that parallel children are disjoint, and lets L4 (module internals) be derived from real code instead of authored.

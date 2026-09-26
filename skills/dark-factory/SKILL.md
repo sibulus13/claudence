@@ -746,6 +746,15 @@ its single highest-value bug here (a dependency the design *claimed* was threade
 code could not actually see). A component with an unmet `requires` is not buildable yet —
 decomposition is not done until every edge resolves.
 
+**Contract first, then fan out: the build order is not optional (owner rule, 2026-09-26).** Before any component is built:
+1. **Write the contract artifact.** This is ONE schema/interface file per boundary that every component imports and none redefines: zod or TS types, OpenAPI, pydantic, whatever the stack uses. For a frontend/backend split, the contract IS the integration API: request and response schemas plus error shapes.
+2. **Give every component `owns: [globs]`**, and make the globs pairwise disjoint. The contract file is owned by nobody after it lands.
+3. **Land the contract first.** It is committed, and under Foreman merged as its own PR (the `contract-only` mode). The contract landing is the stated exit condition for step 4. Re-check it at the start of every turn, so the gate cannot silently turn into a stall.
+4. **Fan out one worker per component, in parallel.** Each builds against the contract and never edits it. A needed contract change goes back to step 1.
+5. **Run an integration step last.** Both sides are validated against the contract (contract tests), plus e2e.
+
+Small slices (a single component, or under ~2 files per side) may fan out inside one session. Anything larger becomes child work items so Foreman can run them concurrently in separate worktrees (Foreman `contract-first-parallel-dispatch`).
+
 Then the part most often skipped — **the coupling map**:
 
 > For every point where new code touches existing code, name the file, what assumption the new
