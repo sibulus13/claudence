@@ -77,6 +77,10 @@ Why experiments differ: an experiment is allowed to be wrong. It records a hypot
 
 At every C4 level, Catwalk aggregates the work items whose `touches` fall under that node. It shows counts by `status` and a per-layer change badge (A/C/F/D). Clicking in narrows the view, and the breadcrumb climbs back out. The fleet level rolls up across projects.
 
+## Architecture model: LikeC4 (adopted by the owner, 2026-09-26)
+
+The C4 architecture (system, containers, components) lives in **`docs/architecture/<project>.c4`** (LikeC4), **generated from the real code where the stack allows**: one component per module and one relationship per import (reference: Foreman `scripts/gen-architecture.mjs`). The only hand-kept input is which module belongs to which container. LikeC4 provides the nested drill-down, the URL per level and back navigation. A part that opens renders stacked and coloured; a leaf renders flat and grey. The Mermaid headings below remain the contract for user flows, call chains, data schema and state machines, and the `## Architecture` Mermaid spine stays until each repo is migrated.
+
 ## Project `docs/DESIGN.md` diagram contract (added 2026-09-26)
 
 Catwalk renders each project's design from these exact headings, so each repo must use them. The contract applies where the project has the concern; where it does not, write the heading with "n/a: <reason>".
