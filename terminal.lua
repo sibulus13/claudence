@@ -341,9 +341,8 @@ wezterm.on('format-tab-title', function(tab, _tabs, _panes, _conf, _hover, _max_
   local st         = A.tab_paint(tab.is_active, flagged, claude_tabs[tab.tab_id])
   local title_fg   = TAB_FG[st.fg]
 
-  -- Focused pill = accent bg + white bold title; its Claude state rides on a
-  -- small ● in the state colour so focus never hides state. Unfocused pills
-  -- colour the title itself. The amber ⬤ (attention) shows in both.
+  -- Focused pill = accent bg + white bold title; unfocused pills colour the
+  -- title by state. The marker slot carries state on every tab.
   local pill    = TAB_BGS[st.bg]
   local focused = st.bg == 'focus'
   local cells = {
@@ -355,10 +354,14 @@ wezterm.on('format-tab-title', function(tab, _tabs, _panes, _conf, _hover, _max_
     cells[#cells + 1] = { Attribute  = { Intensity = bold and 'Bold' or 'Normal' } }
     cells[#cells + 1] = { Text = text }
   end
+  -- Fixed 2-cell marker slot on EVERY tab so focus/state changes never shift
+  -- the bar: ⬤ attention, ● Claude (state colour), blank when no Claude.
   if st.dot then
     add(ATTN, true, '⬤ ')
-  elseif focused and st.fg ~= 'noclaude' then
+  elseif st.fg ~= 'noclaude' then
     add(title_fg, true, '● ')
+  else
+    add(title_fg, false, '  ')
   end
   add(focused and FOCUS_FG or title_fg, st.bold, idx .. ':' .. title)
   cells[#cells + 1] = { Background = { Color = BAR_BG } }
