@@ -58,12 +58,14 @@ config.window_background_opacity = 1.0   -- fully opaque (was 0.96 — that 4% w
 local ACCENT    = '#cf1a73'   -- status bar + focused-tab base (reddish-purple)
 local ACCENT_HI = '#f53f8f'   -- focused tab title — brighter tint, pops on active-tab bg
 local ATTN      = '#f9af3a'   -- amber: agent stopped (bell), tab is waiting on you
-local RUNNING   = '#89dceb'   -- sky: Claude is processing (spinner in its title)
-local IDLE      = '#b4befe'   -- lavender: Claude open, idle, nothing unseen
+local RUNNING   = '#2ee6d6'   -- vivid cyan: Claude is processing (spinner in its title)
+local IDLE      = '#7aa2f7'   -- clear blue: Claude open, idle, nothing unseen
 -- No-Claude: a plain grey so every agent tab (any hue above) dominates the bar.
-local NOCLAUDE    = '#6c7086'   -- no Claude session in the tab
+local NOCLAUDE    = '#7f849c'   -- no Claude session in the tab
 local NOCLAUDE_HI = '#7f849c'   -- off-home workspace chip when no tab has Claude
-local FOCUS_BG    = '#4a1d38'   -- focused tab background: dark tint of ACCENT
+local PILL_BG     = '#2a2b3d'   -- unfocused tab pill: lifted off the bar so the shape reads
+local FOCUS_BG    = ACCENT      -- focused tab pill: the solid accent, as before
+local FOCUS_FG    = '#ffffff'   -- focused title: white on accent for max contrast
 
 -- Left Alt = clean modifier (no special chars); Right Alt still composes é, ñ, etc.
 config.send_composed_key_when_left_alt_is_pressed  = false
@@ -185,9 +187,12 @@ local function attention_target()
   return nil
 end
 
--- Map A.tab_style's semantic fg tokens to colours, plus the constant tab bg.
-local TAB_BG = '#181825'
-local TAB_BGS = { tab = TAB_BG, focus = FOCUS_BG }
+-- Map A.tab_paint's semantic tokens to colours. Each tab is a rounded pill:
+-- Nerd Font half-circle caps (bundled with WezTerm) drawn in the pill colour on
+-- the bar background.
+local BAR_BG  = '#11111b'
+local CAP_L, CAP_R = '\u{e0b6}', '\u{e0b4}'
+local TAB_BGS = { tab = PILL_BG, focus = FOCUS_BG }
 local TAB_FG  = { attn = ATTN, running = RUNNING, idle = IDLE, noclaude = NOCLAUDE }
 
 -- A program running in a pane (notably Claude Code) bakes a decorative brand/
@@ -336,19 +341,29 @@ wezterm.on('format-tab-title', function(tab, _tabs, _panes, _conf, _hover, _max_
   local st         = A.tab_paint(tab.is_active, flagged, claude_tabs[tab.tab_id])
   local title_fg   = TAB_FG[st.fg]
 
-  local cells = { { Background = { Color = TAB_BGS[st.bg] } } }
-  if st.dot then
-    cells[#cells + 1] = { Foreground = { Color = ATTN } }
-    cells[#cells + 1] = { Attribute  = { Intensity = 'Bold' } }
-    cells[#cells + 1] = { Text = ' ⬤ ' }
-    cells[#cells + 1] = { Foreground = { Color = title_fg } }
-    cells[#cells + 1] = { Attribute  = { Intensity = st.bold and 'Bold' or 'Normal' } }
-    cells[#cells + 1] = { Text = idx .. ':' .. title .. ' ' }
-  else
-    cells[#cells + 1] = { Foreground = { Color = title_fg } }
-    cells[#cells + 1] = { Attribute  = { Intensity = st.bold and 'Bold' or 'Normal' } }
-    cells[#cells + 1] = { Text = '  ' .. idx .. ':' .. title .. ' ' }
+  -- Focused pill = accent bg + white bold title; its Claude state rides on a
+  -- small ● in the state colour so focus never hides state. Unfocused pills
+  -- colour the title itself. The amber ⬤ (attention) shows in both.
+  local pill    = TAB_BGS[st.bg]
+  local focused = st.bg == 'focus'
+  local cells = {
+    { Background = { Color = BAR_BG } }, { Foreground = { Color = pill } }, { Text = ' ' .. CAP_L },
+    { Background = { Color = pill } },
+  }
+  local function add(fg, bold, text)
+    cells[#cells + 1] = { Foreground = { Color = fg } }
+    cells[#cells + 1] = { Attribute  = { Intensity = bold and 'Bold' or 'Normal' } }
+    cells[#cells + 1] = { Text = text }
   end
+  if st.dot then
+    add(ATTN, true, '⬤ ')
+  elseif focused and st.fg ~= 'noclaude' then
+    add(title_fg, true, '● ')
+  end
+  add(focused and FOCUS_FG or title_fg, st.bold, idx .. ':' .. title)
+  cells[#cells + 1] = { Background = { Color = BAR_BG } }
+  cells[#cells + 1] = { Foreground = { Color = pill } }
+  cells[#cells + 1] = { Text = CAP_R }
   return cells
 end)
 
