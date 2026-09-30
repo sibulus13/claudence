@@ -69,25 +69,6 @@ function M.decide(flags, ctx)
   return out
 end
 
--- Visual style for a tab, as semantic tokens (terminal.lua maps them to colors).
--- The background is ALWAYS 'tab', so focusing a flagged tab — or clearing its
--- flag — never swaps the background (no flicker). Attention is carried by the
--- `dot` + the fg token, not by a background fill.
---   returns { bg = 'tab', fg = 'focus'|'attn'|'running'|'idle', dot = bool, bold = bool }
-function M.tab_style(is_active, flagged, has_unseen)
-  local s = { bg = 'tab', dot = flagged == true, bold = false }
-  if is_active then
-    s.fg, s.bold = 'focus', true
-  elseif flagged then
-    s.fg, s.bold = 'attn', true
-  elseif has_unseen then
-    s.fg = 'running'
-  else
-    s.fg = 'idle'
-  end
-  return s
-end
-
 -- ── Claude-session detection (drives no-Claude tab dimming) ──────────────────
 -- A pane's foreground PROCESS name is an unreliable "is Claude here?" signal:
 -- while Claude runs a tool the foreground process is the tool's shell
@@ -107,14 +88,25 @@ local CLAUDE_SPARKS = {
   '\u{2748}', '\u{2749}', '\u{274A}', '\u{274B}',
 }
 
+-- True when a title STARTS with a Claude "working" spinner frame: the braille
+-- block (U+2800–U+28FF = E2 A0..A3 xx) or the ◐◓◑◒ half-circles (U+25D0–U+25D3 =
+-- E2 97 90..93) that current Claude Code versions cycle while processing. The
+-- ✳ sparkle is the IDLE title, so it is deliberately not a spinner.
+function M.title_is_spinning(title)
+  if not title or title == '' then return false end
+  local b1, b2, b3 = title:byte(1, 3)
+  if b1 ~= 0xE2 or b2 == nil then return false end
+  if b2 >= 0xA0 and b2 <= 0xA3 then return true end
+  return b2 == 0x97 and b3 ~= nil and b3 >= 0x90 and b3 <= 0x93
+end
+
 -- True when a title STARTS with a Claude marker glyph (sparkle or braille frame).
 function M.title_has_claude_marker(title)
   if not title or title == '' then return false end
   for _, m in ipairs(CLAUDE_SPARKS) do
     if title:sub(1, #m) == m then return true end
   end
-  local b1, b2 = title:byte(1, 2)                  -- braille U+2800–U+28FF = E2 A0..A3 xx
-  return b1 == 0xE2 and b2 ~= nil and b2 >= 0xA0 and b2 <= 0xA3
+  return M.title_is_spinning(title)
 end
 
 -- True when a pane is running Claude Code, by process name OR OSC title.
@@ -124,17 +116,28 @@ function M.is_claude_pane(proc, title)
   return M.title_has_claude_marker(title)
 end
 
--- Final tab paint: tab_style picks the base look, then a tab with no live Claude
--- session is DIMMED (low-contrast tokens) so agent tabs dominate the bar. A
--- flagged tab (amber attention) is never dimmed — attention must stay loud. The
--- focused-but-no-Claude tab keeps a softer, still-readable token so "you are
--- here" survives. Returns { bg, fg, dot, bold } with fg possibly 'noclaude'(_hi).
-function M.tab_paint(is_active, flagged, has_claude, has_unseen)
-  local s = M.tab_style(is_active, flagged, has_unseen)
-  if not flagged and not has_claude then
-    s.fg, s.bold = (is_active and 'noclaude_hi' or 'noclaude'), false
-  end
-  return s
+-- Claude state of ONE pane: 'running' (spinner title), 'idle' (Claude open,
+-- not working), or 'none'. A tab takes the strongest state across its panes.
+function M.claude_state(proc, title)
+  if M.title_is_spinning(title) then return 'running' end
+  if M.is_claude_pane(proc, title) then return 'idle' end
+  return 'none'
+end
+
+-- Tab paint = two INDEPENDENT channels, so neither can hide the other:
+--   background → FOCUS  ('focus' on the active tab, 'tab' otherwise)
+--   title fg   → STATE  ('attn' | 'running' | 'idle' | 'noclaude')
+-- A flag clearing never flips the bg (no flicker), and focusing a tab no longer
+-- paints over its state. Precedence: attn (agent finished, you haven't looked —
+-- the Stop-hook flag) > running > idle > noclaude.
+--   returns { bg = 'tab'|'focus', fg = <state>, dot = bool, bold = bool }
+function M.tab_paint(is_active, flagged, claude_state)
+  local fg = 'noclaude'
+  if flagged then fg = 'attn'
+  elseif claude_state == 'running' then fg = 'running'
+  elseif claude_state == 'idle' then fg = 'idle' end
+  return { bg = is_active and 'focus' or 'tab', fg = fg, dot = flagged == true,
+           bold = is_active == true or flagged == true }
 end
 
 return M

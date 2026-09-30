@@ -58,14 +58,12 @@ config.window_background_opacity = 1.0   -- fully opaque (was 0.96 — that 4% w
 local ACCENT    = '#cf1a73'   -- status bar + focused-tab base (reddish-purple)
 local ACCENT_HI = '#f53f8f'   -- focused tab title — brighter tint, pops on active-tab bg
 local ATTN      = '#f9af3a'   -- amber: agent stopped (bell), tab is waiting on you
-local RUNNING   = '#9399b2'   -- agent still producing output
-local IDLE      = '#585b70'   -- inactive, quiet
--- No-Claude dimming: a tab/workspace with no live Claude session reads in a
--- LOW-contrast grey so the ones that DO have an agent dominate the bar. Both are
--- dimmer than IDLE (a tab can be idle yet still have Claude open); the *_HI tone
--- is for the focused tab so "you are here" stays legible without the loud accent.
-local NOCLAUDE    = '#3a3c4e'   -- no Claude, unfocused: barely-there, recedes into the bar
-local NOCLAUDE_HI = '#7f849c'   -- no Claude, focused (or the off-home chip): muted but readable
+local RUNNING   = '#89dceb'   -- sky: Claude is processing (spinner in its title)
+local IDLE      = '#b4befe'   -- lavender: Claude open, idle, nothing unseen
+-- No-Claude: a plain grey so every agent tab (any hue above) dominates the bar.
+local NOCLAUDE    = '#6c7086'   -- no Claude session in the tab
+local NOCLAUDE_HI = '#7f849c'   -- off-home workspace chip when no tab has Claude
+local FOCUS_BG    = '#4a1d38'   -- focused tab background: dark tint of ACCENT
 
 -- Left Alt = clean modifier (no special chars); Right Alt still composes é, ñ, etc.
 config.send_composed_key_when_left_alt_is_pressed  = false
@@ -99,11 +97,12 @@ config.hide_tab_bar_if_only_one_tab   = false
 config.tab_max_width                  = 28
 config.show_new_tab_button_in_tab_bar = false
 
--- Tab states — color carries focus; the ⬤ appears ONLY when a tab needs you:
---   focused   → bold accent text     you are here (no dot, no bg highlight)
---   attention → amber ⬤ + bold       Stop/permission hook flagged it: agent done
---   running   → muted (has output)   agent still working in the background
---   idle      → dim                  nothing happening
+-- Tab states — title COLOUR carries state, BACKGROUND carries focus:
+--   attention → amber ⬤ + bold      Stop/permission hook flagged it: agent done, unseen
+--   running   → sky                 Claude processing (spinner glyph in its title)
+--   idle      → lavender            Claude open, nothing pending
+--   noclaude  → grey                no Claude session in the tab
+--   focused   → magenta-tinted bg + bold, title keeps its state colour
 -- "attention" is driven by the per-session flag files (attn_set), not a terminal
 -- bell — distinct from has_unseen_output, which flips on every line of output.
 
@@ -122,7 +121,7 @@ local ATTN_DIR        = wezterm.home_dir .. '/.claude/workspaces/attention'
 local ATTN_DWELL_SECS = 5
 local ATTN_MAX_AGE    = 12 * 3600   -- auto-expire zombie flags after 12 h
 local flagged_tabs    = {}          -- [tab_id] = repo  (tabs with a pending flag; refilled each tick)
-local claude_tabs      = {}         -- [tab_id] = true when a pane in the tab runs Claude (drives no-Claude dimming)
+local claude_tabs      = {}         -- [tab_id] = 'running'|'idle' (absent = no Claude); drives tab colour
 local _claude_scan_at  = 0          -- last os.time() the foreground-process scan ran (throttled below)
 local CLAUDE_SCAN_SECS = 2          -- min secs between scans — a per-pane proc lookup isn't free at 4 ticks/s
 local REPO_DIR_NORM   = ''          -- normalized repo root; set once REPO_DIR is known (labels the home flag "Nexus")
@@ -188,8 +187,8 @@ end
 
 -- Map A.tab_style's semantic fg tokens to colours, plus the constant tab bg.
 local TAB_BG = '#181825'
-local TAB_FG = { focus = ACCENT_HI, attn = ATTN, running = RUNNING, idle = IDLE,
-                 noclaude = NOCLAUDE, noclaude_hi = NOCLAUDE_HI }
+local TAB_BGS = { tab = TAB_BG, focus = FOCUS_BG }
+local TAB_FG  = { attn = ATTN, running = RUNNING, idle = IDLE, noclaude = NOCLAUDE }
 
 -- A program running in a pane (notably Claude Code) bakes a decorative brand/
 -- attention glyph into its OSC window title — e.g. the ✳ sparkle. When a tab has
@@ -331,19 +330,13 @@ wezterm.on('format-tab-title', function(tab, _tabs, _panes, _conf, _hover, _max_
   local idx   = tostring(tab.tab_index + 1)
 
   -- flagged_tabs is keyed by tab id (matched by pane id in update-status), so
-  -- it's immune to stale OSC-7 cwd. A.tab_style picks the look — and keeps the
-  -- BACKGROUND constant in every state, so focusing or clearing a flag never
-  -- flips the bg (no flicker). Attention = an amber ⬤ + amber title; focusing a
-  -- flagged tab only swaps the title colour to the accent, dot and bg unchanged.
-  -- A.tab_paint picks the look AND applies no-Claude dimming in one tested call:
-  -- a tab with no live Claude session is dimmed (low-contrast token) so agent
-  -- tabs dominate; a flagged tab (amber ⬤) is never dimmed (attention stays loud).
+  -- it's immune to stale OSC-7 cwd. A.tab_paint (tested) maps focus -> bg and
+  -- attention/Claude state -> title colour as independent channels.
   local flagged    = flagged_tabs[tab.tab_id] ~= nil
-  local has_claude = claude_tabs[tab.tab_id] == true
-  local st         = A.tab_paint(tab.is_active, flagged, has_claude, tab.active_pane.has_unseen_output)
+  local st         = A.tab_paint(tab.is_active, flagged, claude_tabs[tab.tab_id])
   local title_fg   = TAB_FG[st.fg]
 
-  local cells = { { Background = { Color = TAB_BG } } }
+  local cells = { { Background = { Color = TAB_BGS[st.bg] } } }
   if st.dot then
     cells[#cells + 1] = { Foreground = { Color = ATTN } }
     cells[#cells + 1] = { Attribute  = { Intensity = 'Bold' } }
@@ -399,9 +392,9 @@ wezterm.on('update-status', function(window, pane)
   end
 
   -- Map every live pane id -> its tab id, across all workspaces. The SAME sweep
-  -- records which tabs have a live Claude session (any pane), throttled to
-  -- CLAUDE_SCAN_SECS since a per-pane foreground-process lookup isn't free at 4
-  -- ticks/s. format-tab-title reads claude_tabs to dim the ones without.
+  -- records each tab's Claude state (strongest across panes: running > idle),
+  -- throttled to CLAUDE_SCAN_SECS since a per-pane foreground-process lookup isn't
+  -- free at 4 ticks/s. format-tab-title reads claude_tabs to colour each tab.
   local pane_tab       = {}
   local do_claude_scan = (now - _claude_scan_at >= CLAUDE_SCAN_SECS)
   local claude_seen    = do_claude_scan and {} or nil
@@ -414,9 +407,9 @@ wezterm.on('update-status', function(window, pane)
         pane_tab[p:pane_id()] = tid
         -- Detect by title-or-process (A.is_claude_pane): the process name alone
         -- reads bash/pwsh/cmd mid-tool, but Claude owns the title throughout.
-        if do_claude_scan and not claude_seen[tid]
-           and A.is_claude_pane(p:get_foreground_process_name(), p:get_title()) then
-          claude_seen[tid] = true
+        if do_claude_scan and claude_seen[tid] ~= 'running' then
+          local cs = A.claude_state(p:get_foreground_process_name(), p:get_title())
+          if cs ~= 'none' then claude_seen[tid] = cs end
         end
       end
     end
@@ -428,7 +421,7 @@ wezterm.on('update-status', function(window, pane)
     -- attention dwell-clear nudge below).
     for _, t in ipairs(scan_tabs) do
       local tid = t:tab_id()
-      if (claude_seen[tid] == true) ~= (claude_tabs[tid] == true) then
+      if claude_seen[tid] ~= claude_tabs[tid] then
         t:set_title(t:get_title())
       end
     end

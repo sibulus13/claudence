@@ -132,24 +132,18 @@ do
   check('empty -> no chips', #r.chips == 0)
 end
 
--- 13. tab_style: the BACKGROUND must be identical in every state, so focusing a
--- flagged tab (or clearing it) never flips the bg -> no flicker. Flagged differs
--- from focused only by fg/dot.
+-- 13. tab_paint: focus and state are INDEPENDENT channels. Focus owns the bg,
+-- state owns the fg — so a flag clearing never flips the bg (no flicker) and
+-- focusing a tab never hides its state (the old bug: focus painted over state).
 do
-  local fa = A.tab_style(true,  true,  false)  -- focused + flagged
-  local ua = A.tab_style(false, true,  false)  -- unfocused + flagged
-  local fp = A.tab_style(true,  false, false)  -- focused, no flag
-  local ru = A.tab_style(false, false, true)   -- unfocused, running
-  local id = A.tab_style(false, false, false)  -- idle
-  check('tabstyle focused+flagged', fa.bg == 'tab' and fa.fg == 'focus' and fa.dot == true and fa.bold == true)
-  check('tabstyle unfocused+flagged', ua.bg == 'tab' and ua.fg == 'attn' and ua.dot == true and ua.bold == true)
-  check('NO-FLICKER: flagged focus==unfocus bg', fa.bg == ua.bg, tostring(fa.bg) .. ' vs ' .. tostring(ua.bg))
-  check('NO-FLICKER: bg constant everywhere',
-    fa.bg == 'tab' and ua.bg == 'tab' and fp.bg == 'tab' and ru.bg == 'tab' and id.bg == 'tab')
-  check('tabstyle dot iff flagged', fa.dot and ua.dot and not fp.dot and not ru.dot and not id.dot)
-  check('tabstyle focused-plain', fp.fg == 'focus' and fp.dot == false)
-  check('tabstyle running', ru.fg == 'running' and ru.dot == false)
-  check('tabstyle idle', id.fg == 'idle' and id.dot == false)
+  local fa = A.tab_paint(true,  true,  'idle')     -- focused + flagged
+  local ua = A.tab_paint(false, true,  'idle')     -- unfocused + flagged
+  local fi = A.tab_paint(true,  false, 'idle')     -- focused, flag cleared
+  local fr = A.tab_paint(true,  false, 'running')  -- focused, running
+  check('paint focused bg', fa.bg == 'focus' and fi.bg == 'focus' and ua.bg == 'tab')
+  check('NO-FLICKER: flag clear keeps bg', fa.bg == fi.bg)
+  check('paint focus keeps state colour', fr.fg == 'running' and fa.fg == 'attn')
+  check('paint flagged -> attn + dot + bold', ua.fg == 'attn' and ua.dot == true and ua.bold == true)
 end
 
 -- 14. dwell EXACTLY at the boundary (now - active_since == dwell_secs) -> removed.
@@ -194,25 +188,22 @@ do
   check('marker empty/nil', A.title_has_claude_marker('') == false and A.title_has_claude_marker(nil) == false)
 end
 
--- 17. tab_paint: no-Claude tabs dim; flagged tabs NEVER dim (attention stays).
+-- 17. claude_state + tab_paint precedence. REGRESSION (2026-09-30): Claude Code's
+-- current spinner is the ◐◓◑◒ half-circle, not braille — a running Crucible tab
+-- ('◑ Cruicible', proc = bash) read as NO Claude and painted grey.
 do
-  -- has Claude: identical to tab_style (no override)
-  local hc_focus = A.tab_paint(true,  false, true,  false)  -- focused, claude
-  local hc_run   = A.tab_paint(false, false, true,  true)   -- bg, claude, running
-  check('paint claude focused == focus/bold', hc_focus.fg == 'focus' and hc_focus.bold == true)
-  check('paint claude running unchanged', hc_run.fg == 'running')
-  -- no Claude: dimmed, never bold, never a dot
-  local nc_bg    = A.tab_paint(false, false, false, true)   -- bg, no claude (even w/ output)
-  local nc_focus = A.tab_paint(true,  false, false, false)  -- focused, no claude
-  check('paint no-claude bg -> noclaude dim', nc_bg.fg == 'noclaude' and nc_bg.bold == false and nc_bg.dot == false)
-  check('paint no-claude focused -> noclaude_hi', nc_focus.fg == 'noclaude_hi' and nc_focus.bold == false)
-  check('paint no-claude overrides running', nc_bg.fg ~= 'running')
-  -- flagged (attention) is NEVER dimmed, even with no Claude process left
-  local fl_bg    = A.tab_paint(false, true,  false, false)  -- bg, flagged, no claude
-  local fl_focus = A.tab_paint(true,  true,  false, false)  -- focused, flagged, no claude
-  check('paint flagged+no-claude stays attn', fl_bg.fg == 'attn' and fl_bg.dot == true)
-  check('paint flagged+focused stays focus', fl_focus.fg == 'focus' and fl_focus.dot == true)
-  check('paint flagged never dimmed', fl_bg.fg ~= 'noclaude' and fl_focus.fg ~= 'noclaude_hi')
+  check('state running half-circle', A.claude_state('bash.exe', '◑ Cruicible') == 'running')
+  check('state running ◐', A.claude_state('claude.exe', '◐ West term tab colors') == 'running')
+  check('state running braille', A.claude_state('pwsh.exe', '⠂ x') == 'running')
+  check('state idle sparkle', A.claude_state('claude.exe', '✳ Cost tracking') == 'idle')
+  check('state idle by proc only', A.claude_state('claude.exe', 'whatever') == 'idle')
+  check('state none shell', A.claude_state('powershell.exe', 'powershell.exe') == 'none')
+  check('state none geometric ■ not spinner', A.claude_state('pwsh.exe', '■ x') == 'none')
+  check('paint running', A.tab_paint(false, false, 'running').fg == 'running')
+  check('paint idle', A.tab_paint(false, false, 'idle').fg == 'idle')
+  check('paint none -> noclaude', A.tab_paint(false, false, nil).fg == 'noclaude')
+  check('paint flag beats running', A.tab_paint(false, true, 'running').fg == 'attn')
+  check('paint flagged no-claude stays attn', A.tab_paint(false, true, nil).fg == 'attn')
 end
 
 log[#log + 1] = ('---- %d passed, %d failed ----'):format(pass, fail)
