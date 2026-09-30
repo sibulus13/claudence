@@ -94,7 +94,10 @@ pipelineMode: new-product | feature-add | spec-only | review-only | build-only |
 phasesRun: [ "-1", "0", "1", "2", "2.5" ]
 lastCompletedPhase: "2.5"
 updatedAt: <ISO timestamp>
-blockers: []
+blockers: []   # each entry MUST start with its class: "<class>: <what is needed>", class one of
+               # credentials-no-agentic-path | irreversible-approval | repair-budget-exhausted |
+               # hard-to-reverse-choice (Catwalk's Needs you groups by it; an untyped blocker
+               # lands in "unclassified", which breaks the attention budget)
 definitionOfDone:
   shippedMeans: <one sentence, decided in Phase 2 — see "Definition of done" below>
   happyPathDemo: <null, or a short name/ID for this project's standing demo scenario>
