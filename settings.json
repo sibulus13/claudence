@@ -1,6 +1,7 @@
 {
   "env": {
-    "BROWSER": "cmd.exe /c start \"\""
+    "BROWSER": "cmd.exe /c start \"\"",
+    "CLAUDE_CODE_MAX_WEB_SEARCHES_PER_SESSION": "1000"
   },
   "permissions": {
     "allow": [
@@ -15,7 +16,6 @@
     "ask": [],
     "defaultMode": "auto"
   },
-  "model": "opus",
   "hooks": {
     "SessionStart": [
       {
@@ -126,9 +126,17 @@
     "explanatory-output-style@claude-plugins-official": true,
     "remember@claude-plugins-official": true,
     "notion@claude-plugins-official": true,
-    "stripe@claude-plugins-official": true
+    "stripe@claude-plugins-official": true,
+    "sentry@claude-plugins-official": true,
+    "discord@claude-plugins-official": true
   },
+  "feedbackDrafts": "notify",
   "effortLevel": "high",
+  "modelSettings": {
+    "claude-opus-5-5": {
+      "effortLevel": "medium"
+    }
+  },
   "autoUpdatesChannel": "latest",
   "tui": "fullscreen",
   "skipDangerousModePermissionPrompt": true,
