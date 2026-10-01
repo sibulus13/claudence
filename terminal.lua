@@ -354,15 +354,11 @@ wezterm.on('format-tab-title', function(tab, _tabs, _panes, _conf, _hover, _max_
     cells[#cells + 1] = { Attribute  = { Intensity = bold and 'Bold' or 'Normal' } }
     cells[#cells + 1] = { Text = text }
   end
-  -- Fixed 2-cell marker slot on EVERY tab so the bar never shifts. It holds
-  -- the amber ⬤ ONLY while a tab has an unseen finished response; otherwise
-  -- blank (state is carried by the title colour).
-  if st.dot then
-    add(ATTN, true, '⬤ ')
-  else
-    add(title_fg, false, '  ')
-  end
-  add(focused and FOCUS_FG or title_fg, st.bold, idx .. ':' .. title)
+  -- Symmetric 1-cell padding inside the caps. The amber ⬤ appears (and takes
+  -- space) ONLY while a tab has an unseen finished response.
+  add(title_fg, false, ' ')
+  if st.dot then add(ATTN, true, '⬤ ') end
+  add(focused and FOCUS_FG or title_fg, st.bold, idx .. ':' .. title .. ' ')
   cells[#cells + 1] = { Background = { Color = BAR_BG } }
   cells[#cells + 1] = { Foreground = { Color = pill } }
   cells[#cells + 1] = { Text = CAP_R }
