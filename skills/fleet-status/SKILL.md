@@ -155,7 +155,11 @@ node's shape. Report both, but don't conflate them.
 
 ### 7. Report
 
-Terse-Output Contract ledger, four buckets:
+Terse-Output Contract ledger, four buckets. **Every item leads with a plain one-line summary
+of what it is and its state, then the repo + number in parentheses**, e.g. "Intraday vs
+overnight returns strategy research (Crucible #4): gate check failed". Never a bare "#3, #4,
+#6" or a project name alone. The owner's picture of the lifecycle drifts when reports carry
+only numbers (owner, 2026-10-02).
 
 - ✅ **Done** — real merges since the last check (title + repo + issue/PR#).
 - 🔜 **Coming up** — actively dispatching now, or queued `factory:approved`
