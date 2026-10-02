@@ -1492,9 +1492,10 @@ local function open_in_vscode(target)
   })
 end
 
--- Route opened links: web/mail use the OS default (browser); anything that looks
--- like a local file (absolute OR bare-relative) opens in VS Code at its line via
--- open-in-vscode.ps1 (which also flips markdown into preview mode).
+-- Route opened links: web/mail use the OS default (browser); a local file (absolute
+-- OR bare-relative) goes to open-in-vscode.ps1, which picks the opener: code, text
+-- and markdown (and, for safety, scripts/executables) -> VS Code at its line; other
+-- types with a Windows default app (video, image, PDF) -> that app.
 wezterm.on('open-uri', function(_window, pane, uri)
   local kind = PL.classify(uri)
   if kind == 'other' then
