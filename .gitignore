@@ -72,3 +72,6 @@ tests/.last-results-pathlink.txt
 
 # Session planning artifacts — transient, per-session working docs
 plans/
+
+# tiktok-sync scheduled run logs (runtime state)
+logs/
