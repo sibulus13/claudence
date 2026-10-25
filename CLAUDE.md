@@ -235,6 +235,18 @@ Before classifying a missing credential as a hard blocker, check whether an agen
 
 Do NOT pause for: build warnings, lint noise, test scaffolding gaps, "should I continue?", cosmetic decisions, **reversible/adjustable decisions (pick a sensible default, log it in the decision journal with a revisit-trigger, and proceed)**, or anything resolvable by reading existing code. Do NOT pause for credentials that have MCP or CLI paths.
 
+**Owner-oversight items never stall the work (standing practice, owner 2026-10-25).** When something
+needs the owner (a name, a license, a publish, a policy call) classify it at once:
+- **Design-scope:** it shapes what is built. Fold it into the design phase as an explicit option
+  with a recommended default, build on the default, and keep the seam that makes changing it cheap.
+- **Non-blocking:** the rest can proceed without it. Log it in the repo's `docs/DECISIONS.md` as
+  `status: needs-owner` with **severity** (what goes wrong if decided badly: low / medium / high)
+  and **urgency** (when it must be decided: now / before-release / someday), then continue.
+- **Blocking:** only the hard blockers above (irreversible, outward-facing, credentials with no
+  agentic path). Do everything else first, then ask.
+Surface the `needs-owner` list in the ledger's `⛔`, ordered by severity then urgency, with the
+recommended default stated. Never stop a build to ask a non-blocking question.
+
 ### Testing contract
 **Minimal tests, three kinds only (owner rule, 2026-09-26; replaces "unit test every function").** A test exists only when it is one of:
 1. **Sanity/smoke**: the thing starts, the happy path runs, and the gate command is meaningful.
