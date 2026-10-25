@@ -252,11 +252,21 @@ Stay on the critical path. Work that does **not** directly advance the current g
 - Generate random secrets: `-join ((1..32) | ForEach-Object { '{0:x2}' -f (Get-Random -Max 256) })`
 - Firewall rules: `New-NetFirewallRule` not `netsh advfirewall`
 - Never assume `openssl`, `curl` (use `Invoke-RestMethod`), or Unix utilities are in PATH
+- **Background jobs never show a window (standing rule, 2026-09-30).** Every scheduled task,
+  daemon, or background launch of node / powershell / python / cmd / claude runs silently:
+  the Task Scheduler action is `wscript.exe //B //Nologo <repo>\scripts\run-hidden.vbs <program> [args]`
+  (copy `D:\repo\AI\cortex\scripts\run-hidden.vbs` into the repo; it hides the window at process
+  creation, so nothing flashes) and the task is registered with `-Hidden`. Python may use
+  `pythonw.exe` instead. Never `node.exe` / `powershell.exe` directly as the action, and never rely
+  on `powershell -WindowStyle Hidden` (it still flashes). Child processes spawned from Node use
+  `windowsHide: true`. Tasks set to "run whether logged on or not" are already invisible. When
+  touching a repo's scheduled tasks, check them with `Get-ScheduledTask` and fix any that don't comply.
 
 ## Task Execution — Parallelization First
 
 **Default to parallel, not sequential.** Before executing any multi-step task, identify which steps are independent and run them concurrently.
 
+- **Long-running commands run in the background, never on the main thread (owner rule, 2026-10-24).** Anything that can take more than ~30 s — test suites, `git commit` through a pre-commit hook that runs tests, dry runs, network jobs, builds, sweeps — goes out with `run_in_background: true` (or a background subagent), and the conversation stays free. Wait on it with a completion notification or a `Monitor` until-loop, never a foreground sleep or a blocking call. Quick reads, greps and status checks stay foreground.
 - Dispatch independent research, exploration, and file reads as parallel tool calls in a single message
 - Use background subagents (`run_in_background: true`) for tasks whose results aren't immediately needed
 - Use `isolation: worktree` for any subagent that writes files, to prevent conflicts
