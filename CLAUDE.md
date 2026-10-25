@@ -164,6 +164,13 @@ Adopted 2026-08-15 (global). Governs HOW the Turn Contract's bookends render. **
 
 ## Code Quality — Universal
 
+- **Language ground rules (global, 2026-10-25): read `~/.claude/playbooks/<language>.md` before
+  writing code in that language** (`python.md`, `javascript.md`, `typescript.md`, `shell.md`; index
+  `~/.claude/playbooks/README.md`). Defaults, not suggestions: imports at the top of the module,
+  dependencies declared, boundaries validated, tests mock by default. A deviation carries a one-line
+  comment saying why; copying a surrounding legacy pattern that breaks a rule is not a reason.
+  When a language habit is corrected, add the rule to the playbook in the same turn.
+
 - **TypeScript**: strict mode always (`"strict": true`). No implicit `any`. Explicit return types on exported functions
 - **No dead code**: remove unused imports, variables, and functions rather than commenting them out
 - **No magic numbers**: extract constants with descriptive names
