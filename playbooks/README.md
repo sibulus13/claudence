@@ -7,6 +7,7 @@ flowchart TD
     L --> J["javascript.md<br/>(Node ESM)"]
     L --> T["typescript.md<br/>(Next.js / React)"]
     L --> S["shell.md<br/>(PowerShell + bash)"]
+    W --> TT["testing.md<br/>(any test, any language)"]
     P --> R{"rule conflicts with<br/>the surrounding code?"}
     J --> R
     T --> R
@@ -26,6 +27,7 @@ a reason; copying a local pattern that breaks a ground rule is how the rule deca
 | [javascript.md](javascript.md) | Node ESM: imports, async, child processes, errors, tests (node:test) |
 | [typescript.md](typescript.md) | strict mode, schemas (zod), React/Next.js boundaries |
 | [shell.md](shell.md) | PowerShell 5.1 and bash on Windows |
+| [testing.md](testing.md) | every language: what to test, minimal outcome asserts, prove a test can fail |
 
 **Upkeep:** when a review or the owner corrects a language-level habit, add it here (one line,
 with the incident) in the same turn, not just to memory.

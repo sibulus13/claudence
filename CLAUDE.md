@@ -241,7 +241,7 @@ Do NOT pause for: build warnings, lint noise, test scaffolding gaps, "should I c
 2. **Requirement / acceptance criterion**: one test per AC. It **freezes the intent** ("what we meant"), not the implementation, and names its AC/FR id.
 3. **Regression, written test-first when a regression actually happens**: reproduce the bug as a failing test, then fix it (TDD). The test names the incident.
 
-No speculative edge-case tests, no coverage-chasing, and no tests that pin implementation details. A found caveat is a regression (kind 3). Integration tests live only at real external boundaries, with external services mocked in CI. The cycle's design step writes this as the gate plan (`~/.claude/skills/dark-factory/CYCLE.md`).
+No speculative edge-case tests, no coverage-chasing, and no tests that pin implementation details. A found caveat is a regression (kind 3). **How to write them: `~/.claude/playbooks/testing.md`** (2026-10-25) — freeze only fundamental behaviours, 1-3 asserts on the outcome (never a whole object unless the shape is the contract), mocks only at real boundaries, and see every new test go red once by breaking the behaviour on purpose. Integration tests live only at real external boundaries, with external services mocked in CI. The cycle's design step writes this as the gate plan (`~/.claude/skills/dark-factory/CYCLE.md`).
 
 ### Run summary / checkpoint
 At loop completion OR any natural stop not caused by user interruption, emit: **Accomplished** · **Trade-offs** · **Decisions** · **Requires manual validation** · **Blocked**. Keep it compact — this is the handoff that lets the next session start without re-deriving context.

@@ -26,6 +26,10 @@ Baseline: Node 20 LTS, ESM (`"type": "module"`), pnpm. Each rule: **the rule**, 
   (temp + rename).
 
 ## Tests (node:test)
+- Follow [testing.md](testing.md) (what to test, minimal asserts, prove it can fail); below are the language specifics.
 - `node:test` + `node:assert/strict`; filesystem tests use `mkdtempSync` and clean up in `finally`.
 - Behaviour over call strings: assert observable state (files, exit codes, outputs), not the exact
   commands an implementation issues (review finding 2026-10-24, Foreman post-merge views).
+- **Minimal asserts: one behaviour per test, 1-3 asserts on the outcome.** No `deepEqual` of a
+  whole payload unless the full shape is the requirement; assert the field that carries the
+  behaviour (owner correction 2026-10-25).

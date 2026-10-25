@@ -40,7 +40,13 @@ Baseline: PEP 8 + PEP 20; 3.12. Each rule: **the rule**, then the reason or inci
 - Every network call has a timeout. Long jobs print progress and write a heartbeat.
 
 ## Tests (pytest)
+- Follow [testing.md](testing.md) (what to test, minimal asserts, prove it can fail); below are the language specifics.
 - Tests are sanity, one per acceptance criterion, or a regression named after its incident.
+- **Minimal asserts: one behaviour per test, asserted by its outcome (usually 1-3 asserts).** Assert
+  the property that matters ("the note reaches the sink", "a foreign chat is ignored"), not the
+  whole object, not exact formatting, not every intermediate call. No `==` on a full dict/envelope
+  unless the full shape IS the requirement. A test that breaks on a harmless wording or field-order
+  change is pinning implementation (owner correction 2026-10-25).
 - No real network, phone or production paths in tests: mock adapters by default, live tests behind
   an env flag (e.g. `NOTIFLY_LIVE=1`) and skipped otherwise.
 - Use `tmp_path` / `monkeypatch`; autouse fixtures sandbox anything a test could write for real.
