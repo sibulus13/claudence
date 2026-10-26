@@ -169,7 +169,7 @@ commits, `docs/M3-UI-DESIGN.md`) the first time this was asked, because nothing 
 it. Never skipped for a "small" addition — a one-FR addition is still one `featureHistory` entry.
 
 **Also append one line to `docs/PHASE-LOG.jsonl`** at the end of every phase, in every mode —
-added 2026-09-08 (FR-D3/D5, `D:/repo/AI/foreman/docs/VISUALIZATION-REQUIREMENTS.md`) after a
+added 2026-09-08 (FR-D3/D5, `D:/repo/Factory/foreman/docs/VISUALIZATION-REQUIREMENTS.md`) after a
 real dispatch made clear that STATE.md's single phase number can't answer "what did this phase
 actually produce" or "is this really sequential or does it fan out into parallel components."
 One JSON object per line (same convention as this codebase's other JSONL logs —
@@ -335,7 +335,7 @@ check).
 - **Catwalk renders this as a dedicated Roadmap view** — separate from the existing per-project
   pipeline flowchart (which shows dark-factory's own -1→7.5 phases for the CURRENT build), showing
   the dependency graph across node types, each node expandable to its full spec/gates/scoring —
-  see `D:/repo/AI/foreman/docs/VISUALIZATION-REQUIREMENTS.md` for how Catwalk's existing
+  see `D:/repo/Factory/foreman/docs/VISUALIZATION-REQUIREMENTS.md` for how Catwalk's existing
   requirements doc should grow to cover this, rather than a second, competing requirements doc.
 
 **What a node actually represents — `scope`, and how to decompose for real parallelism.**
@@ -376,7 +376,7 @@ level explicitly:
 described syncing `STATE.md` into Helm's "Nexus" workspace via generated `helm-*.json` files.
 Helm was verified dormant (3 commits ever, no runtime data since build day) and archived.
 Its design was extracted into requirements for a purpose-built replacement, **Catwalk**
-(`D:\repo\AI\catwalk`), which shipped 2026-09-07.
+(`D:\repo\Factory\catwalk`), which shipped 2026-09-07.
 
 **No file generation needed — this is simpler than the section it replaced.** Catwalk polls
 `~/.foreman/repos.json` (the project registry) and each registered project's `docs/STATE.md`
@@ -384,7 +384,7 @@ directly every 5s; there is no intermediate JSON to keep in sync. The only actio
 takes:
 
 - **Phase -1, when scaffolding a `new-product`:** register the repo once — `foreman repos add
-  <path>` (see `D:\repo\AI\foreman\docs\SPEC.md`) — so it appears in Catwalk's sidebar.
+  <path>` (see `D:\repo\Factory\foreman\docs\SPEC.md`) — so it appears in Catwalk's sidebar.
 - **Every phase, every mode:** keep `STATE.md`'s YAML block and build-status Mermaid current
   (already required above). That alone is what Catwalk renders — the phase highlighting comes
   straight from `phasesRun` / `lastCompletedPhase` / `status`.

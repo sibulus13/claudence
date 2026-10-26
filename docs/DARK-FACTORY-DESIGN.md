@@ -17,7 +17,7 @@
 | Bifrost's continuity check, rigor dial, human-approval-as-node | Ported into Phases 3/2/4+7 |
 | Run without a human clicking through each gate | Phase 1/2.5 auto-advance rule + continuous same-run execution (event-driven, not scheduled) |
 | **Reusable in pieces, not all-or-nothing** (2026-09-07 ask) | New **Entry modes** — `new-product` / `feature-add` / `spec-only` / `review-only` / `build-only` / `integration-check` / `gap-log` |
-| **Visualize in-progress build status** (2026-09-07 ask, = Ask #1 from the original dark-factory memory) | Originally: reuse Helm's "Nexus" workspace. **Superseded same day** — Helm confirmed dormant; now a fresh app spec'd at `D:/repo/AI/foreman/docs/VISUALIZATION-REQUIREMENTS.md`, not yet built |
+| **Visualize in-progress build status** (2026-09-07 ask, = Ask #1 from the original dark-factory memory) | Originally: reuse Helm's "Nexus" workspace. **Superseded same day** — Helm confirmed dormant; now a fresh app spec'd at `D:/repo/Factory/foreman/docs/VISUALIZATION-REQUIREMENTS.md`, not yet built |
 
 ---
 
@@ -50,7 +50,7 @@ code coupled to an unrelated personal monorepo was a worse bet than a fresh,
 purpose-built surface. **Current plan:** Helm/`second-brain` is archived in place
 (marked superseded in its own `context.md`/`CLAUDE.md`, not deleted); its proven
 schemas and UX were extracted into
-`D:/repo/AI/foreman/docs/VISUALIZATION-REQUIREMENTS.md` as requirements for a new
+`D:/repo/Factory/foreman/docs/VISUALIZATION-REQUIREMENTS.md` as requirements for a new
 app in the `AI/` category — see Foreman's `docs/DECISIONS.md` D12 for the full
 evidence. The section below is kept for its still-useful analysis (the STATE.md →
 schema mapping, the phase-to-milestone logic) but "Nexus" in it should now be read
@@ -228,7 +228,7 @@ flowchart LR
 - **The one genuine suspend point** — `awaiting-human-approval`, `live` tier only — resumes on the approval event itself (the human sets the field and re-invokes), never on a timer. `pre-traffic` projects never reach this state.
 - **Crucible's every-6-hours auto-implementer** (`Stock/Research 2026`) stays a useful reference for *that* domain's shape (hundreds of independent trading strategies genuinely do warrant a regular re-scan), but is not a template to copy here — this pipeline's phases are dependent and sequential, not an independent batch to re-poll.
 
-**2026-09-07 addendum — Foreman.** The above is about *within one running session*; it does not address running with literally no session active at all (true unattended operation, no human or agent currently driving anything). For that, `D:/repo/AI/foreman` (ported from `sibulus13/ostler`'s `core/`, see its own `docs/OSTLER-PRIOR-ART.md`) is now the real answer: a headless daemon with an always-on, non-blocking, wakeable dispatcher — the same "no polling delay" shape described above, but as actual running code rather than an in-session agent loop. Its board is GitHub issue labels (`factory:approved` is the human-approval act), not `STATE.md` polling, and it invokes `/dark-factory build-only` per approved issue. See `[[project_foreman]]` (session memory) for status.
+**2026-09-07 addendum — Foreman.** The above is about *within one running session*; it does not address running with literally no session active at all (true unattended operation, no human or agent currently driving anything). For that, `D:/repo/Factory/foreman` (ported from `sibulus13/ostler`'s `core/`, see its own `docs/OSTLER-PRIOR-ART.md`) is now the real answer: a headless daemon with an always-on, non-blocking, wakeable dispatcher — the same "no polling delay" shape described above, but as actual running code rather than an in-session agent loop. Its board is GitHub issue labels (`factory:approved` is the human-approval act), not `STATE.md` polling, and it invokes `/dark-factory build-only` per approved issue. See `[[project_foreman]]` (session memory) for status.
 
 ---
 

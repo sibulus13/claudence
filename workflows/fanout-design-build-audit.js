@@ -15,16 +15,16 @@ export const meta = {
 /*
  * Expected `args` shape (pass via Workflow({..., args})):
  * {
- *   repo: 'D:/repo/AI/nuwa',                          // absolute repo root
- *   pyInterpreter: 'D:/repo/AI/nuwa/.venv/Scripts/python.exe',  // PINNED interpreter — determinism checklist item 5
- *   designDoc: 'D:/repo/AI/nuwa/docs/SOME-DESIGN.md',  // the spec every stage reads
- *   schemasFile: 'D:/repo/AI/nuwa/nuwa/ops/content/schemas.py', // the one shared contract, never redefined by a component
+ *   repo: 'D:/repo/SaaS/nuwa',                          // absolute repo root
+ *   pyInterpreter: 'D:/repo/SaaS/nuwa/.venv/Scripts/python.exe',  // PINNED interpreter — determinism checklist item 5
+ *   designDoc: 'D:/repo/SaaS/nuwa/docs/SOME-DESIGN.md',  // the spec every stage reads
+ *   schemasFile: 'D:/repo/SaaS/nuwa/nuwa/ops/content/schemas.py', // the one shared contract, never redefined by a component
  *   maxLoopIterations: 3,                              // safety cap on the Build Review/Audit/Fix loop — logged if hit, never silent
  *   components: [
  *     {
  *       key: 'shot_matcher',
- *       file: 'D:/repo/AI/nuwa/nuwa/ops/content/shot_matcher.py',
- *       test: 'D:/repo/AI/nuwa/tests/test_shot_matcher.py',
+ *       file: 'D:/repo/SaaS/nuwa/nuwa/ops/content/shot_matcher.py',
+ *       test: 'D:/repo/SaaS/nuwa/tests/test_shot_matcher.py',
  *       designBrief: 'One-paragraph pointer to the relevant design-doc section + a one-line summary of what this component does.',
  *     },
  *     // ...more components

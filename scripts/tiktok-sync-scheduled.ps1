@@ -15,7 +15,7 @@ $Tools = @(
   'Bash(python:*)', 'Read', 'Write', 'Skill'
 )
 Add-Content -Path $Log -Value ("=== {0} start ===" -f (Get-Date -Format 's')) -Encoding utf8
-Set-Location 'D:\repo\AI\nuwa\docs\work\own-style-analysis'
+Set-Location 'D:\repo\SaaS\nuwa\docs\work\own-style-analysis'
 & $Claude -p '/tiktok-sync scheduled' --chrome --model sonnet --max-budget-usd $MaxBudgetUsd --allowedTools ($Tools -join ',') 2>&1 |
   ForEach-Object { Add-Content -Path $Log -Value $_ -Encoding utf8 }
 $rc = $LASTEXITCODE

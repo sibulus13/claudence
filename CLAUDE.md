@@ -16,11 +16,11 @@ These instructions apply to every project on this machine. Project-level CLAUDE.
 ## Repository Organization (D:\repo)
 
 - **Every repo lives inside a categorized subfolder** of `D:\repo` — `D:\repo\<Category>\<project>`, never bare at `D:\repo\<project>`.
-- **Existing categories:** `AI\` (AI/ML tools & pipelines), `web\` (web apps/products), `Bot\`, `Data\`, `Experiment\` (spikes/POCs), `Lib\` (shared libraries/services, e.g. TeleFi), `Life\` (personal docs), `_Misc\`, `_Archive\` (retired repos, kept under their original path; index `D:\repo\_Archive\README.md`). Reuse an existing category before inventing one.
-- **Moving a repo:** run `python ~/.claude/scripts/path_pins.py` (who pins the path), then `python ~/.claude/scripts/repo_move.py --plan <moves.json>` (moves, keeps Claude history attached, writes an undo log); rewrite any task/registry pin it lists in the same step.
+- **Categories are by THEME (purpose), not tech stack** (owner-approved 2026-10-25): `Finance\` (Crucible, Augur), `Factory\` (Ostler -> Foreman -> Catwalk, Herald), `SaaS\` (products being productionized: cashcow/Tarive, certify, nuwa, `SaaS\pylon\*`, Workout Gen), `Assistant\` (Cortex, Groundtruth), `Lib\` (shared services: TeleFi), `Life\` (personal docs; its apps stay in the Life repo), `web\personal\` (portfolio, sunset), `Experiment\` (spikes/POCs), `_Misc\`, `_Archive\` (retired repos under their original path; index `D:\repo\_Archive\README.md`). Legacy `AI\`, `Bot\`, `Data\`, `web\` are being emptied: never add to them. Shared capabilities follow the sensor/actuator architecture (`~/.claude/docs/fleet/ARCHITECTURE_SENSE_ACT.md`).
+- **Moving a repo:** run `python ~/.claude/scripts/path_pins.py` (who pins the path), then `python ~/.claude/scripts/repo_move.py --plan <moves.json>` (moves, keeps Claude history attached, writes an undo log), then `repoint_paths.py --map` (text pins, set `MSYS_NO_PATHCONV=1` in Git Bash) and `repoint_tasks.ps1 -Map` (scheduled tasks), `git worktree repair <new paths>`, and `pnpm install --offline --force` (pnpm links are absolute junctions). A running daemon or open terminal in the folder blocks the rename.
 - **New repos:** when creating or cloning a repo, **deem its category** and place it in that subfolder. State the chosen category when you do. If none fit, propose a new category rather than dropping it bare at the root.
 - **Make repos relocatable:** never hardcode absolute repo paths in code — derive in-repo paths from `__file__`/repo-root so a repo can be moved between categories without breakage.
-- **Known placement:** Nüwa (beat-synced short-form video editor) → `D:\repo\AI\nuwa` (AI media pipeline). Its v2 rebuild stays under `AI\`.
+- **Known placement:** Nüwa (beat-synced short-form video editor, product candidate) → `D:\repo\SaaS\nuwa`.
 
 ## Production Application Governance (design → review → gate → build)
 
@@ -73,7 +73,7 @@ Whenever a new rule, convention, or operating contract is established, **explici
 - Do not add unsolicited comments, docstrings, or type annotations to code you didn't change
 - Do not add emojis unless explicitly asked
 - **Cite files as ABSOLUTE forward-slash paths with a line number** —
-  `D:/repo/web/cashcow/docs/FOO.md:1`, never `docs/FOO.md`. This is not cosmetic: this
+  `D:/repo/SaaS/cashcow/docs/FOO.md:1`, never `docs/FOO.md`. This is not cosmetic: this
   machine runs Claude Code inside **WezTerm**, whose hyperlink rule requires a drive letter
   (`~/.claude/terminal.lua`), and whose `open-uri` handler then opens the match in VS Code —
   flipping markdown into preview automatically. A relative path is styled blue by Claude Code
@@ -275,7 +275,7 @@ Stay on the critical path. Work that does **not** directly advance the current g
 - **Background jobs never show a window (standing rule, 2026-09-30).** Every scheduled task,
   daemon, or background launch of node / powershell / python / cmd / claude runs silently:
   the Task Scheduler action is `wscript.exe //B //Nologo <repo>\scripts\run-hidden.vbs <program> [args]`
-  (copy `D:\repo\AI\cortex\scripts\run-hidden.vbs` into the repo; it hides the window at process
+  (copy `D:\repo\Assistant\cortex\scripts\run-hidden.vbs` into the repo; it hides the window at process
   creation, so nothing flashes) and the task is registered with `-Hidden`. Python may use
   `pythonw.exe` instead. Never `node.exe` / `powershell.exe` directly as the action, and never rely
   on `powershell -WindowStyle Hidden` (it still flashes). Child processes spawned from Node use

@@ -5,7 +5,7 @@ description: Post-review playbook for @chase.ride. For each reel in the Notion M
 
 # tiktok-sync: post-review playbook
 
-Procedure source of truth for reading TikTok without the API: `D:/repo/AI/nuwa/docs/work/own-style-analysis/STATS-PLAYBOOK.md`. Strategy context (which levers are real): `PERFORMANCE-2026-10-02.md` § Core signals in the same folder.
+Procedure source of truth for reading TikTok without the API: `D:/repo/SaaS/nuwa/docs/work/own-style-analysis/STATS-PLAYBOOK.md`. Strategy context (which levers are real): `PERFORMANCE-2026-10-02.md` § Core signals in the same folder.
 
 ```mermaid
 flowchart TD
@@ -20,7 +20,7 @@ flowchart TD
 
 ## Store
 - Notion data source `collection://20a5eed4-845d-80c8-8551-000b195bd10b` (Motorcycle Content Bank). Account `@chase.ride`. Times are America/Vancouver; Notion stores UTC.
-- Curves: `D:/repo/AI/nuwa/docs/work/own-style-analysis/data/post-curves.jsonl`, one line per post `{"id","read","retention":[% at 0s,1s,...],"hourly":[views at +0h,+1h,...]}`. Machine-read by `post_review.py`, so it lives in a file, not in Notion columns.
+- Curves: `D:/repo/SaaS/nuwa/docs/work/own-style-analysis/data/post-curves.jsonl`, one line per post `{"id","read","retention":[% at 0s,1s,...],"hourly":[views at +0h,+1h,...]}`. Machine-read by `post_review.py`, so it lives in a file, not in Notion columns.
 - Scorer: `post_review.py` in the same folder (`python post_review.py <review.json> data/post-curves.jsonl`).
 
 ## Modes

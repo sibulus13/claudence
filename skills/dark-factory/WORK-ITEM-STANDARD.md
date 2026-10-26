@@ -1,6 +1,6 @@
 # Work-Item Standard — one C4 spine, per-layer change impact, per-type profiles
 
-Adopted 2026-09-25 (global: every dark-factory repo). It is rendered by Catwalk (`D:/repo/AI/catwalk/docs/work/c4-change-impact/`).
+Adopted 2026-09-25 (global: every dark-factory repo). It is rendered by Catwalk (`D:/repo/Factory/catwalk/docs/work/c4-change-impact/`).
 
 ```mermaid
 flowchart TD

@@ -5,7 +5,7 @@ description: Intake + configuration + go-live for the Miko (Pythia) chat widget 
 
 # miko-onboard — put Miko live on a new website
 
-Miko is the guardrailed RAG assistant served by the **pythia** backend (`D:\repo\web\pythia`), embedded via a
+Miko is the guardrailed RAG assistant served by the **pythia** backend (`D:\repo\SaaS\pylon\pythia`), embedded via a
 `<script>`/`widget.js`. Onboarding a new site = a **tenant** (config + CORS + persona) + a **corpus** (its knowledge)
 + a **brand-matched embed**. Public marketing surface only.
 
