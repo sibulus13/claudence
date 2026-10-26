@@ -100,6 +100,7 @@ broken are enforced in code (`~/.claude/hooks/guard.py`), not here. Each rule's 
 | file-type rules / task playbooks | `~/.claude/rules/`, `~/.claude/playbooks/` |
 | skills, agents, workflows | `~/.claude/skills/`, `~/.claude/agents/`, `~/.claude/workflows/cycle.js` |
 | harness standard | `~/.claude/docs/fleet/reports/Agent harness engineering practices.md`, `~/.claude/docs/fleet/HARNESS_AUDIT.md` |
+| docs, by audience | public harness docs `~/.claude/docs/` (claudence) · private fleet-wide docs `~/.claude/docs/fleet/` (own local repo: ledger, plans, audits) · one project's docs `<repo>/docs/` · one project's memory `~/.claude/projects/D--repo-<Theme>-<project>/memory/` |
 | this folder | `~/.claude` is the public `claudence` repo: commit and push drift; `docs/fleet/` stays private (ignored) |
 
 Sounds on Stop and PermissionRequest are configured globally; never play sounds or change the volume.
