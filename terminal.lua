@@ -1334,7 +1334,7 @@ table.insert(config.hyperlink_rules, {
 })
 -- SECOND rule: paths inside backtick code-spans. The bare-path rule above excludes
 -- whitespace from every segment ([^\s...]), so a repo with a SPACE in its own path
--- (e.g. "D:/repo/Stock/Research 2026/...", this machine's own algo-trading repo) can
+-- (e.g. "D:/repo/Finance/crucible/...", this machine's own algo-trading repo) can
 -- never match — the regex stops at the space and the link is silently never formed,
 -- even though Claude Code still colors the text blue on its own. Discovered live
 -- 2026-09-09: paths in that repo's session showed blue but were never clickable.

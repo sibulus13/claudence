@@ -12,7 +12,7 @@
 
 .EXAMPLE
   open-workspace.ps1 -WorkspaceName helm -ProjectPath "D:\repo\Life\second-brain"
-  open-workspace.ps1 -WorkspaceName crucible -ProjectPath "D:\repo\Stock\Research 2026" -RightCmd "python main.py"
+  open-workspace.ps1 -WorkspaceName crucible -ProjectPath "D:\repo\Finance\crucible" -RightCmd "python main.py"
 #>
 param(
   [Parameter(Mandatory)][string]$WorkspaceName,

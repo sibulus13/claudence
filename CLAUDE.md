@@ -406,7 +406,7 @@ not specific to fan-out workflows; it's a general build practice:
 Every non-trivial task has a *cognitive mode*. Match the persona to the mode, and the model to the persona's complexity ceiling.
 
 **This table was pure documentation for a long time — worth naming plainly.** A project under
-`D:\repo\Stock\Research 2026\.claude\agents\` independently diagnosed the gap and said it best:
+`D:\repo\Finance\crucible\.claude\agents\` independently diagnosed the gap and said it best:
 *"`subagent_type` could only ever resolve to a built-in (`Explore`, `Plan`, `general-purpose`)...
 `general-purpose` won every dispatch by default, not by judgement."* Three of these personas now
 have real, dispatchable files promoted from that project to `~/.claude/agents/` (global, so
