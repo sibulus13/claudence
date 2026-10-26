@@ -231,9 +231,8 @@ end
 -- rendered text. Keys are the repo path RELATIVE to the repo root, forward-
 -- slashed + lowercased. No entry => the leaf folder name (last path segment).
 local REPO_ALIASES = {
-  ['web/cashcow']         = 'Tarive',        -- legacy folder name; product rebranded to Tarive (web app)
-  ['web/tarive']          = 'Tarive (app)',  -- the Expo mobile app — disambiguated from the web tab above
-  ['stock/research 2026'] = 'Crucible',      -- algo-trading paper-gate project (#37); folder predates the name
+  ['saas/cashcow']        = 'Tarive',        -- legacy folder name; product rebranded to Tarive (web app)
+  ['finance/crucible']    = 'Crucible',      -- algo-trading paper-gate project (#37); moved from Stock/Research 2026
   ['life/second-brain']   = 'Cortex',        -- #31 second brain + Helm dashboard; product name = Cortex
 }
 
