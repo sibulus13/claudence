@@ -80,6 +80,8 @@ broken are enforced in code (`~/.claude/hooks/guard.py`), not here. Each rule's 
   then summarize phase, last step and next action.
 - One canonical doc per concern. Decisions: `docs/DECISIONS.md`. Session detail: `docs/SESSION_LOG.md` under
   the docs root the SessionStart hook states.
+- Fleet-wide journal and roadmap: `~/.claude/docs/fleet/LEDGER.md` (private). Update it with `/ledger` at the end
+  of a working session: one row per meaningful change with its why and commit ref.
 - Repos where agents run concurrently keep an `## Agentic Orchestration Rules` section.
 - Anything that produces an artifact also produces a pass/fail check of it (`~/.claude/playbooks/reliability.md`).
 
