@@ -28,6 +28,7 @@ LONG_RUNNERS = re.compile(r"\b(pnpm|npm|yarn)\s+(run\s+)?(build|test)\b|\bnext\s
                           r"\bvitest\b(?!\s+\S*\.(test|spec)\.)|\bpytest\b|\bnpm\s+test\b")
 PYTEST_TARGET = re.compile(r"\.py\b|::|/|\\")
 QUOTED = re.compile(r"\"(?:\\.|[^\"\\])*\"|'[^']*'")
+HEREDOC = re.compile(r"<<-?\s*['\"]?(\w+)['\"]?[^\n]*\n.*?\n\s*\1\s*(?=\n|$)", re.S)
 SINGLE_TEST = re.compile(r"\S+\.(test|spec)\.[cm]?[jt]sx?\b|\btest_\w+\.py\b|::")
 
 
@@ -83,7 +84,7 @@ def clone_or_init_target(cmd: str, cwd: str) -> Path | None:
 def check_shell(event: dict) -> dict | None:
     ti = event.get("tool_input") or {}
     # Quoted text (commit messages, echo strings) is data, not flags: match rules against the rest only.
-    cmd = QUOTED.sub("''", ti.get("command") or "")
+    cmd = QUOTED.sub("''", HEREDOC.sub("<<HEREDOC", ti.get("command") or ""))
     cwd = event.get("cwd") or os.getcwd()
     if re.search(r"\bgit\b[^|;&]*\b(commit|push|merge|rebase)\b[^|;&]*--no-verify", cmd):
         return decide("deny", "--no-verify is never allowed: fix the failing hook instead.")

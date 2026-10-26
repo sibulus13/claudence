@@ -29,7 +29,7 @@ Read in parallel:
 - `~/.claude/telemetry/reports/*.json` — friction reports (score, overrides, friction_notes, allow_suggestions)
 - `~/.claude/projects/*/memory/MEMORY.md` — accumulated memory index files
 - `~/.claude/projects/*/memory/feedback_*.md` — existing feedback memories (to avoid duplicating)
-- Active project `context.md` files: Helm, Envoy, Crucible — look for drift notes and open decisions
+- Active project state docs (`docs/STATE.md`, `todo.md`) of Foreman, Catwalk, Cortex, Crucible: look for drift notes and open decisions
 
 ### 3. Extract patterns
 

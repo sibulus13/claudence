@@ -43,6 +43,8 @@ def test_always_never_rules_are_denied(cmd: str) -> None:
     "git commit -m 'feat: x'",
     # regression 2026-10-25: a commit message that merely mentions the flag was blocked
     'git commit -q -m "feat: deny --no-verify and git stash in hooks"',
+    # regression 2026-10-25: a heredoc writing a doc that mentions pytest was blocked as a long command
+    "cat > notes.md <<'EOF'\n| rules | pytest and pnpm build |\nEOF\necho ok",
     "git push --force-with-lease origin feature",
     "git stash list",
     "python -m pytest tests/test_x.py -q",

@@ -1,6 +1,6 @@
 ---
 name: orchestrate
-description: Six named role-flows (feature / bugfix / arch-decision / security-review / go-to-market / hotfix) that sequence real agent personas with structural review gates, and hand multi-component fan-out to the fanout-design-build-audit workflow rather than re-deriving partition/execute logic ad hoc.
+description: Six named role-flows (feature / bugfix / arch-decision / security-review / go-to-market / hotfix) that sequence real agent personas with structural review gates, and hand multi-component fan-out to the cycle workflow (one call per scope) rather than re-deriving partition/execute logic ad hoc.
 version: 2.0.0
 ---
 
@@ -20,14 +20,14 @@ pointed you here, this version is what actually backs that description now.
   dispatchable subagent types — pass `subagent_type: "implementer"` / `"researcher"` / `"reviewer"` /
   `"designer"` / `"architect"` to the Agent tool (or `agentType` to a `Workflow` script's `agent()`
   calls) and get the real persona file, not a prompt you hand-roll. Planner is covered by the
-  built-in `Plan` agent; QA is covered by the `/qa` skill; Questioner/Security/Marketing/Business are
-  deferred (see the Agent Personas table in CLAUDE.md for each one's build trigger) — write their
+  built-in `Plan` agent; QA is covered by the `/qa` skill; Security is `subagent_type: "security"`;
+  Questioner/Marketing/Business are deferred (see the Agent Personas table in CLAUDE.md for each one's build trigger) — write their
   persona into the prompt text explicitly if a flow below needs one before it's promoted to a file.
 - **Multi-component fan-out**: when a flow's work naturally splits into ≥2 independently-testable
   components (separate files/modules, each with its own test boundary), delegate the actual
-  build-review-audit-fix mechanics to the saved workflow at
-  `~/.claude/workflows/fanout-design-build-audit.js` via
-  `Workflow({ scriptPath: "~/.claude/workflows/fanout-design-build-audit.js", args: { repo, pyInterpreter, designDoc, schemasFile, components, maxLoopIterations } })`
+  design-review-implement-review mechanics to the cycle workflow at `~/.claude/workflows/cycle.js`
+  (spec `~/.claude/skills/dark-factory/CYCLE.md`; it superseded fanout-design-build-audit 2026-09-26),
+  one `Workflow({ scriptPath: "~/.claude/workflows/cycle.js", args })` call per component, in parallel,
   rather than re-implementing partition/execute/verify logic here. That script already encodes the
   Fan-Out Workflow Pre-Flight Checklist (persona/model/effort per stage, determinism pinned,
   independent reviewer mandatory, worktree-by-default) — don't duplicate it.
