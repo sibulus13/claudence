@@ -16,7 +16,8 @@ These instructions apply to every project on this machine. Project-level CLAUDE.
 ## Repository Organization (D:\repo)
 
 - **Every repo lives inside a categorized subfolder** of `D:\repo` — `D:\repo\<Category>\<project>`, never bare at `D:\repo\<project>`.
-- **Existing categories:** `AI\` (AI/ML tools & pipelines), `web\` (web apps/products), `Bot\`, `Data\`, `Experiment\` (spikes/POCs), `_Misc\`. Reuse an existing category before inventing one.
+- **Existing categories:** `AI\` (AI/ML tools & pipelines), `web\` (web apps/products), `Bot\`, `Data\`, `Experiment\` (spikes/POCs), `Lib\` (shared libraries/services, e.g. TeleFi), `Life\` (personal docs), `_Misc\`, `_Archive\` (retired repos, kept under their original path; index `D:\repo\_Archive\README.md`). Reuse an existing category before inventing one.
+- **Moving a repo:** run `python ~/.claude/scripts/path_pins.py` (who pins the path), then `python ~/.claude/scripts/repo_move.py --plan <moves.json>` (moves, keeps Claude history attached, writes an undo log); rewrite any task/registry pin it lists in the same step.
 - **New repos:** when creating or cloning a repo, **deem its category** and place it in that subfolder. State the chosen category when you do. If none fit, propose a new category rather than dropping it bare at the root.
 - **Make repos relocatable:** never hardcode absolute repo paths in code — derive in-repo paths from `__file__`/repo-root so a repo can be moved between categories without breakage.
 - **Known placement:** Nüwa (beat-synced short-form video editor) → `D:\repo\AI\nuwa` (AI media pipeline). Its v2 rebuild stays under `AI\`.
