@@ -75,3 +75,6 @@ plans/
 
 # tiktok-sync scheduled run logs (runtime state)
 logs/
+
+# fleet inventory: private project/Notion state, never published (claudence is public)
+docs/fleet/
