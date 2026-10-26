@@ -36,6 +36,15 @@
             "shell": "bash"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$USERPROFILE/.claude/hooks/session_context.py\"",
+            "timeout": 15
+          }
+        ]
       }
     ],
     "UserPromptSubmit": [
@@ -104,6 +113,18 @@
             "command": "powershell.exe -NoProfile -File $USERPROFILE/.claude/telemetry/notify-attention.ps1 -Reason permission -Sound ding-half.wav",
             "shell": "bash",
             "async": true
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell|Write|Edit|MultiEdit|NotebookEdit|mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$USERPROFILE/.claude/hooks/guard.py\"",
+            "timeout": 15
           }
         ]
       }

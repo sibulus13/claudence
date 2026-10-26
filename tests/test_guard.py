@@ -1,0 +1,71 @@
+"""Acceptance tests for ~/.claude/hooks/guard.py: one case per always/never rule (HARNESS_AUDIT.md §3),
+plus the allow cases that must stay allowed. Runs the hook as Claude Code does: JSON on stdin.
+
+    python -m pytest ~/.claude/tests/test_guard.py -q
+"""
+from __future__ import annotations
+
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+import pytest
+
+HOOK = Path(__file__).resolve().parents[1] / "hooks" / "guard.py"
+CWD = "D:/repo"
+
+
+def run(tool: str, tool_input: dict, **extra: object) -> str | None:
+    event = {"tool_name": tool, "tool_input": tool_input, "cwd": CWD, "permission_mode": "default", **extra}
+    out = subprocess.run([sys.executable, str(HOOK)], input=json.dumps(event), capture_output=True, text=True,
+                         timeout=30, env={"PATH": "", "SYSTEMROOT": "C:/Windows"})
+    return json.loads(out.stdout)["hookSpecificOutput"]["permissionDecision"] if out.stdout.strip() else None
+
+
+@pytest.mark.parametrize("cmd", [
+    "git commit --no-verify -m x",
+    "git push --force origin main",
+    "git stash",
+    "python3 script.py",
+    "schtasks /create /tn x /tr notepad.exe",
+    "git clone https://github.com/x/newrepo D:/repo/newrepo",
+    "git clone https://github.com/x/newrepo D:/repo/AI/newrepo",
+    "echo v | vercel env add KEY production",
+    "pnpm build",
+    "python -m pytest -q",
+])
+def test_always_never_rules_are_denied(cmd: str) -> None:
+    assert run("Bash", {"command": cmd}) == "deny"
+
+
+@pytest.mark.parametrize("cmd", [
+    "git commit -m 'feat: x'",
+    # regression 2026-10-25: a commit message that merely mentions the flag was blocked
+    'git commit -q -m "feat: deny --no-verify and git stash in hooks"',
+    "git push --force-with-lease origin feature",
+    "git stash list",
+    "python -m pytest tests/test_x.py -q",
+    "git clone https://github.com/x/newrepo D:/repo/SaaS/newrepo",
+    "wscript.exe //B //Nologo D:\\repo\\x\\scripts\\run-hidden.vbs; Register-ScheduledTask -TaskName t",
+])
+def test_normal_commands_stay_allowed(cmd: str) -> None:
+    assert run("Bash", {"command": cmd}) is None
+
+
+def test_long_command_allowed_in_background_and_unattended() -> None:
+    assert run("Bash", {"command": "pnpm build", "run_in_background": True}) is None
+    assert run("Bash", {"command": "pnpm build"}, permission_mode="bypassPermissions") is None
+
+
+def test_subagent_cannot_edit_governance_but_parent_can() -> None:
+    target = {"file_path": "C:/Users/Michael/.claude/CLAUDE.md", "old_string": "a", "new_string": "b"}
+    assert run("Edit", target, agent_id="sub-1") == "deny"
+    assert run("Edit", target) is None
+
+
+def test_notion_write_asks_unless_unattended() -> None:
+    tool = "mcp__plugin_Notion_notion__notion-update-page"
+    assert run(tool, {}) == "ask"
+    assert run(tool, {}, permission_mode="bypassPermissions") is None
+    assert run("mcp__plugin_Notion_notion__notion-fetch", {}) is None

@@ -16,6 +16,8 @@ $Tools = @(
 )
 Add-Content -Path $Log -Value ("=== {0} start ===" -f (Get-Date -Format 's')) -Encoding utf8
 Set-Location 'D:\repo\SaaS\nuwa\docs\work\own-style-analysis'
+# Unattended run: hooks/guard.py skips its interactive-only rules (Notion write = ask) for this job only.
+$env:CLAUDE_UNATTENDED = '1'
 & $Claude -p '/tiktok-sync scheduled' --chrome --model sonnet --max-budget-usd $MaxBudgetUsd --allowedTools ($Tools -join ',') 2>&1 |
   ForEach-Object { Add-Content -Path $Log -Value $_ -Encoding utf8 }
 $rc = $LASTEXITCODE
