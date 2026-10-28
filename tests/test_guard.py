@@ -66,6 +66,16 @@ def test_subagent_cannot_edit_governance_but_parent_can() -> None:
     assert run("Edit", target) is None
 
 
+def test_notion_write_to_owner_approved_ids_does_not_ask() -> None:
+    sys.path.insert(0, str(HOOK.parent))
+    from guard import targets_only_approved
+    ok = {"1675eed4845d8056992fd03c7227da76"}
+    assert targets_only_approved({"page_id": "1675eed4-845d-8056-992f-d03c7227da76", "command": "update_content"}, ok)
+    assert not targets_only_approved({"page_id": "1675eed4845d8056992fd03c7227da76",
+                                      "new_str": "<page url=\"https://n.so/p/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\">"}, ok)
+    assert not targets_only_approved({"query": "x"}, ok)
+
+
 def test_notion_write_asks_unless_unattended() -> None:
     tool = "mcp__plugin_Notion_notion__notion-update-page"
     assert run(tool, {}) == "ask"

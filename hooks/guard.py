@@ -22,6 +22,12 @@ SHELL_TOOLS = {"Bash", "PowerShell"}
 EDIT_TOOLS = {"Write", "Edit", "MultiEdit", "NotebookEdit"}
 NOTION_WRITE = re.compile(r"^mcp__.*notion.*__notion-(create|update|move|duplicate|delete|restore|set|upload|"
                           r"convert|spawn|send|stop|calendar-(create|update|cancel))", re.I)
+# Destructive Notion actions always ask, even on approved pages.
+NOTION_DESTRUCTIVE = re.compile(r"__notion-(delete|move|restore)", re.I)
+# Owner-approved Notion targets (2026-10-27): ids of pages, databases and data sources the owner allows interactive
+# writes to without a per-action prompt. Kept outside this public repo.
+NOTION_ALLOW_NAME = (".cortex", "notion-allow.json")
+HEX_ID = re.compile(r"[0-9a-f]{32}")
 GOVERNANCE = re.compile(r"(/|\\)(CLAUDE\.md|AGENTS\.md)$|(/|\\)memory(/|\\)|(/|\\)\.claude(/|\\)settings[^/\\]*\.json$|"
                         r"(/|\\)\.claude(/|\\)(agents|hooks|rules|output-styles)(/|\\)", re.I)
 LONG_RUNNERS = re.compile(r"\b(pnpm|npm|yarn)\s+(run\s+)?(build|test)\b|\bnext\s+build\b|\bplaywright\s+test\b|"
@@ -39,6 +45,21 @@ def decide(kind: str, reason: str) -> dict:
 
 def unattended(event: dict) -> bool:
     return event.get("permission_mode") == "bypassPermissions" or os.environ.get("CLAUDE_UNATTENDED") == "1"
+
+
+def approved_notion_ids(path: Path | None = None) -> set[str]:
+    try:
+        path = path or Path.home().joinpath(*NOTION_ALLOW_NAME)
+        return {i.replace("-", "").lower() for i in json.loads(path.read_text(encoding="utf-8")).get("ids", [])}
+    except (OSError, ValueError, RuntimeError):  # no file, bad JSON, or no home directory: nothing is approved
+        return set()
+
+
+def targets_only_approved(tool_input: dict, allowed: set[str] | None = None) -> bool:
+    """True when every Notion id the call names is on the owner's approved list (and it names at least one)."""
+    allowed = approved_notion_ids() if allowed is None else allowed
+    ids = set(HEX_ID.findall(json.dumps(tool_input).replace("-", "").lower()))
+    return bool(ids) and ids <= allowed
 
 
 def staged_env_files(cwd: str) -> list[str]:
@@ -128,6 +149,8 @@ def check(event: dict) -> dict | None:
             return decide("deny", "Subagents never edit governance (CLAUDE.md, memory, settings, agents, hooks, rules): "
                                   "return the proposed change to the parent session.")
     if NOTION_WRITE.search(tool) and not unattended(event):
+        if not NOTION_DESTRUCTIVE.search(tool) and targets_only_approved(event.get("tool_input") or {}):
+            return None
         return decide("ask", "Notion write: needs the owner's per-action OK.")
     return None
 
