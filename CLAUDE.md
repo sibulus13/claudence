@@ -34,6 +34,8 @@ broken are enforced in code (`~/.claude/hooks/guard.py`), not here. Each rule's 
 - Loop: next unblocked milestone -> implement with its tests -> run the gate -> commit (conventional
   `feat:`/`fix:`/`chore:`/`docs:`/`refactor:`/`test:`) and push -> repeat. Auto-commit and push unless the repo
   says otherwise. Stage specific files. Never amend a pushed commit.
+- A large milestone (a project, service or feature finished) or code going public ends with the refactor
+  pass: `~/.claude/playbooks/refactor-pass.md`.
 - The only reasons to stop, always named by class:
   - `credentials-no-agentic-path` (look for an MCP server or CLI first)
   - `irreversible-approval` (schema drop, billing, outreach, data migration, publishing)
