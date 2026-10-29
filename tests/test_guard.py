@@ -5,6 +5,7 @@ plus the allow cases that must stay allowed. Runs the hook as Claude Code does: 
 """
 from __future__ import annotations
 
+import _winapi
 import json
 import subprocess
 import sys
@@ -53,6 +54,17 @@ def test_always_never_rules_are_denied(cmd: str) -> None:
 ])
 def test_normal_commands_stay_allowed(cmd: str) -> None:
     assert run("Bash", {"command": cmd}) is None
+
+
+def test_worktree_remove_denied_while_node_modules_holds_a_link(tmp_path: Path) -> None:
+    # regression 2026-10-28: removal followed node_modules/meter (a junction) and deleted the linked repo
+    target = tmp_path / "target"
+    target.mkdir()
+    (tmp_path / "wt" / "node_modules").mkdir(parents=True)
+    cmd = f'git worktree remove --force "{tmp_path / "wt"}"'
+    assert run("Bash", {"command": cmd}) is None
+    _winapi.CreateJunction(str(target), str(tmp_path / "wt" / "node_modules" / "meter"))  # what npm `file:` makes
+    assert run("Bash", {"command": cmd}) == "deny"
 
 
 def test_long_command_allowed_in_background_and_unattended() -> None:

@@ -19,6 +19,7 @@ flowchart TD
 | `~/.claude/rules/hooks.md` | settings / hooks | fail-closed hooks, loops, tests |
 | `notion.md` | any Notion tool | write permission, field minimization |
 | `reliability.md` | guards, monitors, "done?" | verify the effect, quality floors |
+| `refactor-pass.md` | a large milestone is done, or code goes public | simplify, constants, minimal tests, mutation check, fresh review |
 | `agent-dispatch.md` | Agent / Workflow | dispatch order, fan-out pre-flight, isolation |
 
 A rule is a default: a deviation carries a one-line comment saying why. Copying a legacy local pattern is not a reason. The language files that used to live here are pointer stubs now.

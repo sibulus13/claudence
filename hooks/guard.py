@@ -73,6 +73,21 @@ def has_pnpm_lock(cwd: str) -> bool:
     return any((d / "pnpm-lock.yaml").exists() for d in [p, *p.parents])
 
 
+# Incident 2026-10-28: `git worktree remove` followed the npm `file:` junction node_modules/meter into
+# D:/repo/Lib/meter and deleted that repo, .git included.
+WORKTREE_REMOVE = re.compile(r"\bgit\b[^|;&]*\bworktree\s+remove\s+(?:-\S+\s+)*(\"[^\"]+\"|'[^']+'|\S+)")
+
+
+def worktree_links(path: str, cwd: str) -> list[str]:
+    """Symlinks/junctions under <worktree>/node_modules (top level and @scope): git on Windows recurses through them."""
+    root = Path(path.strip("\"'"))
+    nm = (root if root.is_absolute() else Path(cwd) / root) / "node_modules"
+    if not nm.is_dir():
+        return []
+    entries = [*nm.iterdir(), *(q for d in nm.glob("@*") if d.is_dir() for q in d.iterdir())]
+    return [str(p) for p in entries if p.is_symlink() or p.is_junction()]
+
+
 def bad_repo_target(path: Path) -> bool:
     try:
         rel = path.resolve().relative_to(REPO_ROOT.resolve())
@@ -114,6 +129,9 @@ def check_shell(event: dict) -> dict | None:
         return decide("deny", "Never force-push main/master.")
     if re.search(r"\bgit\b[^|;&]*\bstash\b(?!\s+(list|show)\b)|--autostash", cmd):
         return decide("deny", "No git stash: commit to a branch or use a worktree (stash loses work in shared checkouts).")
+    if (m := WORKTREE_REMOVE.search(ti.get("command") or "")) and (links := worktree_links(m.group(1), cwd)):
+        return decide("deny", f"Worktree has links that removal would follow into their targets: {', '.join(links[:3])}. "
+                              "Delete the links themselves first (cmd /c rmdir <link>), then remove the worktree.")
     if re.search(r"\bpython3\b", cmd) and event.get("tool_name") == "Bash":
         return decide("deny", "Use `python`, not `python3`, on this machine.")
     if re.search(r"(^|[;&|]\s*)(npm\s+(i|install|add)\b|yarn(\s+add)?\b)", cmd) and has_pnpm_lock(cwd):
