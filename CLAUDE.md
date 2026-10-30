@@ -20,11 +20,12 @@ broken are enforced in code (`~/.claude/hooks/guard.py`), not here. Each rule's 
 ## 2. Repo layout (D:/repo)
 - `D:/repo/<Theme>/<project>`, never bare at the root. Themes:
   - `Finance/` crucible, augur, market-signal-watch
-  - `Factory/` ostler -> foreman -> catwalk, herald
+  - `Factory/` foreman -> catwalk, herald (ostler: reference only, idle since 2026-08-24)
   - `SaaS/` cashcow (= Tarive), certify, nuwa, `pylon/*`, Workout Gen (= Ascension)
-  - `Assistant/` cortex, groundtruth; `Lib/` telefi; `Life/` personal docs and apps; `web/personal/`;
+  - `Assistant/` cortex, groundtruth; `Lib/` telefi, meter; `Life/` personal docs and apps; `web/personal/`;
     `Experiment/`; `_Misc/`; `_Archive/` (index `D:/repo/_Archive/README.md`)
-- Legacy `AI/`, `Bot/`, `Data/` are being emptied. A new repo goes in a theme folder; say which.
+- Legacy `AI/`, `Bot/`, `Data/` and bare `fitbit/` are being emptied (LEDGER roadmap). A new repo goes in a theme
+  folder; say which.
 - Moving a repo: `/repo-move`. Code derives paths from the repo root, never absolute repo paths.
 - Each theme folder has a CLAUDE.md with its shared rules; each repo has its own CLAUDE.md, `docs/` and memory.
 - Shared capabilities are sensors or actuators behind one contract (`~/.claude/docs/fleet/ARCHITECTURE_SENSE_ACT.md`):
@@ -46,7 +47,8 @@ broken are enforced in code (`~/.claude/hooks/guard.py`), not here. Each rule's 
 - Never pause to ask "continue?", for lint or build noise, or on a tool error you can fix. A workaround is
   labelled as one, with its root-cause hypothesis; confirming that is the next task.
 - Off-critical-path improvements go to the backlog; a bug that breaks the critical path is not extra.
-- Outward-facing actions (posting, sending, publishing, purchases, Notion writes) need the owner's go per action.
+- Outward-facing actions (posting, sending, publishing, purchases) need the owner's go per action; Notion writes
+  follow `playbooks/notion.md`.
 - Review evidence for pre-traffic work is a demo video or a before/after screenshot pair, queued (Catwalk
   Review Queue), never an interrupt.
 - Ambiguity that would change a hard-to-reverse design: ask once. Otherwise choose and log.
