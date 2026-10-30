@@ -17,7 +17,7 @@
 #   otherwise                                         -> notify
 #
 # Retrospection threshold:
-#   sessions_since_review >= 3 AND cumulative_score >= 6 -> prompt /retrospect
+#   sessions_since_review >= 3 AND cumulative_score >= 6 -> prompt /retrospect (at most daily; counters reset only by retrospect-complete.ps1)
 
 $rawInput = [Console]::In.ReadToEnd()
 $data = try { $rawInput | ConvertFrom-Json -ErrorAction Stop } catch { $null }
@@ -320,7 +320,12 @@ if ($score -gt 0) {
 $cum | ConvertTo-Json | Set-Content $cumulative_file
 
 # --- Determine output and play sound ---
-$retrospect_needed = ($cum.sessions_since_review -ge 3 -and $cum.total_score -ge 6)
+# The nag is throttled (once per $nag_interval_hours) but never touches the counters: only a completed
+# /retrospect run (telemetry/retrospect-complete.ps1) resets them. Resetting on the nag hid a 2.3k backlog.
+$nag_interval_hours = 24
+$nag_last = if ($cum.PSObject.Properties['last_nag_ts'] -and $cum.last_nag_ts) { [DateTimeOffset]::Parse($cum.last_nag_ts) } else { $null }
+$nag_quiet = ($null -ne $nag_last -and ([DateTimeOffset]::Now - $nag_last).TotalHours -lt $nag_interval_hours)
+$retrospect_needed = ($cum.sessions_since_review -ge 3 -and $cum.total_score -ge 6 -and -not $nag_quiet)
 $play_ring = ($elapsed -gt 30 -or $score -ge 5 -or $retrospect_needed)
 
 $suggest_str = if ($allow_suggestions.Count -gt 0) {
@@ -349,9 +354,7 @@ if (($ding_now - $ding_last) -ge $ding_window) {
 }
 
 if ($retrospect_needed) {
-    $cum.total_score           = 0
-    $cum.sessions_since_review = 0
-    $cum.last_review_ts        = (Get-Date -Format 'o')
+    $cum | Add-Member -NotePropertyName last_nag_ts -NotePropertyValue (Get-Date -Format 'o') -Force
     $cum | ConvertTo-Json | Set-Content $cumulative_file
 
     [PSCustomObject]@{

@@ -5,7 +5,7 @@ description: Keep the fleet ledger (~/.claude/docs/fleet/LEDGER.md) - a terse pe
 
 # /ledger
 
-1. Draft: `python ~/.claude/scripts/ledger_draft.py [YYYY-MM-DD]` (all commits that day, per repo).
+1. Draft: a nightly job leaves `~/.claude/docs/fleet/drafts/<date>.md` for each unledgered day (SessionStart says "ledger draft for <date> pending"); otherwise run `python ~/.claude/scripts/ledger_draft.py [YYYY-MM-DD]` (all commits that day, per repo). Delete a draft file once its day is in the ledger.
 2. Curate into `~/.claude/docs/fleet/LEDGER.md` under `## Days`, newest day first:
    - one row per meaningful change (merge commits that serve one goal), columns `project | change | why | ref | kind`;
    - kinds: feat, fix, move, release, decision, refactor, incident;
