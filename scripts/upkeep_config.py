@@ -37,6 +37,7 @@ DEFAULTS: dict = {
     ],
     "sweepWorktreePatterns": [r"--git-foreman-worktrees-", r"-\.claude-worktrees-"],
     "tasksFailingResultsAllowed": [0, 267009, 267011],  # 0 ok; 267009 running; 267011 not yet run
+    "tasksIgnoreRegex": ["^NVIDIA", "^OneDrive", "^Adobe", "^Google", "^MicrosoftEdge"],  # vendor updaters
     "tasksDeadDays": 30,
     "tasksNextRunFarDays": 365,
 }
