@@ -44,7 +44,8 @@ def pending_drafts(drafts_dir: Path = DRAFTS_DIR, ledger_file: Path = LEDGER_FIL
     if not drafts_dir.is_dir():
         return []
     ledger = ledger_file.read_text(encoding="utf-8", errors="replace") if ledger_file.exists() else ""
-    days = (p.stem for p in drafts_dir.glob("*.md"))
+    # Only <YYYY-MM-DD>.md is a draft; a stray note or an edited copy must never break session start.
+    days = (p.stem for p in drafts_dir.glob("*.md") if re.fullmatch(r"\d{4}-\d{2}-\d{2}", p.stem))
     return sorted(d for d in days if not ledger_has_day(ledger, date.fromisoformat(d)))
 
 

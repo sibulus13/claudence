@@ -29,6 +29,12 @@ def test_a_draft_whose_day_is_already_in_the_ledger_is_not_pending(tmp_path: Pat
     assert sc.pending_drafts(drafts, ledger) == ["2026-10-27"]
 
 
+def test_non_date_markdown_in_drafts_is_ignored(tmp_path: Path):
+    for name in ("notes.md", "2026-10-29.bak.md", "2026-10-29-edit.md", "2026-10-27.md"):
+        (tmp_path / name).write_text("x", encoding="utf-8")
+    assert sc.pending_drafts(tmp_path, tmp_path / "none.md") == ["2026-10-27"]
+
+
 def test_no_drafts_dir_or_empty_dir_says_nothing_about_the_ledger(tmp_path: Path):
     assert not any("ledger draft" in line for line in sc.lines_for(str(tmp_path), "startup", drafts_dir=tmp_path))
     assert not any("ledger draft" in line for line in sc.lines_for(str(tmp_path), "startup", drafts_dir=tmp_path / "x"))
