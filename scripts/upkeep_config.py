@@ -26,7 +26,6 @@ DEFAULTS: dict = {
     "ledgerFile": "docs/fleet/LEDGER.md",
     "draftsDir": "docs/fleet/drafts",
     "ledgerDraftMinCommits": 10,  # a day above this with no LEDGER row is flagged
-    "ledgerDraftLookbackDays": 7,
     "sweepMinAgeDays": 7,
     "sweepTempPatterns": [  # projects/ dir-name regexes (cwd under Temp or a probe) that are clutter
         r"-AppData-Local-Temp-remember-summarizer-cwd-",
