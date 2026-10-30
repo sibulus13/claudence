@@ -30,6 +30,14 @@ NOTION_ALLOW_NAME = (".cortex", "notion-allow.json")
 HEX_ID = re.compile(r"[0-9a-f]{32}")
 GOVERNANCE = re.compile(r"(/|\\)(CLAUDE\.md|AGENTS\.md)$|(/|\\)memory(/|\\)|(/|\\)\.claude(/|\\)settings[^/\\]*\.json$|"
                         r"(/|\\)\.claude(/|\\)(agents|hooks|rules|output-styles)(/|\\)", re.I)
+# The same governance paths anywhere inside a shell command, and a command that writes (redirect, in-place edit,
+# move/copy/delete, an interpreter one-liner): together they are a subagent editing governance through the shell.
+GOVERNANCE_IN_SHELL = re.compile(r"(/|\\)(CLAUDE|AGENTS)\.md\b|(/|\\)memory(/|\\)|\.claude(/|\\)settings[^/\\\s]*\.json|"
+                                 r"\.claude(/|\\)(agents|hooks|rules|output-styles)(/|\\)", re.I)
+SHELL_WRITE = re.compile(r"(?<![<>=!])>{1,2}(?!&)|\bsed\s+-i|\b(mv|cp|rm|rmdir|tee|touch|truncate)\b|"
+                         r"\b(Set-Content|Add-Content|Out-File|Remove-Item|Move-Item|Copy-Item|New-Item)\b|"
+                         r"\b(python|node|perl|ruby)\b[^|;&]*\s-[ce]\b|\.write_text\(|writeFileSync|open\([^)]*['\"][wa]",
+                         re.I)
 LONG_RUNNERS = re.compile(r"\b(pnpm|npm|yarn)\s+(run\s+)?(build|test)\b|\bnext\s+build\b|\bplaywright\s+test\b|"
                           r"\bvitest\b(?!\s+\S*\.(test|spec)\.)|\bpytest\b|\bnpm\s+test\b")
 PYTEST_TARGET = re.compile(r"\.py\b|::|/|\\")
@@ -120,7 +128,11 @@ def clone_or_init_target(cmd: str, cwd: str) -> Path | None:
 def check_shell(event: dict) -> dict | None:
     ti = event.get("tool_input") or {}
     # Quoted text (commit messages, echo strings) is data, not flags: match rules against the rest only.
-    cmd = QUOTED.sub("''", HEREDOC.sub("<<HEREDOC", ti.get("command") or ""))
+    raw = ti.get("command") or ""
+    if event.get("agent_id") and GOVERNANCE_IN_SHELL.search(raw) and SHELL_WRITE.search(raw):
+        return decide("deny", "Subagents never edit governance (CLAUDE.md, memory, settings, agents, hooks, rules), "
+                              "including through the shell: return the proposed change to the parent session.")
+    cmd = QUOTED.sub("''", HEREDOC.sub("<<HEREDOC", raw))
     cwd = event.get("cwd") or os.getcwd()
     if re.search(r"\bgit\b[^|;&]*\b(commit|push|merge|rebase)\b[^|;&]*--no-verify", cmd):
         return decide("deny", "--no-verify is never allowed: fix the failing hook instead.")

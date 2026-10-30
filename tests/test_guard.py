@@ -78,6 +78,22 @@ def test_subagent_cannot_edit_governance_but_parent_can() -> None:
     assert run("Edit", target) is None
 
 
+@pytest.mark.parametrize("cmd", [
+    "sed -i 's/a/b/' C:/Users/M/.claude/projects/D--repo/memory/note.md",
+    "rm C:/Users/M/.claude/projects/D--repo/memory/old.md",
+    "python -c \"open('C:/Users/M/.claude/CLAUDE.md','w')\"",
+    "echo x >> D:/repo/Lib/meter/CLAUDE.md",
+])
+def test_subagent_cannot_write_governance_through_shell(cmd: str) -> None:
+    assert run("Bash", {"command": cmd}, agent_id="sub-1") == "deny"
+    assert run("Bash", {"command": cmd}) is None
+
+
+def test_subagent_can_read_governance_through_shell() -> None:
+    assert run("Bash", {"command": "grep -n hook C:/Users/M/.claude/projects/D--repo/memory/MEMORY.md"},
+               agent_id="sub-1") is None
+
+
 def test_notion_write_to_owner_approved_ids_does_not_ask() -> None:
     sys.path.insert(0, str(HOOK.parent))
     from guard import targets_only_approved
