@@ -76,4 +76,11 @@ def test_cli_reads_a_tasks_file_and_writes_the_report(tmp_path: Path):
     out = tmp_path / "state" / "tasks-audit.json"
     cmd = [sys.executable, str(Path(ta.__file__)), "--root", str(tmp_path), "--tasks-file", str(src), "--json"]
     report = json.loads(subprocess.run(cmd, capture_output=True, text=True, check=True).stdout)
-    assert report["total"] == 1 and out.exists()
+    assert report["total"] == 1 and out.with_name("tasks-audit.pending.json").exists()
+
+
+def test_empty_inventory_prints_an_empty_json_array_not_null():
+    inv = Path(ta.__file__).with_name("tasks_inventory.ps1")
+    out = subprocess.run(["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(inv),
+                          "-TaskPath", r"\NoSuchFolder" + "\\"], capture_output=True, text=True, check=True).stdout
+    assert json.loads(out) == []

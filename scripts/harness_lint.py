@@ -13,7 +13,8 @@ Checks (ids are the `check` field of a finding):
 
 Private inventory (deny patterns, repo root, budgets, skipped files) lives in a config file read at runtime,
 `<root>/docs/fleet/upkeep.config.json` by default (see upkeep_config.py); every key is optional. Writes the report to
-`<root>/state/harness-lint.json` (--out) and prints it with --json. `newFindings` are findings whose id is absent
+`<root>/state/harness-lint.pending.json`; --commit promotes it to `harness-lint.json` (--out), the baseline. --json
+prints it. `newFindings` are findings whose id is absent
 from the previous report, which is what the Cortex upkeep job turns into a TeleFi digest. Read-only otherwise.
 """
 from __future__ import annotations
@@ -27,7 +28,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from upkeep_config import config_path, load_config
+from upkeep_config import HIDDEN, commit_pending, config_path, load_config, previous_ids, store_pending
 
 WALK_SKIP = {"_Archive", "node_modules", "worktrees", "foreman-worktrees", ".claude", ".git", ".next", ".venv"}
 WALK_DEPTH = 3
@@ -215,7 +216,7 @@ def check_wikilinks(root: Path) -> list[dict]:
 
 
 def check_drift(root: Path) -> list[dict]:
-    r = subprocess.run(["git", "-C", str(root), "status", "--porcelain"], capture_output=True, text=True, timeout=30)
+    r = subprocess.run(["git", "-C", str(root), "status", "--porcelain"], capture_output=True, text=True, timeout=30, **HIDDEN)
     if r.returncode != 0:
         return []  # not a git checkout: nothing to drift from
     out = []
@@ -250,16 +251,16 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--config", type=Path)
     ap.add_argument("--out", type=Path)
     ap.add_argument("--json", action="store_true", help="print the report as JSON")
+    ap.add_argument("--commit", action="store_true", help="promote the pending report to the baseline (after delivery)")
     args = ap.parse_args(argv)
     root = args.root
     cfg = load_config(args.config or config_path(root))
     out = args.out or root / "state" / "harness-lint.json"
-    previous = None
-    if out.exists():
-        previous = {f["id"] for f in json.loads(read(out))["findings"]}
-    report = run(root, cfg, previous)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(report, indent=1), encoding="utf-8")
+    if args.commit:
+        commit_pending(out)
+        return 0
+    report = run(root, cfg, previous_ids(out))
+    store_pending(out, report)
     if args.json:
         sys.stdout.write(json.dumps(report) + "\n")
     else:

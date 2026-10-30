@@ -144,6 +144,7 @@ def test_cli_writes_report_and_second_run_has_no_new_findings(root: Path, tmp_pa
     script = Path(hl.__file__)
     cmd = [sys.executable, str(script), "--root", str(root), "--json"]
     one = json.loads(subprocess.run(cmd, capture_output=True, text=True, check=True).stdout)
+    subprocess.run(cmd[:-1] + ["--commit"], check=True, capture_output=True)
     two = json.loads(subprocess.run(cmd, capture_output=True, text=True, check=True).stdout)
     assert len(one["newFindings"]) == 1 and two["newFindings"] == [] and two["total"] == 1
     assert (root / "state" / "harness-lint.json").exists()

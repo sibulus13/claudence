@@ -26,6 +26,8 @@ def mk(projects: Path, name: str, files: dict[str, str] | None = None, age: floa
     for rel, text in (files or {}).items():
         (d / rel).parent.mkdir(parents=True, exist_ok=True)
         (d / rel).write_text(text, encoding="utf-8")
+    for f in d.rglob("*"):
+        os.utime(f, (age, age))
     os.utime(d, (age, age))
     return d
 
@@ -39,7 +41,7 @@ def world(tmp_path: Path):
 
 
 def reasons(report: dict) -> dict[str, str]:
-    return {Path(c["path"]).name: c["reason"] for c in report["candidates"]}
+    return {Path(c["path"]).name: c["reason"] for c in report["findings"]}
 
 
 def test_old_empty_dir_is_a_candidate_but_a_fresh_empty_dir_and_a_dir_with_files_are_not(world):
@@ -61,7 +63,7 @@ def test_a_dir_holding_memory_notes_is_never_a_candidate(world):
     root, projects, cfg = world
     mk(projects, "C--Users-Michael-AppData-Local-Temp-remember-summarizer-cwd-9", {"memory/MEMORY.md": "- n"})
     mk(projects, "D--repo-App--git-foreman-worktrees-x1", {"memory/note.md": "n"})
-    assert ps.sweep(root, cfg)["candidates"] == []
+    assert ps.sweep(root, cfg)["findings"] == []
 
 
 def test_worktree_dir_is_orphaned_only_when_its_worktree_is_gone(world, tmp_path: Path):
@@ -82,13 +84,38 @@ def test_encode_cwd_matches_claude_code_project_dir_naming():
         "D--repo-Assistant-cortex--git-foreman-worktrees-x"
 
 
-def test_report_lists_categories_and_new_findings_only_when_a_category_first_appears(world):
+def test_each_dir_is_its_own_finding_new_only_when_not_in_the_baseline(world):
     root, projects, cfg = world
     mk(projects, "C--empty-old")
+    mk(projects, "C--empty-old-2")
     first = ps.sweep(root, cfg)
-    assert [f["id"] for f in first["newFindings"]] == ["projects-sweep:empty"]
-    again = ps.sweep(root, cfg, previous_categories={"empty"})
-    assert again["newFindings"] == []
+    assert sorted(f["id"] for f in first["newFindings"]) == ["projects-sweep:C--empty-old", "projects-sweep:C--empty-old-2"]
+    again = ps.sweep(root, cfg, previous={"projects-sweep:C--empty-old"})
+    assert [f["id"] for f in again["newFindings"]] == ["projects-sweep:C--empty-old-2"]
+
+
+def test_age_is_the_newest_file_inside_the_dir_not_the_dir_mtime(world):
+    root, projects, cfg = world
+    name = "C--Users-Michael-AppData-Local-Temp-remember-summarizer-cwd-5"
+    d = mk(projects, name, {"s.jsonl": "{}"})  # dir mtime old, then a session appends to its file (dir mtime unchanged)
+    os.utime(d, (OLD, OLD))
+    assert reasons(ps.sweep(root, cfg)) == {name: "temp"}
+    os.utime(d / "s.jsonl", (time.time(), time.time()))
+    os.utime(d, (OLD, OLD))
+    assert ps.sweep(root, cfg)["findings"] == []
+
+
+def test_dot_claude_worktree_dir_is_orphaned_when_gone_and_kept_when_live(world, tmp_path: Path):
+    root, projects, cfg = world
+    tree = tmp_path / "repos"
+    live = tree / "Theme" / "app" / ".claude" / "worktrees" / "wt1"
+    live.mkdir(parents=True)
+    (tree / "Theme" / "app" / ".git").mkdir()
+    cfg = {**cfg, "repoRoot": str(tree)}
+    gone = tree / "Theme" / "app" / ".claude" / "worktrees" / "wt2"
+    mk(projects, ps.encode_cwd(live), {"s.jsonl": "{}"})
+    mk(projects, ps.encode_cwd(gone), {"s.jsonl": "{}"})
+    assert reasons(ps.sweep(root, cfg)) == {ps.encode_cwd(gone): "orphaned-worktree"}
 
 
 def test_cli_is_dry_run_it_deletes_nothing_and_writes_the_report(world):
@@ -97,6 +124,6 @@ def test_cli_is_dry_run_it_deletes_nothing_and_writes_the_report(world):
     out = subprocess.run([sys.executable, str(Path(ps.__file__)), "--root", str(root), "--json"],
                          capture_output=True, text=True, check=True).stdout
     report = json.loads(out)
-    assert report["dryRun"] is True and len(report["candidates"]) == 1
+    assert report["dryRun"] is True and len(report["findings"]) == 1
     assert d.exists()
-    assert (root / "state" / "projects-sweep.json").exists()
+    assert (root / "state" / "projects-sweep.pending.json").exists()

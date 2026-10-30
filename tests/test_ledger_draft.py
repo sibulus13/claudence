@@ -55,6 +55,8 @@ def test_ledger_has_day_matches_only_that_days_heading():
     assert ld.ledger_has_day("### 2026-10-28 (Wed)\nrows", DAY)
     assert not ld.ledger_has_day("### 2026-10-29 (Thu)\n", DAY)
     assert not ld.ledger_has_day("mentions 2026-10-28 in prose", DAY)
+    assert ld.ledger_has_day("x\n### 2026-10-28", DAY)  # heading at end of file, no newline
+    assert not ld.ledger_has_day("### 2026-10-281 (odd)", DAY)
 
 
 def test_plan_drafts_an_unledgered_day_flags_it_and_is_new_once(world):
@@ -65,8 +67,20 @@ def test_plan_drafts_an_unledgered_day_flags_it_and_is_new_once(world):
     first = ld.plan(root, cfg, DAY, 1, out)[0]
     assert first["commits"] == 3 and first["flagged"] and first["new"]
     assert (out / "2026-10-28.md").read_text(encoding="utf-8").count("| Theme/app |") == 3
-    second = ld.plan(root, cfg, DAY, 1, out)[0]
+    second = ld.plan(root, cfg, DAY, 1, out, previous={"ledger-draft:2026-10-28"})[0]
     assert second["flagged"] and not second["new"]
+    third = ld.plan(root, cfg, DAY, 1, out)[0]  # draft file exists but the alert was never delivered: still new
+    assert third["new"]
+
+
+def test_an_existing_draft_is_never_overwritten(world):
+    root, app, cfg = world
+    commit(app, "feat: one")
+    out = root / "drafts"
+    out.mkdir()
+    (out / "2026-10-28.md").write_text("curator edits", encoding="utf-8")
+    ld.plan(root, cfg, DAY, 1, out)
+    assert (out / "2026-10-28.md").read_text(encoding="utf-8") == "curator edits"
 
 
 def test_plan_does_not_flag_a_quiet_day_and_skips_a_ledgered_day(world):
@@ -104,4 +118,7 @@ def test_cli_json_never_touches_the_ledger_and_reports_new_findings(world, tmp_p
     assert [f["id"] for f in out["newFindings"]] == ["ledger-draft:2026-10-28"]
     assert ledger.read_bytes() == before
     again = json.loads(subprocess.run(cmd, capture_output=True, text=True, check=True).stdout)
-    assert again["newFindings"] == []
+    assert [f["id"] for f in again["newFindings"]] == ["ledger-draft:2026-10-28"]  # not committed: re-alerts
+    subprocess.run(cmd[:-1] + ["--commit"], check=True, capture_output=True)
+    quiet = json.loads(subprocess.run(cmd, capture_output=True, text=True, check=True).stdout)
+    assert quiet["newFindings"] == []
