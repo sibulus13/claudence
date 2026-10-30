@@ -51,6 +51,7 @@ def test_always_never_rules_are_denied(cmd: str) -> None:
     "python -m pytest tests/test_x.py -q",
     "git clone https://github.com/x/newrepo D:/repo/SaaS/newrepo",
     "wscript.exe //B //Nologo D:\\repo\\x\\scripts\\run-hidden.vbs; Register-ScheduledTask -TaskName t",
+    "Unregister-ScheduledTask -TaskName t -Confirm:$false",
 ])
 def test_normal_commands_stay_allowed(cmd: str) -> None:
     assert run("Bash", {"command": cmd}) is None

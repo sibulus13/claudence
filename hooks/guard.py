@@ -152,7 +152,7 @@ def check_shell(event: dict) -> dict | None:
         return decide("deny", "Piping into `vercel env add` from PowerShell corrupts values: pass the value via a file or --value.")
     if re.search(r"\bgit\b[^|;&]*\bcommit\b", cmd) and (bad := staged_env_files(cwd)):
         return decide("deny", f"Refusing to commit secrets: {', '.join(bad)} is staged. Unstage it.")
-    if re.search(r"Register-ScheduledTask|New-ScheduledTaskAction|schtasks(\.exe)?\s+/create", cmd, re.I) and \
+    if re.search(r"\bRegister-ScheduledTask|New-ScheduledTaskAction|schtasks(\.exe)?\s+/create", cmd, re.I) and \
        not re.search(r"run[-_]hidden\.vbs|pythonw(\.exe)?", cmd, re.I):
         return decide("deny", "Scheduled tasks must run hidden: action = wscript.exe //B //Nologo <repo>\\scripts\\run-hidden.vbs "
                               "<program> (or pythonw.exe). Then smoke it: Start-ScheduledTask + LastTaskResult 0.")
