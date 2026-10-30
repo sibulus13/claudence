@@ -2,6 +2,7 @@
 
 - the repo's state doc (first match) and whether it is older than the last commit;
 - the repo's deploymentTier (from its CLAUDE.md), or a warning that it is undeclared;
+- ledger drafts the nightly job wrote that /ledger has not confirmed yet;
 - after a compaction: the standing ask to summarize in-progress work, open states and the next step.
 Prints additionalContext JSON; prints nothing when there is nothing to say.
 """
@@ -29,8 +30,18 @@ def last_commit_epoch(root: Path) -> int:
     return int(r.stdout.strip() or 0)
 
 
-def lines_for(cwd: str, source: str) -> list[str]:
+DRAFTS_DIR = Path.home() / ".claude" / "docs" / "fleet" / "drafts"
+
+
+def pending_drafts(drafts_dir: Path = DRAFTS_DIR) -> list[str]:
+    return sorted(p.stem for p in drafts_dir.glob("*.md")) if drafts_dir.is_dir() else []
+
+
+def lines_for(cwd: str, source: str, drafts_dir: Path = DRAFTS_DIR) -> list[str]:
     out = []
+    pending = pending_drafts(drafts_dir)
+    if pending:
+        out.append(f"ledger draft for {', '.join(pending)} pending: run /ledger to curate it into LEDGER.md.")
     root = repo_root(cwd)
     if root is None:
         out.append("Fleet session (not inside a repo): project hooks and memory arrive via the D:/repo router "

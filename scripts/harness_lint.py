@@ -12,7 +12,7 @@ Checks (ids are the `check` field of a finding):
   drift     (f) the harness repo has no uncommitted or untracked files
 
 Private inventory (deny patterns, repo root, budgets, skipped files) lives in a config file read at runtime,
-`<root>/docs/fleet/harness-lint.config.json` by default; every key is optional. Writes the report to
+`<root>/docs/fleet/upkeep.config.json` by default (see upkeep_config.py); every key is optional. Writes the report to
 `<root>/state/harness-lint.json` (--out) and prints it with --json. `newFindings` are findings whose id is absent
 from the previous report, which is what the Cortex upkeep job turns into a TeleFi digest. Read-only otherwise.
 """
@@ -27,20 +27,8 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-DEFAULTS = {
-    "repoRoot": None,  # a tree to search for theme/repo CLAUDE.md files
-    "denyList": [],  # [{"pattern": regex, "label": str}]
-    "denyIgnoreLine": None,  # regex: a deny hit on a line matching this is history, not a finding
-    "pathCheckSkip": [],  # globs relative to root: files whose paths are historical
-    "fleetMemoryDir": None,  # name of the fleet-wide memory dir under projects/
-    "budgets": {
-        "globalClaudeMdLines": 120,
-        "fleetIndexLines": 15,
-        "projectIndexLines": 70,
-        "projectIndexBytes": 25_000,
-        "repoClaudeMdLines": 200,
-    },
-}
+from upkeep_config import config_path, load_config
+
 WALK_SKIP = {"_Archive", "node_modules", "worktrees", "foreman-worktrees", ".claude", ".git", ".next", ".venv"}
 WALK_DEPTH = 3
 MD_LINK = re.compile(r"\]\(([^)\s]+)\)")
@@ -54,15 +42,6 @@ CODE_FENCE = re.compile(r"^\s*```")
 def finding(check: str, path: str, detail: str, key: str | None = None) -> dict:
     ident = hashlib.sha1((key or detail).encode()).hexdigest()[:10]
     return {"id": f"{check}:{path}:{ident}", "check": check, "path": path, "detail": detail}
-
-
-def load_config(path: Path) -> dict:
-    cfg = json.loads(json.dumps(DEFAULTS))
-    if path.exists():
-        user = json.loads(path.read_text(encoding="utf-8"))
-        cfg["budgets"].update(user.pop("budgets", {}))
-        cfg.update(user)
-    return cfg
 
 
 def rel(root: Path, p: Path) -> str:
@@ -273,7 +252,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--json", action="store_true", help="print the report as JSON")
     args = ap.parse_args(argv)
     root = args.root
-    cfg = load_config(args.config or root / "docs" / "fleet" / "harness-lint.config.json")
+    cfg = load_config(args.config or config_path(root))
     out = args.out or root / "state" / "harness-lint.json"
     previous = None
     if out.exists():

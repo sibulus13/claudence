@@ -13,6 +13,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 import harness_lint as hl  # noqa: E402
+from upkeep_config import DEFAULTS  # noqa: E402
 
 
 def git(root: Path, *args: str) -> None:
@@ -38,7 +39,7 @@ def root(tmp_path: Path) -> Path:
 
 
 def lint(root: Path, cfg: dict | None = None, previous: set[str] | None = None) -> dict:
-    return hl.run(root, {**json.loads(json.dumps(hl.DEFAULTS)), **(cfg or {})}, previous)
+    return hl.run(root, {**json.loads(json.dumps(DEFAULTS)), **(cfg or {})}, previous)
 
 
 def of(report: dict, check: str) -> list[dict]:
@@ -94,7 +95,7 @@ def test_d_budgets_for_global_claude_md_fleet_index_and_project_index(root: Path
         (fleet / f"n{i}.md").write_text("x\n", encoding="utf-8")
     mem = root / "projects" / "proj" / "memory"
     (mem / "MEMORY.md").write_text("- [note](note_one.md): h\n" * 4, encoding="utf-8")
-    cfg = {"fleetMemoryDir": "fleet", "budgets": {**hl.DEFAULTS["budgets"], "globalClaudeMdLines": 3,
+    cfg = {"fleetMemoryDir": "fleet", "budgets": {**DEFAULTS["budgets"], "globalClaudeMdLines": 3,
                                                   "fleetIndexLines": 3, "projectIndexLines": 3}}
     paths = sorted(f["path"] for f in of(lint(root, cfg), "budget"))
     assert paths == ["CLAUDE.md", "projects/fleet/memory/MEMORY.md", "projects/proj/memory/MEMORY.md"]
@@ -106,7 +107,7 @@ def test_d_repo_claude_md_budget_walks_the_configured_tree_and_skips_archive(roo
     (tree / "_Archive" / "old").mkdir(parents=True)
     (tree / "Theme" / "app" / "CLAUDE.md").write_text("x\n" * 10, encoding="utf-8")
     (tree / "_Archive" / "old" / "CLAUDE.md").write_text("x\n" * 10, encoding="utf-8")
-    cfg = {"repoRoot": str(tree), "budgets": {**hl.DEFAULTS["budgets"], "repoClaudeMdLines": 5}}
+    cfg = {"repoRoot": str(tree), "budgets": {**DEFAULTS["budgets"], "repoClaudeMdLines": 5}}
     found = of(lint(root, cfg), "budget")
     assert len(found) == 1 and found[0]["path"].endswith("Theme/app/CLAUDE.md")
 
