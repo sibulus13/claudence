@@ -78,3 +78,7 @@ logs/
 
 # fleet inventory: private project/Notion state, never published (claudence is public)
 docs/fleet/
+
+# Runtime output of scripts/ (lint reports) and bytecode
+state/
+__pycache__/
