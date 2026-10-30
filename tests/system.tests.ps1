@@ -8,6 +8,8 @@
 
 BeforeAll {
     $script:ClaudeRoot  = "$HOME\.claude"
+    # Scripts under test come from the checkout this test file lives in (same as ClaudeRoot once merged).
+    $script:RepoRoot    = Split-Path -Parent $PSScriptRoot
     $script:StateFile   = "$script:ClaudeRoot\telemetry\current-session.json"
     $script:CumFile     = "$script:ClaudeRoot\telemetry\cumulative.json"
     $script:SessionsDir = "$script:ClaudeRoot\telemetry\sessions"
@@ -232,7 +234,7 @@ Describe "analyze-session.ps1: cumulative reset after retrospect threshold" {
     BeforeEach { script:Backup-File $script:CumFile }
     AfterEach  { script:Restore-File $script:CumFile }
 
-    It "resets cumulative counters and emits systemMessage when threshold is met" {
+    It "emits systemMessage when threshold is met but does NOT reset the counters (only a retrospect run does)" {
         # Threshold: sessions_since_review >= 3 AND total_score >= 6
         [PSCustomObject]@{
             total_score           = 8
@@ -248,20 +250,65 @@ Describe "analyze-session.ps1: cumulative reset after retrospect threshold" {
         ) | ForEach-Object { $_ | ConvertTo-Json -Compress } | Set-Content $sFile
 
         $hookInput = [PSCustomObject]@{ session_id = $sid } | ConvertTo-Json -Compress
-        $raw = $hookInput | powershell.exe -NoProfile -File "$script:ClaudeRoot\telemetry\analyze-session.ps1" 2>$null
+        $raw = $hookInput | powershell.exe -NoProfile -File "$script:RepoRoot\telemetry\analyze-session.ps1" 2>$null
         $out = $raw -join ''
 
         $out | Should -Match 'systemMessage'
         $out | Should -Match 'retrospect'
 
         $cum = Get-Content $script:CumFile -Raw | ConvertFrom-Json
-        $cum.sessions_since_review | Should -Be 0
-        $cum.total_score           | Should -Be 0
-        $cum.last_review_ts        | Should -Not -BeNullOrEmpty
+        $cum.sessions_since_review | Should -BeGreaterOrEqual 3
+        $cum.total_score           | Should -BeGreaterOrEqual 8
+        $cum.last_review_ts        | Should -BeNullOrEmpty
+        $cum.last_nag_ts           | Should -Not -BeNullOrEmpty
 
         if (Test-Path $sFile) { Remove-Item $sFile -Force }
         $rFile = Join-Path $script:ReportsDir "$($sid.Substring(0,8)).json"
         if (Test-Path $rFile) { Remove-Item $rFile -Force }
+    }
+
+    It "does not nag again within 24h of the last nag, and counters stay put" {
+        [PSCustomObject]@{
+            total_score           = 8
+            sessions_since_review = 3
+            last_review_ts        = ''
+            last_nag_ts           = (Get-Date).AddHours(-1).ToString('o')
+        } | ConvertTo-Json | Set-Content $script:CumFile
+
+        $sid   = 'renag-test-' + [guid]::NewGuid().ToString('N').Substring(0, 8)
+        $sFile = Join-Path $script:SessionsDir "$sid.jsonl"
+        @(
+            [PSCustomObject]@{ ts = (Get-Date).AddMinutes(-5).ToString('o'); session_id = $sid; event = 'prompt'; classification = 'override'; prompt_chars = 20; prompt_text = 'redo it'; cwd = 'C:\test' }
+            [PSCustomObject]@{ ts = (Get-Date).AddMinutes(-1).ToString('o'); session_id = $sid; event = 'stop' }
+        ) | ForEach-Object { $_ | ConvertTo-Json -Compress } | Set-Content $sFile
+
+        $hookInput = [PSCustomObject]@{ session_id = $sid } | ConvertTo-Json -Compress
+        $raw = $hookInput | powershell.exe -NoProfile -File "$script:RepoRoot\telemetry\analyze-session.ps1" 2>$null
+        ($raw -join '') | Should -Not -Match 'systemMessage'
+        (Get-Content $script:CumFile -Raw | ConvertFrom-Json).sessions_since_review | Should -BeGreaterOrEqual 3
+
+        if (Test-Path $sFile) { Remove-Item $sFile -Force }
+        $rFile = Join-Path $script:ReportsDir "$($sid.Substring(0,8)).json"
+        if (Test-Path $rFile) { Remove-Item $rFile -Force }
+    }
+
+    It "retrospect-complete.ps1 archives reports and resets the counters (the only reset)" {
+        [PSCustomObject]@{ total_score = 9; sessions_since_review = 4; last_review_ts = ''; last_nag_ts = (Get-Date).ToString('o') } | ConvertTo-Json | Set-Content $script:CumFile
+        $tmp = Join-Path ([IO.Path]::GetTempPath()) ('retro-' + [guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $tmp | Out-Null
+        '{}' | Set-Content (Join-Path $tmp 'aaaa.json')
+        '{}' | Set-Content (Join-Path $tmp 'bbbb.json')
+
+        $raw = & powershell.exe -NoProfile -File "$script:RepoRoot\telemetry\retrospect-complete.ps1" -ReportsDir $tmp -CumulativeFile $script:CumFile 2>$null
+        ($raw -join '') | Should -Match 'archived 2'
+
+        (Get-ChildItem $tmp -Filter *.json).Count | Should -Be 0
+        (Get-ChildItem (Join-Path $tmp 'archived') -Filter *.json).Count | Should -Be 2
+        $cum = Get-Content $script:CumFile -Raw | ConvertFrom-Json
+        $cum.sessions_since_review | Should -Be 0
+        $cum.total_score           | Should -Be 0
+        $cum.last_review_ts        | Should -Not -BeNullOrEmpty
+        Remove-Item $tmp -Recurse -Force
     }
 
     It "does NOT reset cumulative counters when threshold is not met" {
@@ -279,7 +326,7 @@ Describe "analyze-session.ps1: cumulative reset after retrospect threshold" {
         ) | ForEach-Object { $_ | ConvertTo-Json -Compress } | Set-Content $sFile
 
         $hookInput = [PSCustomObject]@{ session_id = $sid } | ConvertTo-Json -Compress
-        $hookInput | powershell.exe -NoProfile -File "$script:ClaudeRoot\telemetry\analyze-session.ps1" 2>$null | Out-Null
+        $hookInput | powershell.exe -NoProfile -File "$script:RepoRoot\telemetry\analyze-session.ps1" 2>$null | Out-Null
 
         $cum = Get-Content $script:CumFile -Raw | ConvertFrom-Json
         # Threshold not met — last_review_ts must still be empty (not reset)

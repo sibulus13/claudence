@@ -47,11 +47,10 @@ Ask the user to confirm each change before applying. Group them: "Here are 3 all
 
 ### 4. Archive addressed reports
 
-After changes are applied, move the analyzed report files to `~/.claude/telemetry/reports/archived/` so they don't re-appear in the next retrospective.
+After changes are applied, run the completion script. It moves every report in `~/.claude/telemetry/reports/` to `reports/archived/` and resets `cumulative.json`. It is the only thing that resets the counters; the Stop-hook nag never does (it only stamps `last_nag_ts` and repeats at most daily).
 
-Reset `cumulative.json`:
-```json
-{ "total_score": 0, "sessions_since_review": 0, "last_review_ts": "<now>" }
+```powershell
+powershell.exe -NoProfile -File ~/.claude/telemetry/retrospect-complete.ps1
 ```
 
 ### 5. Summary

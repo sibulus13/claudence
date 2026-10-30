@@ -103,8 +103,8 @@ Describe 'Alt+O launcher: EXTRA_PROJECTS' {
 }
 
 Describe 'Alt+O launcher: coverage' {
-    It 'surfaces Crucible (Stock/Research 2026), which the git walk finds' {
-        $script:RelsLower | Should -Contain 'stock/research 2026'
+    It 'surfaces Crucible (Finance/crucible), which the git walk finds' {
+        $script:RelsLower | Should -Contain 'finance/crucible'
     }
 
     It 'surfaces Life/pylon, which lives inside the Life repo' {
@@ -112,7 +112,7 @@ Describe 'Alt+O launcher: coverage' {
     }
 
     It 'still surfaces a plain top-level repo' {
-        $script:RelsLower | Should -Contain 'ai/nuwa'
+        $script:RelsLower | Should -Contain 'saas/nuwa'
     }
 }
 
