@@ -77,7 +77,11 @@ broken are enforced in code (`~/.claude/hooks/guard.py`), not here. Each rule's 
 - No dead code, no magic numbers, error handling only at boundaries, secrets only from env.
 - Every subprocess, network call, lock wait and retry loop has a timeout and a bound. On expiry it reports a named
   failure; it never hangs and never silently skips (hooks: `~/.claude/rules/hooks.md`).
-- Spec-driven for contracts and money paths; intent-driven for research and spikes.
+- Every feature, fix or build starts from a persistent work item, `<repo>/docs/work/<id>/` (README + layer files,
+  `~/.claude/skills/dark-factory/WORK-ITEM-STANDARD.md`): acceptance criteria with pass/fail conditions and a test each.
+  Enforced by the git commit-msg hook (pre-commit, `scripts/spec_gate.py`): a source commit on the default branch needs
+  a `Spec: docs/work/<id>/README.md` trailer naming a `building`/`shipped` item that passes `scripts/spec_check.py`.
+  Research and spikes are exempt until their code is committed.
 
 ## 6. Dispatch
 - Skill > `/orchestrate` role flow > `cycle` workflow > named agent (implementer, reviewer, researcher, designer,

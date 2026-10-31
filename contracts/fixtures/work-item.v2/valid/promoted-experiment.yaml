@@ -1,0 +1,8 @@
+# expect: valid
+id: exp
+type: experiment
+status: promoted
+touches: []
+layers: { architecture: none, component: none, functional: none, data: none }
+created: "2026-10-31"
+owner: harness

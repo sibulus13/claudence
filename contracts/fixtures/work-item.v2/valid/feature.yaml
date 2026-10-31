@@ -1,0 +1,14 @@
+# expect: valid
+id: demo
+type: feature
+status: building
+touches: [core]
+layers:
+  architecture: added
+  component: added
+  functional: added
+  data: none
+created: "2026-10-31"
+owner: harness
+lifecycle: false
+evidence: { demo: evidence/demo.webm }

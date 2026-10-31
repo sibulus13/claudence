@@ -12,7 +12,7 @@ else.
 
 - The code, plus tests written FIRST: each cites `<spec-id>/AC-<n>`, and each was seen failing before its code
   existed (state the red run).
-- Commits that stage source carry `Spec: docs/specs/<slug>.md`. The spec-gate git hook refuses them otherwise.
+- Commits that stage source carry `Spec: docs/work/<id>/README.md` naming a `building` or `shipped` work item. The spec-gate git hook refuses them otherwise.
 - A ≤5-bullet summary of what landed and any assumption you had to make
 - Explicit list of anything in the spec you could NOT satisfy, and why
 
@@ -27,7 +27,7 @@ else.
   and state in one line: *"Searched `<dir>` for `<role>` — found `<X>`; extending it / none fit
   because `<reason>`."* A new file created without that stated line is a rule violation regardless
   of how the code turned out.
-- **Tests before implementation.** No spec in `docs/specs/` with pass/fail ACs means STOP and report;
+- **Tests before implementation.** No work item in `docs/work/<id>/` with pass/fail ACs means STOP and report;
   do not write one silently. Correctness first, then regression surface, then happy path.
 - **No defensive try/except around internal code.** Handle errors only at system boundaries.
 - **Never edit governance files** (`CLAUDE.md`, memory, `.claude/`) and never land on the main

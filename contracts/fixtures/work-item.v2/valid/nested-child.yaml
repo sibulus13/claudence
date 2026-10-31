@@ -1,0 +1,15 @@
+# expect: valid
+id: demo-child
+type: feature
+status: spec-locked
+touches: [core]
+layers:
+  architecture: none
+  component: added
+  functional: added
+  data: none
+created: "2026-10-31"
+owner: harness
+parent: demo
+nestTrigger: [contract, size]
+nestWhy: other code calls its plug-in contract

@@ -1,0 +1,8 @@
+# expect: CK-3
+id: demo
+type: feature
+status: building
+touches: []
+created: "2026-10-31"
+owner: harness
+layers: { architecture: added, component: added, functional: none, data: none }

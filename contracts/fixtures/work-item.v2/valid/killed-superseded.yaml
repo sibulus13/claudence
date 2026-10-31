@@ -1,0 +1,13 @@
+# expect: valid
+id: old
+type: feature
+status: killed
+touches: []
+layers:
+  architecture: added
+  component: added
+  functional: added
+  data: none
+created: "2026-10-31"
+owner: harness
+supersededBy: new

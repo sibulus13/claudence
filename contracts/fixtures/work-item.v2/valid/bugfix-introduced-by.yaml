@@ -1,0 +1,9 @@
+# expect: valid
+id: fix-it
+type: bugfix
+status: draft
+touches: []
+layers: { architecture: none, component: modified, functional: none, data: none }
+created: "2026-10-31"
+owner: harness
+introducedBy: harness#12@abc1234

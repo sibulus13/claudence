@@ -1,0 +1,12 @@
+# expect: CK-2
+id: demo
+type: gizmo
+status: building
+touches: []
+created: "2026-10-31"
+owner: harness
+layers:
+  architecture: added
+  component: added
+  functional: added
+  data: none

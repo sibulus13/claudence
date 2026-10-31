@@ -82,3 +82,5 @@ docs/fleet/
 # Runtime output of scripts/ (lint reports) and bytecode
 state/
 __pycache__/
+
+node_modules/

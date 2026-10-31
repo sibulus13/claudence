@@ -1,0 +1,8 @@
+# expect: CK-3
+id: r
+type: refactor
+status: building
+touches: []
+created: "2026-10-31"
+owner: harness
+layers: { architecture: modified, component: modified, functional: modified, data: none }

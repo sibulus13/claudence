@@ -1,0 +1,11 @@
+{
+  "name": "claude-harness-tools",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Dev tooling for scripts/spec_check.py: markdownlint (CK-4) and the mermaid parser (diagram findings).",
+  "devDependencies": {
+    "jsdom": "^24.1.3",
+    "markdownlint-cli2": "^0.24.0",
+    "mermaid": "^12.2.0"
+  }
+}

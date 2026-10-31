@@ -1,0 +1,157 @@
+{
+  "source": "skills/dark-factory/WORK-ITEM-STANDARD.md",
+  "l0": {
+    "full": [
+      "Purpose",
+      "Non-goals",
+      "Capabilities",
+      "Non-functional requirements",
+      "Trade-offs",
+      "Patterns applied",
+      "Components chosen",
+      "Gate plan"
+    ],
+    "lite": [
+      "Purpose",
+      "Non-goals",
+      "Capabilities",
+      "Non-functional requirements",
+      "Gate plan"
+    ]
+  },
+  "readme": {
+    "feature": {
+      "headings": [
+        "Purpose",
+        "Non-goals",
+        "Capabilities",
+        "Non-functional requirements",
+        "Trade-offs",
+        "Patterns applied",
+        "Components chosen",
+        "Gate plan"
+      ]
+    },
+    "integration": {
+      "headings": [
+        "Purpose",
+        "Non-goals",
+        "Capabilities",
+        "Non-functional requirements",
+        "Trade-offs",
+        "Patterns applied",
+        "Components chosen",
+        "Gate plan",
+        "External contract"
+      ]
+    },
+    "data-collection": {
+      "headings": [
+        "Purpose",
+        "Non-goals",
+        "Capabilities",
+        "Non-functional requirements",
+        "Gate plan",
+        "Sample size",
+        "Stopping rule"
+      ]
+    },
+    "experiment": {
+      "headings": [
+        "Purpose",
+        "Non-goals",
+        "Gate plan",
+        "Hypothesis",
+        "Metric",
+        "Control vs variant",
+        "Kill/adopt threshold",
+        "Timebox",
+        "Result"
+      ],
+      "conditional": [
+        {
+          "heading": "Promoted to",
+          "status": "promoted"
+        }
+      ]
+    },
+    "research": {
+      "headings": [
+        "Question",
+        "Sources",
+        "Findings",
+        "Recommendation"
+      ]
+    },
+    "bugfix": {
+      "headings": [
+        "Root cause",
+        "Observed vs expected",
+        "Acceptance criteria",
+        "Gate plan"
+      ]
+    },
+    "refactor": {
+      "headings": [
+        "Motivation",
+        "What got simpler",
+        "Acceptance criteria",
+        "Gate plan"
+      ]
+    }
+  },
+  "nestedBase": [
+    "Purpose",
+    "Non-goals",
+    "Capabilities",
+    "Non-functional requirements",
+    "Gate plan"
+  ],
+  "files": {
+    "architecture.md": [
+      {
+        "heading": "Components",
+        "types": [
+          "feature",
+          "integration"
+        ]
+      },
+      {
+        "heading": "Work breakdown",
+        "when": "multi-package"
+      },
+      {
+        "heading": "Lifecycle",
+        "when": "lifecycle"
+      },
+      {
+        "heading": "Call chains",
+        "types": [
+          "feature",
+          "integration"
+        ],
+        "when": "architecture"
+      }
+    ],
+    "components.md": [],
+    "functional.md": [
+      {
+        "heading": "FR/NFR delta"
+      },
+      {
+        "heading": "Acceptance criteria"
+      }
+    ],
+    "data.md": [
+      {
+        "heading": "Schema"
+      },
+      {
+        "heading": "Contracts"
+      },
+      {
+        "heading": "Migration and back-compat"
+      }
+    ]
+  }
+}

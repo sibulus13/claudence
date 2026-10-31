@@ -1,0 +1,8 @@
+# expect: CK-3
+id: q
+type: research
+status: draft
+touches: []
+created: "2026-10-31"
+owner: harness
+layers: { architecture: none, component: added, functional: none, data: none }

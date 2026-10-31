@@ -21,9 +21,9 @@ if (a.scope !== 'spec' && !a.testCommand) throw new Error('cycle: testCommand is
 
 const WORK_DIR = `${a.repo}/docs/work/${a.workItem}`
 const TRACE_DIR = `${WORK_DIR}/cycles/${a.cycleId}`
-// Persistent spec for the work item (docs/specs/spec-gate.md format). the spec-gate git hook (scripts/spec_gate.py) refuses a source commit
-// without a `Spec:` trailer naming it, so this is enforced in code, not by this prompt.
-const SPEC_FILE = `docs/specs/${a.workItem}.md`
+// The work item README is the persistent spec (WORK-ITEM-STANDARD.md v2). The spec-gate git hook (scripts/spec_gate.py)
+// refuses a source commit on the default branch unless its `Spec:` trailer names a building/shipped item: enforced in code.
+const SPEC_FILE = `docs/work/${a.workItem}/README.md`
 const SPEC_CHECK = `python C:/Users/Michael/.claude/scripts/spec_check.py ${a.repo}/${SPEC_FILE}`
 const BUDGET_BY_SIZE = { S: 1, M: 2, L: 3 }
 const MAX_BUDGET = 3
@@ -120,7 +120,7 @@ You are the DESIGNER for cycle ${a.cycleId}, iteration ${iteration}, scope "${a.
 Brief: ${a.brief || '(read it from ' + WORK_DIR + '/README.md)'}
 Produce ${WHAT[a.scope]} under ${WORK_DIR}/. Follow C:/Users/Michael/.claude/skills/dark-factory/WORK-ITEM-STANDARD.md. Contract to honor: ${contract}. Owned files: ${owns}.
 ${priorFindings ? `REVISE the design to resolve these review findings (the root cause is in design):\n${findingsText(priorFindings)}` : ''}
-Write or update the persistent spec ${a.repo}/${SPEC_FILE} in the format of C:/Users/Michael/.claude/docs/specs/spec-gate.md: frontmatter (id=${a.workItem}, kind, status: draft, created), and an "## Acceptance criteria" table | AC | Given / when | Pass when | Fail when | Test | with one row per criterion, each naming the test file that will cite "${a.workItem}/AC-<n>". Run ${SPEC_CHECK} and make it exit 0.
+The work item IS the persistent spec: README (L0: overview, capabilities, NFRs with target and verification, trade-offs, patterns, components chosen) plus the layer files, per the type profile in WORK-ITEM-STANDARD.md, status draft. Its acceptance criteria table (| AC | Given / when | Pass when | Fail when | Traces | Test |) names, per row, the test file that will cite "${a.workItem}/AC-<n>". Multi-package items carry ## Work breakdown. Run ${SPEC_CHECK} and fix every error.
 Design only: write no implementation code. Estimate the size honestly. List every assumption, and mark low-confidence irreversible ones truthfully.
 Write the GATE PLAN into ${WORK_DIR}/README.md under "## Gate plan" and return it. Keep it to the MINIMUM number of checks that catch regression risk: one per acceptance criterion or coupling point that could actually break. Choose per risk:
 - deterministic: exact assertion, blocking. Use it for logic, schemas and contracts, data transforms and state machines.
@@ -172,7 +172,7 @@ Test-first is mandatory. For each acceptance criterion in ${a.repo}/${SPEC_FILE}
 - write the test first, citing "${a.workItem}/AC-<n>" in it;
 - run it and see it FAIL, and record that red run in your summary;
 - then write the code that makes it pass.
-Set the spec status to locked if it is still draft. Run ${SPEC_CHECK} until it exits 0.
+Set the work item status to building once the red tests exist (the gate accepts source commits only at building or shipped). Run ${SPEC_CHECK} until it exits 0.
 Commit with the trailer "Spec: ${SPEC_FILE}". The spec-gate git hook refuses a source commit on the default branch without it.
 Run: cd ${a.repo} && ${a.testCommand}. Get it green, then report the REAL final line.`,
     { label: `implement:${a.workItem}#${iteration}`, phase: 'Implement', schema: IMPL_OUT, agentType: 'implementer' },

@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://claude.local/contracts/work-item.v2.json",
+  "title": "Work-Item Standard v2: README.md frontmatter",
+  "description": "Source of truth for the frontmatter rules CK-1, CK-2, CK-3 (layer profiles), CK-17 (nesting keys), CK-21 and CK-25. `x-ck` maps a failing keyword to its checker rule id: {keyword: CK id, '*': default}. Unknown keys are allowed (Catwalk strips them).",
+  "type": "object",
+  "x-ck": {"type": "CK-1", "required": "CK-1"},
+  "required": ["id", "type", "status", "touches", "layers", "created", "owner"],
+  "properties": {
+    "id": {"type": "string", "minLength": 1, "x-ck": {"*": "CK-1"}},
+    "type": {
+      "enum": ["feature", "experiment", "research", "bugfix", "refactor", "integration", "data-collection"],
+      "x-ck": {"*": "CK-2"}
+    },
+    "status": {
+      "enum": ["draft", "spec-locked", "building", "shipped", "killed", "promoted"],
+      "x-ck": {"*": "CK-2"}
+    },
+    "touches": {"type": "array", "items": {"type": "string"}, "x-ck": {"*": "CK-1"}},
+    "layers": {
+      "type": "object",
+      "required": ["architecture", "component", "functional", "data"],
+      "x-ck": {"type": "CK-1", "required": "CK-1"},
+      "properties": {
+        "architecture": {"$ref": "#/$defs/layer"},
+        "component": {"$ref": "#/$defs/layer"},
+        "functional": {"$ref": "#/$defs/layer"},
+        "data": {"$ref": "#/$defs/layer"}
+      }
+    },
+    "created": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$", "x-ck": {"*": "CK-1"}},
+    "owner": {"type": "string", "minLength": 1, "x-ck": {"*": "CK-1"}},
+    "lifecycle": {"type": "boolean", "x-ck": {"*": "CK-1"}},
+    "parent": {"type": "string", "minLength": 1, "x-ck": {"*": "CK-1"}},
+    "children": {"type": "array", "items": {"type": "string"}, "x-ck": {"*": "CK-1"}},
+    "nestTrigger": {
+      "type": "array",
+      "items": {"enum": ["contract", "boundary", "team", "size"], "x-ck": {"*": "CK-2"}},
+      "uniqueItems": true,
+      "x-ck": {"*": "CK-2"}
+    },
+    "nestWhy": {"type": "string", "x-ck": {"*": "CK-1"}},
+    "supersededBy": {"type": "string", "minLength": 1, "x-ck": {"*": "CK-1"}},
+    "introducedBy": {"type": "string", "pattern": "^[^#\\s]+#\\d+@[0-9a-fA-F]{7,40}$", "x-ck": {"*": "CK-1"}},
+    "evidence": {
+      "type": ["object", "array"],
+      "x-ck": {"*": "CK-25"},
+      "additionalProperties": {"type": "string"},
+      "items": {"type": "string"}
+    }
+  },
+  "$defs": {
+    "layer": {"enum": ["added", "modified", "removed", "none"], "x-ck": {"*": "CK-2"}},
+    "none": {"const": "none", "x-ck": {"*": "CK-3"}},
+    "some": {"enum": ["added", "modified", "removed"], "x-ck": {"*": "CK-3"}}
+  },
+  "allOf": [
+    {
+      "if": {"required": ["supersededBy"]},
+      "then": {"properties": {"status": {"const": "killed", "x-ck": {"*": "CK-21"}}}}
+    },
+    {
+      "if": {"properties": {"status": {"const": "promoted"}}, "required": ["status"]},
+      "then": {"properties": {"type": {"const": "experiment", "x-ck": {"*": "CK-21"}}}}
+    },
+    {
+      "if": {"required": ["introducedBy"]},
+      "then": {"properties": {"type": {"const": "bugfix", "x-ck": {"*": "CK-2"}}}}
+    },
+    {
+      "if": {"required": ["parent"]},
+      "then": {
+        "x-ck": {"*": "CK-17"},
+        "required": ["nestTrigger", "nestWhy"],
+        "properties": {
+          "nestTrigger": {"minItems": 1, "x-ck": {"minItems": "CK-17", "*": "CK-2"}},
+          "nestWhy": {"minLength": 1, "x-ck": {"*": "CK-17"}}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"type": {"const": "experiment"}}, "required": ["type"]},
+      "then": {"properties": {"layers": {"properties": {"architecture": {"$ref": "#/$defs/none"}}}}}
+    },
+    {
+      "if": {"properties": {"type": {"const": "data-collection"}}, "required": ["type"]},
+      "then": {"properties": {"layers": {"properties": {
+        "architecture": {"$ref": "#/$defs/none"}, "data": {"$ref": "#/$defs/some"}}}}}
+    },
+    {
+      "if": {"properties": {"type": {"const": "research"}}, "required": ["type"]},
+      "then": {"properties": {"layers": {"properties": {
+        "architecture": {"$ref": "#/$defs/none"}, "component": {"$ref": "#/$defs/none"},
+        "functional": {"$ref": "#/$defs/none"}, "data": {"$ref": "#/$defs/none"}}}}}
+    },
+    {
+      "if": {"properties": {"type": {"const": "refactor"}}, "required": ["type"]},
+      "then": {"properties": {"layers": {"properties": {
+        "functional": {"$ref": "#/$defs/none"}, "architecture": {"$ref": "#/$defs/some"},
+        "component": {"$ref": "#/$defs/some"}}}}}
+    },
+    {
+      "if": {"properties": {"type": {"const": "feature"}}, "required": ["type"]},
+      "then": {"properties": {"layers": {"properties": {
+        "functional": {"$ref": "#/$defs/some"}, "component": {"$ref": "#/$defs/some"}}}}}
+    },
+    {
+      "if": {"properties": {"type": {"const": "integration"}}, "required": ["type"]},
+      "then": {"properties": {"layers": {"properties": {
+        "architecture": {"$ref": "#/$defs/some"}, "component": {"$ref": "#/$defs/some"},
+        "functional": {"$ref": "#/$defs/some"}, "data": {"$ref": "#/$defs/some"}}}}}
+    }
+  ]
+}
