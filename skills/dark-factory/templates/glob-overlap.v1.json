@@ -1,0 +1,30 @@
+{
+  "contract": "glob-overlap",
+  "version": 1,
+  "dialect": "Foreman core/ownership.js: charset [A-Za-z0-9._\\-/*?], no leading /, no .. segment; normalize leading ./ (strip), trailing / (becomes /**), case folded to lower; ** = any number of segments (zero included), * and ? within one segment. overlap=true unless provably disjoint; an unparseable glob overlaps everything.",
+  "home": "~/.claude/contracts/glob-overlap.v1.json (seed copy: ~/.claude/skills/dark-factory/templates/glob-overlap.v1.json)",
+  "consumers": ["~/.claude/scripts/spec_check.py tests", "D:/repo/Factory/foreman/test/core/ownership.test.js (Foreman follow-up)"],
+  "pairs": [
+    { "a": "src/a/**", "b": "src/b/**", "overlap": false },
+    { "a": "src/**", "b": "src/a/**", "overlap": true },
+    { "a": "src/*.ts", "b": "src/a/**", "overlap": false },
+    { "a": "src/*.ts", "b": "src/*.js", "overlap": true },
+    { "a": "src/a/", "b": "src/a/b.ts", "overlap": true },
+    { "a": "./src/a/**", "b": "src/a/**", "overlap": true },
+    { "a": "src/a", "b": "src/a/**", "overlap": true },
+    { "a": "**", "b": "src/a/**", "overlap": true },
+    { "a": "src/a/*.ts", "b": "src/a/x?.ts", "overlap": true },
+    { "a": "src/*/x.ts", "b": "src/*/y.ts", "overlap": false },
+    { "a": "src/a/**", "b": "tests/a/**", "overlap": false },
+    { "a": "package.json", "b": "package.json", "overlap": true },
+    { "a": "package.json", "b": "tsconfig.json", "overlap": false },
+    { "a": "src/a?", "b": "src/ab", "overlap": true },
+    { "a": "src/*", "b": "src/a/b", "overlap": false },
+    { "a": "src/**/x.ts", "b": "src/a/y.ts", "overlap": true },
+    { "a": "Src/A/**", "b": "src/a/**", "overlap": true, "note": "case fold; Foreman is case-sensitive today, its follow-up aligns" },
+    { "a": "SRC/B/x.ts", "b": "src/a/**", "overlap": false, "note": "case fold keeps distinct segments distinct" },
+    { "a": "src/{a,b}/**", "b": "docs/**", "overlap": true, "note": "unparseable (outside the charset) overlaps everything" },
+    { "a": "../x/**", "b": "docs/**", "overlap": true, "note": "unparseable" },
+    { "a": "/abs/**", "b": "docs/**", "overlap": true, "note": "unparseable" }
+  ]
+}

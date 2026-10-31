@@ -20,7 +20,7 @@ flowchart TD
 | ACs | list in functional.md, free form | one table, one id scheme `<id>/AC-<n>`, each AC traced to a CAP, FR or NFR; more than 15 ACs forces a split |
 | NFRs | free text | target + named verification method from a closed list |
 | Nesting | undefined | trigger rule; a nested spec is a sibling work item with `parent:` |
-| Enforcement | Phase 7.5 file-presence check | `spec_check.py` rules CK-1..CK-26 in two tiers + git `Spec:` trailer |
+| Enforcement | Phase 7.5 file-presence check | `spec_check.py` rules CK-1..CK-46 in tiers + git `Spec:` trailer |
 | Frontmatter | id type status touches layers evidence | adds `created owner` (required by the checker) and optional `lifecycle parent children nestTrigger nestWhy supersededBy introducedBy`. Catwalk ignores the new keys |
 
 ## The spine (unchanged)
@@ -78,7 +78,7 @@ Match is case-insensitive on the H2 text. "L0 full" headings: `Purpose`, `Non-go
 
 | File | Required H2 headings |
 |---|---|
-| architecture.md | `Components` (feature, integration); `Lifecycle` iff `lifecycle: true`; `Call chains` (feature, integration, when `layers.architecture` is not `none`) |
+| architecture.md | `Components` (feature, integration); `Work breakdown` iff the item is multi-package (components.md has >= 2 non-stub `##` component sections); `Lifecycle` iff `lifecycle: true`; `Call chains` (feature, integration, when `layers.architecture` is not `none`) |
 | components.md | one `## <component>` per component (feature, integration); other types: none required |
 | functional.md | `FR/NFR delta`, `Acceptance criteria` |
 | data.md | `Schema`, `Contracts`, `Migration and back-compat` |
@@ -96,7 +96,7 @@ Sections in order, exact H2 headings (these do not collide with Catwalk's experi
 5. `## Patterns applied`: `| Pattern | Where | Why |`, at least 1 row.
 6. `## Components chosen`: `| Need | Chosen (off the shelf) | Rejected | Why rejected |`, at least 1 row. A need built in-house says so in "Chosen" and states why nothing off the shelf fit.
 7. `## Gate plan` (v1): risk, deterministic|qualitative, check, blocking|advisory.
-8. Type-specific sections from the heading table.
+8. Multi-package items also carry `## Overview` (at most 300 words; see Context packs). Type-specific sections from the heading table.
 
 **Evidence cell format:** one or more tokens joined by ` + `: `AC-<n>`, `config:<repo-relative path>`, `decision:<R-id>` (the `DECISIONS.md` row id). Regex: `^(AC-\d+|config:[^\s+]+|decision:[\w.-]+)( \+ (AC-\d+|config:[^\s+]+|decision:[\w.-]+))*$`. Example: `AC-7 + config:.dependency-cruiser.cjs`.
 
@@ -115,11 +115,11 @@ NFR verification kinds (closed list; the `Method` cell starts with the kind toke
 
 ### L1 Architecture (architecture.md) [v2]
 
-Before/after container flowcharts first. Then `## Components` (one-line role per component, matching L2 section names), `## Lifecycle` (a `stateDiagram-v2`; the section exists if and only if README `lifecycle: true`), and `## Call chains` (one `sequenceDiagram` per main call chain, at most 5 participants each, hard rule CK-22). Lifecycle stages are sections of the parent spec, not nested specs, unless they are plug-in points (then trigger `contract`).
+Before/after container flowcharts first. Then `## Components` (one-line role per component, matching L2 section names), `## Lifecycle` (a `stateDiagram-v2`; the section exists if and only if README `lifecycle: true`), and `## Call chains` (one `sequenceDiagram` per main call chain, at most 5 participants each, hard rule CK-22). Lifecycle stages are sections of the parent spec, not nested specs, unless they are plug-in points (then trigger `contract`). A multi-package item adds `## Work breakdown` here (see Work breakdown).
 
 ### L2 Component specs (components.md, data.md) [v2]
 
-components.md keeps the before/after diagram and an owned-files table, then one `## <component>` section per component. Each full section has these H3s in order: `### Interface`, `### Functional requirements` (`FR-<n>` ids, unique per work item), `### Data`, `### Failure modes` (`| Failure | Detection | Handling |`), `### Budget` (latency and cost, numbers). A **nested stub** is a `## <component>` section with no H3 whose first non-blank line starts `Nested spec: ` followed by `docs/work/<child-id>/`; it is exempt from the five H3s and must name an existing child in `children`. data.md is the shared data contract that `### Data` sections link to rather than duplicate.
+components.md keeps the before/after diagram and, for single-package items, an owned-files table (multi-package items carry `owns` in the Work breakdown instead), then one `## <component>` section per component. Each full section has these H3s in order: `### Interface`, `### Functional requirements` (`FR-<n>` ids, unique per work item), `### Data`, `### Failure modes` (`| Failure | Detection | Handling |`), `### Budget` (latency and cost, numbers). A **nested stub** is a `## <component>` section with no H3 whose first non-blank line starts `Nested spec: ` followed by `docs/work/<child-id>/`; it is exempt from the five H3s and must name an existing child in `children`. data.md is the shared data contract and the contracts register (`## Contracts`, exact columns in Work breakdown) that `### Data` sections link to rather than duplicate.
 
 ### L3 Acceptance criteria (functional.md) [v2]
 
@@ -157,6 +157,7 @@ nestTrigger: [contract | boundary | team | size]   # required iff parent is set
 nestWhy: <one sentence of evidence per trigger>    # required iff parent is set
 supersededBy: <id>         # only with status killed
 introducedBy: <repo>#<issue>@<mergeSha>            # bugfix, optional
+packBudgetWords: <n>       # optional; context-pack word budget, default 2500 (CK-46)
 ```
 
 ### Status set (Catwalk's six, unchanged) [v2]
@@ -174,15 +175,15 @@ Flow: `draft` → (review) `spec-locked` → commit red tests (gate-exempt) → 
 
 ## Per-type profiles [v2: L0 and AC columns added]
 
-| type | architecture | component | functional | data | type-specific section | review evidence | L0 | AC table |
-|---|---|---|---|---|---|---|---|---|
-| **feature** | required (may be none) | required | **required** | required (may be none) | acceptance criteria | demo video or before/after | **full** | functional.md |
-| **experiment** | must be none (promotion opens a feature item) | optional | optional | optional | see heading table | result table or chart; on adopt, `promoted` and a new feature item | experiment form | optional |
-| **research** | must be none | must be none | must be none | must be none | see heading table | findings doc | none | none |
-| **bugfix** | optional (only if structural) | optional (the layer that held the bug) | optional (observed vs expected) | optional | root cause; `introducedBy` key | failing → passing regression test | none | README, 1+ rows |
-| **refactor** | **required** before/after | **required** before/after | must be none | required (may be none) | motivation · what got simpler (measured) | before/after diagrams | none | README, rows assert unchanged tests |
-| **integration** | **required** | required | required | **required** (the contract) | `External contract` | contract test + demo | **full** | functional.md |
-| **data-collection** | must be none | optional | optional | **required** | sample size · stopping rule | sample + row count | lite | functional.md if present, else README |
+| type | architecture | component | functional | data | type-specific section | review evidence | L0 | AC table | Work breakdown |
+|---|---|---|---|---|---|---|---|---|---|
+| **feature** | required (may be none) | required | **required** | required (may be none) | acceptance criteria | demo video or before/after | **full** | functional.md | required if multi-package, else omitted |
+| **experiment** | must be none (promotion opens a feature item) | optional | optional | optional | see heading table | result table or chart; on adopt, `promoted` and a new feature item | experiment form | optional | none |
+| **research** | must be none | must be none | must be none | must be none | see heading table | findings doc | none | none | none |
+| **bugfix** | optional (only if structural) | optional (the layer that held the bug) | optional (observed vs expected) | optional | root cause; `introducedBy` key | failing → passing regression test | none | README, 1+ rows | none |
+| **refactor** | **required** before/after | **required** before/after | must be none | required (may be none) | motivation · what got simpler (measured) | before/after diagrams | none | README, rows assert unchanged tests | none |
+| **integration** | **required** | required | required | **required** (the contract) | `External contract` | contract test + demo | **full** | functional.md | required if multi-package, else omitted |
+| **data-collection** | must be none | optional | optional | **required** | sample size · stopping rule | sample + row count | lite | functional.md if present, else README | none |
 
 Bugfix and refactor stay light: no L0, no L1-L2 beyond the layers declared. Experiment form = the experiment row of the heading table (no Capabilities/NFR). Why experiments differ (v1): an experiment may be wrong; on a win the real change is a new `feature` item.
 
@@ -206,6 +207,104 @@ Triggers (token → test):
 
 **One number: more than 15 AC rows in one work item is an error unless that item has `children` (CK-23).** A parent with children and more than 15 own rows gets a warning (move rows into children). A nested spec is a sibling work item `docs/work/<child-id>/`, a full v2 folder with its own AC ids `<child-id>/AC-<n>`; it is not a subfolder, because Catwalk lists top-level folders only. The parent lists it in `children:` and in a nested stub in components.md. A part with no trigger stays a section (for example lifecycle stages).
 
+## Work breakdown, contracts, isolation, milestones, context packs [v2]
+
+Purpose: the spec cuts the work into **packages** that separate agent teams take in isolation, and each agent receives only its own boundary plus a short overview. It builds on the dark-factory contract cycle (`REFERENCE.md` section 3: contract artifact first, `owns` pairwise disjoint, contract landed as its own PR, fan-out, integration last), the coupling map, and Foreman's `contract-first-parallel-dispatch` / `contract-only` mode. What it adds is that the **spec's Work breakdown table is the single authoritative source** of those dispatch facts, so the same facts are never written twice.
+
+Reconciliation with `REFERENCE.md:759` ("anything larger becomes child work items so Foreman can run them concurrently"): packages inside one work item are the default unit of parallel work; Foreman runs a package as a backlog child (`parent / owns / dependsOn / contract`). A separate child work item (nested spec) is used only when a nesting trigger holds. Foreman today takes its children from hand-written `backlogItems`; generating them from this table is a Foreman follow-up (open question 6). Until then CK-43 warns when the two disagree.
+
+```mermaid
+flowchart TD
+  C1[PKG-1 contracts<br/>provides result@1] --> P2[PKG-2 consumes result@1]
+  C1 --> P3[PKG-3 consumes result@1]
+  P2 --> I[PKG-4 integration]
+  P3 --> I
+  I --> M[Milestone exit:<br/>ACs green + contract tests + isolation run]
+```
+
+### Scope and where it lives
+- **Multi-package** means: `components.md` has two or more non-stub `##` component sections (the predicate `P`). Packages and components are 1:1. Everything below applies to `feature` and `integration` items (and `build`, which maps to feature) where `P` holds. When `P` does not hold the item is single-package: no Work breakdown is needed, `layers.architecture` may stay `none`, and CK-27..CK-46 are skipped. A `Single package.` section is tolerated only when `P` does not hold (CK-27).
+- `## Work breakdown` is an H2 in **architecture.md** (L1; components.md is not used because CK-16 treats every `##` there as a component). When `P` holds, `layers.architecture` must not be `none`. CK-4 requires the heading in exactly that case.
+- The contracts register is the `## Contracts` table of **data.md**. When any package provides or consumes a contract, `layers.data` must not be `none`.
+- A component that is a nested stub is never a package: it is a separate work item, consumed through `ext:` contracts.
+
+### The table
+Header exactly: `| Package | Component | Owns | Provides | Consumes | Depends on | Milestone | ACs | Test seam |`
+
+| Column | Format |
+|---|---|
+| Package | `PKG-<n>`, unique; plus exactly one reserved row `SHARED` |
+| Component | the name of a non-stub `## <component>` section in components.md, unique per package; `-` on the SHARED row |
+| Owns | comma-separated globs in the Foreman dialect (below) |
+| Provides / Consumes | comma-separated `<contract-id>@<version>` (integer), or `-`. A consumed contract from another work item is `ext:<item-id>:<contract-id>@<version>` |
+| Depends on | comma-separated `PKG-<n>`, or `-` |
+| Milestone | `M<n>` |
+| ACs | comma-separated `AC-<n>`, at least one (`-` on SHARED) |
+| Test seam | ` + `-joined tokens `fixtures:<contract-id>@<version>` and/or `stub:<repo-relative path>`; or `none` when Consumes is `-` |
+
+The **SHARED** row owns root files that belong to no package (package.json, tsconfig, lockfiles, CI config): `Component -`, Provides/Consumes/Depends `-`, ACs `-`, milestone `M1`. A change to a shared file is made in its own package or in the integration cycle, never inside a component package. The integration/e2e ACs belong to a package of their own, normally the last (depends on all others, owns `tests/e2e/**` or equivalent).
+
+### Glob dialect and overlap (ported from Foreman, not a second dialect)
+Source of truth: `D:/repo/Factory/foreman/core/ownership.js` (`isSafeGlob`, `normalizeGlob`, `globsOverlap`, `matchGlob`); its tests are `D:/repo/Factory/foreman/test/core/ownership.test.js`.
+- Charset `[A-Za-z0-9._\-/*?]` only; no leading `/`; no `..` segment. Anything else in an Owns cell is an error and, as a pair, is treated as overlapping.
+- Normalize: strip a leading `./`; a trailing `/` becomes `/**`; fold case to lower (Windows). Foreman is case-sensitive today; aligning it is part of its follow-up.
+- Semantics: `**` any number of segments (zero included), `*` any characters within a segment, `?` one character.
+- Overlap = Foreman's conservative `globsOverlap`: true unless provably disjoint; unparseable overlaps everything. The checker ports that algorithm; it does not use a different lexical rule.
+- **Shared contract vectors:** one JSON file of glob-pair overlap vectors, `~/.claude/contracts/glob-overlap.v1.json` (seed: `templates/glob-overlap.v1.json` next to this file). `spec_check.py`'s test and Foreman's ownership test both load it (contract-test rule of `rules/testing.md` section 5), so the two implementations cannot drift. Wiring Foreman's test to it is a Foreman follow-up; a missing vector file fails the test, it is never skipped.
+
+### Contract rules
+1. A contract is a versioned schema file (zod or JSON Schema) named `<contract-id>.v<version>.<ext>`, listed in the data.md Contracts table, owned by exactly one package (its provider). The contract package is an ordinary package with the earliest milestone.
+2. Contracts table header exactly: `| Contract | Version | Schema file | Provider | Valid fixtures | Invalid fixtures | Digest | Status |`. Fixture cells are repo-relative globs whose directory segment is `valid` / `invalid`. `Status` is `current` or `retired`. Each contract ships at least one valid and one invalid fixture.
+3. Producer and consumer both run contract tests against those fixtures (`rules/testing.md` section 5).
+4. A breaking change adds `<id>.v<n+1>.<ext>` and a new row; the previous row becomes `retired` and stays while any package consumes it (a retired row nobody consumes is a warning to delete). Versions per id strictly increase; the highest is `current`. A published version is never edited in place; the `Digest` enforces this.
+5. **Digest** = `sha256:<hex>` over the text `schema <sha256 of schema file>\n` followed by one line `<path> <sha256>\n` per fixture file (valid and invalid), sorted by repo-relative path; files hashed with CRLF normalized to LF. It stays blank until the contract package merges (the provider package prints it with `spec_check.py --digest <contract-id>@<version>` and the merge commit records it). A non-blank digest that differs from the files fails (CK-42): a changed contract needs a version bump.
+6. Contracts lock first: the contract package's milestone is strictly earlier than every consumer's. Under Foreman the contract package merges as its own PR (`contract-only`); that merge is the exit condition for fanning out (REFERENCE section 3 step 3). "Owned by nobody after it lands" in REFERENCE means no consumer may edit it.
+7. **Stubs** live inside the contract **provider's** `owns`, next to the contract's fixtures, versioned and contract-tested with them. Reason: a consumer-owned stub is a second implementation of the contract per consumer and drifts; a provider-owned stub changes only with the contract, and one team keeps schema, fixtures and stub consistent. A consumer references the stub in its Test seam and never edits it.
+
+### Isolation rule
+A package must be buildable and testable with only its own owned files plus the locked contract schema files, fixtures and stubs it consumes, plus the SHARED files. It may not import another package's internals. Two checks:
+1. **Static:** an import-boundary fitness check (dependency-cruiser or import-linter), the NFR kind `fitness` (CK-38). Rule: files matched by package P's `owns` may import only P's own files, third-party packages, the SHARED files, and the consumed contracts' schema files and stubs.
+2. **Observed:** each package builds and tests in a sparse checkout containing only that set. `spec_check.py --sparse <PKG-id>` prints the set (one glob per line; the same derivation the context pack uses). The item's Gate plan names the gate command that does the sparse checkout and runs the package's build and test (CK-41); a milestone is not exit-green until it passes for every package in it.
+Generating the dependency-cruiser config from the table, as Foreman's `gen-architecture.mjs` generates the C4 model, is a recommended follow-up; until then design review checks it matches the table.
+
+### Milestones
+A milestone `M<n>` is the set of packages with that milestone value. Exit condition: every AC listed for those packages is green, the integration cycle's contract tests pass for every contract they provide or consume (REFERENCE section 3 step 5), and the isolation run passes for each package. Every package depends only on packages in strictly earlier milestones, so packages in one milestone are independent and can be dispatched in parallel worktrees. Milestones are contiguous from `M1`. The checker validates the structure and runs no tests.
+
+### Context packs (minimum context per agent) [v2]
+An agent receives exactly two things: a short holistic overview and its own boundary.
+1. **Overview.** Every multi-package item has a README `## Overview`: purpose, the capabilities (each `CAP-n` id named), the package flowchart, and the milestone list (each `M<n>` named). At most 300 words, not counting the fenced diagram (CK-44). It is the only holistic text an agent receives.
+2. **Pack.** `spec_check.py <README> --pack <PKG-id>` deterministically emits to **stdout** a markdown pack with exactly these sections, in order: `# Pack: <id>/<PKG-id>`; `## Overview` (the README Overview, verbatim); `## Package` (that package's table row, verbatim); `## Component` (that component's whole `##` section from components.md, verbatim); `## Contracts` (for each contract it provides or consumes: the Contracts-table row, schema file path, fixture globs, and the schema text inline when the file is at most 200 lines); `## Acceptance criteria` (the AC table header plus only this package's rows); `## Test seam` (the cell, and the stub and fixture paths); `## Owns` (the globs). Nothing else: no other component sections, no other package's row or ACs, no other README sections. The generator refuses (exit 1, findings printed) if the STATIC rules fail.
+3. **Stdout, not files.** The pack is derived, so the spec stays the only source; a checked-in `packs/` folder would go stale, add generated files to review and collide across parallel agents. The cycle records the pack it dispatched in its trace folder `docs/work/<id>/cycles/<cycleId>/` (the cycle already writes there), which gives an audit trail without a second source. A pack is never hand-edited.
+4. **Budget.** Default 2,500 words per pack (override with optional frontmatter `packBudgetWords: <n>`). CK-46 warns when a pack exceeds it: the package is too big and should split.
+5. **Dispatch (follow-ups, nothing wired yet).** `workflows/cycle.js` and Foreman's dispatch hand the pack, not the whole spec, to implementer prompts for multi-package items. Reviewers get the pack plus the full text of the consumed contract schema and fixture files. A designer working at L1 gets the whole spec. Single-package items are small and receive the whole spec. The `brief` skill (`~/.claude/skills/brief/`) is LLM-written and non-deterministic, so it is not the generator; its role-to-context idea stands, and it may embed the pack.
+
+### Checker rules CK-27..CK-46 (CK-1..CK-26 unchanged) [v2]
+
+Binding sets are those of the Checker requirements section: STATIC = {spec-locked, building, shipped}, EXEC = {building, shipped}, SHIPPED = {shipped}. All rules apply only when the item is feature or integration and `P` holds, except CK-27's `Single package.` check.
+
+| Rule | Binds at | Check | Fail fixture | Pass fixture |
+|---|---|---|---|---|
+| CK-27 | STATIC | table present with the exact header, a flowchart fence first, >= 2 package rows plus exactly one `SHARED` row, unique ids; `Component` resolves to a distinct non-stub components.md section; the body is not `Single package.` when `P` holds; `layers.architecture` not `none` (`layers.data` not `none` when any contract token) | `Single package.` with 2 components; Component is a nested stub; two packages share a component | 2 packages + SHARED |
+| CK-28 | STATIC | each Owns cell is non-empty and in the dialect charset; no two rows (SHARED included) overlap, using the ported algorithm and checked against the shared vectors file | `src/**` with `src/a/**`; `src/{a,b}/**`; `Src/A/**` with `src/a/**` | `src/a/**` with `src/b/**` |
+| CK-29 | STATIC | if any Provides/Consumes token exists, data.md and its Contracts table must exist (else error naming the missing piece); exact header; kebab-case id; integer version strictly increasing per id; highest is `current`, others `retired`; schema file ends `.v<Version>.<ext>`; fixture globs have a `valid` / `invalid` segment; Provider is a package id; every `current` row is in exactly its Provider's Provides; a `retired` row consumed by nobody is a warning | consumed contract with no data.md; two current versions of one id; `.v1` file on version 2 | v1 retired + v2 current |
+| CK-30 | STATIC | every non-`ext:` Consumes token resolves to a row (current or retired); an `ext:` token names the parent, a child or a sibling item, whose data.md must exist and hold the row; the item graph over `ext:` edges is acyclic | consumes `result@3` with only v1, v2; `ext:` to an item with no data.md; items A and B `ext:` each other | consumes `result@1`; `ext:` to a child |
+| CK-31 | STATIC | each contract's schema file and fixture globs are matched by the provider's Owns and by no other row | schema under another package's glob | all inside the provider |
+| CK-32 | STATIC | every Depends-on id exists, is not itself, graph acyclic (the finding prints the cycle) | PKG-2 and PKG-3 depend on each other | diamond graph |
+| CK-33 | STATIC | for every consumed (non-`ext:`) contract the provider is **reachable** from the consumer over Depends-on (direct or transitive) | provider unreachable | consumer depends on X, X on provider |
+| CK-34 | STATIC | package ACs cells (SHARED excluded) partition the AC table: each AC in exactly one package, every listed id exists | AC-3 twice; AC-9 absent; AC-4 in none | each once |
+| CK-35 | STATIC | milestones `M<n>` contiguous from M1; for every direct dependency d of p, milestone(d) < milestone(p) | same milestone as provider; M1 then M3 | provider M1, consumer M2 |
+| CK-36 | STATIC | Test seam tokens well formed; `none` only when Consumes is `-`; every consumed contract (including `ext:`) has a `fixtures:<contract>@<version>` token that resolves to a provider contract row; each `stub:` path is matched by the Owns of the provider of a consumed contract and by no other row | seam `none` while consuming; `fixtures:` for an unknown contract; stub path under the consumer's own Owns | `fixtures:result@1 + stub:fixtures/result.v1/stub.ts` |
+| CK-37 | EXEC | each schema file exists; each Valid and Invalid fixture glob matches >= 1 file; each `stub:` path exists; for `ext:` contracts the same checks run on the other item's real files | invalid glob matches nothing; `ext:` provider file missing | all present |
+| CK-38 | STATIC | README has >= 1 NFR whose Method begins `fitness` and whose Target contains the word `import` (lint; CK-24 checks its `config:` file at EXEC) | no fitness NFR | NFR "no import across package owns" |
+| CK-39 | EXEC | for every contract a package provides or consumes, at least one test file named by that package's ACs contains the contract's schema path or fixtures directory path (substring; proves reference, not execution) | consumer tests never mention the fixtures | both sides mention them |
+| CK-40 | EXEC | expand every row's Owns over `git ls-files` (excluding Foreman's `SHARED_BOOKKEEPING_GLOBS`, e.g. `docs/work/**`); every tracked file matches at most one row | a tracked file matched by two rows | each file at most once |
+| CK-41 | STATIC | README Gate plan has a blocking row whose Check starts `isolation:` and names the sparse-checkout build/test gate command | no such row, or it is advisory | blocking `isolation:` row |
+| CK-42 | EXEC | a non-blank `Digest` equals the recomputed digest; at SHIPPED every `current` row's Digest is non-blank | edited schema, same version, stale digest; blank at `shipped` | matching digest |
+| CK-43 | STATIC (warning only) | each `docs/STATE.md` backlogItems child whose `parent` is this item (id `<item-id>-pkg-<n>`) agrees with its row: `owns` set-equal to Owns, `dependsOn` equal to Depends-on, `contract` is one of the provided schema files | child owns differ from the table (warns) | child matches |
+| CK-44 | STATIC | README `## Overview` exists, <= 300 words excluding fenced blocks, holds a mermaid flowchart, names every `CAP-n` and every `M<n>` of the table | 301 words; missing `M2` | 280 words, all named |
+| CK-45 | tool contract | `--pack <PKG>` output has exactly the 8 parts above in order; it contains no AC id outside the package's ACs, no other component's `##` heading, no other package row, no README section but Overview. Tested on fixtures against a golden pack; not run per item | pack for PKG-2 contains PKG-3's AC-3 or `## <component-b>` | golden pack for PKG-2 |
+| CK-46 | STATIC (warning only) | each package's pack word count <= budget (default 2,500) | pack of 2,912 words warns "split the package" | 1,800 words |
+
 ## Where the commit gate points [v2]
 
 The git commit-msg hook's `Spec:` trailer names the README: `Spec: docs/work/<id>/README.md` (no `..`, `<id>` equals the folder). The hook runs `spec_check.py <README> --for-source-commit`:
@@ -221,8 +320,8 @@ Interface: `spec_check.py <path/to/README.md> [--root <repo>] [--for-source-comm
 **Tiers (explicit sets, no ordering):**
 - ALWAYS = every status: CK-1, CK-2, CK-3, CK-18.
 - `killed`, `promoted`: ALWAYS plus CK-21.
-- STATIC = {`spec-locked`, `building`, `shipped`}: ALWAYS + CK-4..CK-17, CK-19, CK-21..CK-23. CK-23 (more than 15 ACs needs children) binds at STATIC only: a `draft` may exceed 15 while being written.
-- EXEC = {`building`, `shipped`}: STATIC + CK-20, CK-24.
+- STATIC = {`spec-locked`, `building`, `shipped`}: ALWAYS + CK-4..CK-17, CK-19, CK-21..CK-23, CK-27..CK-36, CK-38, CK-41, CK-43, CK-44, CK-46 (the last of which and CK-43 only warn; CK-27..CK-46 apply to multi-package feature and integration items). CK-23 (more than 15 ACs needs children) binds at STATIC only: a `draft` may exceed 15 while being written.
+- EXEC = {`building`, `shipped`}: STATIC + CK-20, CK-24, CK-37, CK-39, CK-40, CK-42.
 - SHIPPED = {`shipped`}: EXEC + CK-25.
 - `draft`: ALWAYS only (placeholders and missing sections are allowed).
 - `--for-source-commit` adds CK-26.
@@ -347,3 +446,8 @@ If any is built, add the key to `WorkItemFrontmatterSchema` and to the frontmatt
 3. The AC header gained a `Traces` column; the old 5-column header is accepted only in legacy mode.
 4. The weaver seam table is indicative; the migrator may regroup if a seam fails its trigger test.
 5. cortex-plugin (22 ACs) needs its own split plan at migration time.
+6. Foreman follow-up (roadmap item, to add to the LEDGER roadmap): `contract-only` dispatch generates the backlog children (`parent / owns / dependsOn / contract`) from the Work breakdown table so dispatch facts exist once; until then CK-43 only warns. Same follow-up: align Foreman's glob handling to case folding and wire `ownership.test.js` to `~/.claude/contracts/glob-overlap.v1.json`.
+7. Context-pack wiring: `workflows/cycle.js` and Foreman dispatch pass the pack (not the whole spec) to implementer prompts, and pack plus consumed contract files to reviewers. Not built.
+8. Locked-contract immutability beyond the Digest (for example a commit-time check against git history) is not specified; the Digest catches edits only once it is filled in.
+9. `ext:` references are limited to parent, child or sibling items and skip milestone ordering across items; stricter cross-item ordering is open.
+10. The isolation gate command (sparse checkout then build and test, fed by `--sparse`) is named in the Gate plan but not yet written.

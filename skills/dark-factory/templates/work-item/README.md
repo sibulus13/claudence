@@ -24,6 +24,15 @@ flowchart TD
   S --> Y[External system B]
 ```
 
+## Overview
+<!-- Multi-package items only; delete otherwise. At most 300 words excluding the diagram: purpose, every CAP-n id, the package flowchart, every milestone M<n>. This is the only holistic text a package agent receives. -->
+EXAMPLE (replace): <one paragraph naming CAP-1..CAP-5 and milestones M1..M3.>
+
+```mermaid
+flowchart TD
+  M1[M1 contracts] --> M2[M2 components] --> M3[M3 integration]
+```
+
 ## Purpose
 <One paragraph for the owner: the problem and the outcome.>
 
@@ -45,7 +54,7 @@ flowchart TD
 | NFR-1 | EXAMPLE (replace): p95 latency <= 200 ms at 10 req/s | latency-bench: <what is timed> | AC-<n> |
 | NFR-2 | EXAMPLE (replace): cost <= $0.05 per job | cost-budget: recorded tokens/$ | AC-<n> |
 | NFR-3 | EXAMPLE (replace): a new plug-in needs 0 core file edits | extensibility: add a stub plug-in in a test | AC-<n> |
-| NFR-4 | EXAMPLE (replace): no import from core into plugins | fitness: dependency-cruiser / import-linter rule | AC-<n> + config:.dependency-cruiser.cjs |
+| NFR-4 | EXAMPLE (replace): no import of another package's internals (import-boundary rule) | fitness: dependency-cruiser / import-linter rule | AC-<n> + config:.dependency-cruiser.cjs |
 
 Evidence format: `AC-<n>` and/or `config:<path>` and/or `decision:<R-id>` joined by ` + `. Method kinds: fault-injection, latency-bench, cost-budget, extensibility, fitness, observability, clock-kill, spike (evidence = DECISIONS.md row, status confirmed).
 
@@ -69,5 +78,6 @@ Evidence format: `AC-<n>` and/or `config:<path>` and/or `decision:<R-id>` joined
 | Risk | Kind (deterministic / qualitative) | Check | Blocking / advisory |
 |---|---|---|---|
 | <risk> | deterministic | <check> | blocking |
+| package isolation (multi-package only) | deterministic | isolation: <gate command: sparse checkout from spec_check --sparse, then build and test> | blocking |
 
 <!-- Integration adds `## External contract`; type-specific sections go here (see the profile table): bugfix root cause, experiment hypothesis/metric/result, etc. -->

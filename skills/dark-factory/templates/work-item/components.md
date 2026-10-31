@@ -10,6 +10,7 @@ flowchart TD
   end
 ```
 
+<!-- Single-package items keep this owned-files table. Multi-package items carry `owns` in architecture.md `## Work breakdown`; keep only the Component and Public interface columns here. -->
 | Component | Owned files | Public interface |
 |---|---|---|
 | <component-a> | `src/<a>/**` | `<signature or endpoint>` |
