@@ -71,6 +71,8 @@ broken are enforced in code (`~/.claude/hooks/guard.py`), not here. Each rule's 
 - Schema first for any non-trivial data shape (zod or pydantic, types derived), validated at boundaries.
 - Tests: sanity, one per acceptance criterion, and regression-first when a bug happens; see each fail once.
 - No dead code, no magic numbers, error handling only at boundaries, secrets only from env.
+- Every subprocess, network call, lock wait and retry loop has a timeout and a bound. On expiry it reports a named
+  failure; it never hangs and never silently skips (hooks: `~/.claude/rules/hooks.md`).
 - Spec-driven for contracts and money paths; intent-driven for research and spikes.
 
 ## 6. Dispatch

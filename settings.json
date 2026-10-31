@@ -23,17 +23,20 @@
           {
             "type": "command",
             "command": "powershell.exe -NoProfile -File $USERPROFILE/.claude/startup-reminder.ps1",
-            "shell": "bash"
+            "shell": "bash",
+            "timeout": 15
           },
           {
             "type": "command",
             "command": "powershell.exe -NoProfile -File $USERPROFILE/.claude/scripts/record-pane-session.ps1",
-            "shell": "bash"
+            "shell": "bash",
+            "timeout": 15
           },
           {
             "type": "command",
             "command": "powershell.exe -NoProfile -File $USERPROFILE/.claude/scripts/resolve-docs-root.ps1 -Hook",
-            "shell": "bash"
+            "shell": "bash",
+            "timeout": 15
           }
         ]
       },
@@ -53,7 +56,8 @@
           {
             "type": "command",
             "command": "powershell.exe -NoProfile -File $USERPROFILE/.claude/telemetry/log-prompt.ps1",
-            "shell": "bash"
+            "shell": "bash",
+            "timeout": 10
           }
         ]
       }
@@ -64,25 +68,15 @@
           {
             "type": "command",
             "command": "powershell.exe -NoProfile -File $USERPROFILE/.claude/telemetry/analyze-session.ps1",
-            "shell": "bash"
+            "shell": "bash",
+            "timeout": 30
           },
           {
             "type": "command",
             "command": "powershell.exe -NoProfile -File $USERPROFILE/.claude/telemetry/notify-attention.ps1 -Reason stop -Silent",
             "shell": "bash",
-            "async": true
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "powershell.exe -NoProfile -File $USERPROFILE/.claude/telemetry/log-tool-done.ps1",
-            "shell": "bash",
-            "async": true
+            "async": true,
+            "timeout": 30
           }
         ]
       }
@@ -94,7 +88,8 @@
             "type": "command",
             "command": "powershell.exe -NoProfile -File $USERPROFILE/.claude/telemetry/record-compact.ps1",
             "shell": "bash",
-            "async": true
+            "async": true,
+            "timeout": 15
           }
         ]
       }
@@ -106,13 +101,15 @@
             "type": "command",
             "command": "powershell.exe -NoProfile -File $USERPROFILE/.claude/telemetry/log-permission.ps1",
             "shell": "bash",
-            "async": true
+            "async": true,
+            "timeout": 10
           },
           {
             "type": "command",
             "command": "powershell.exe -NoProfile -File $USERPROFILE/.claude/telemetry/notify-attention.ps1 -Reason permission -Sound ding-half.wav",
             "shell": "bash",
-            "async": true
+            "async": true,
+            "timeout": 10
           }
         ]
       }
@@ -125,6 +122,19 @@
             "type": "command",
             "command": "python \"$USERPROFILE/.claude/hooks/guard.py\"",
             "timeout": 15
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell.exe -NoProfile -File $USERPROFILE/.claude/telemetry/log-tool-done.ps1",
+            "shell": "bash",
+            "async": true,
+            "timeout": 10
           }
         ]
       }
