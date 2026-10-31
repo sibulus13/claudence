@@ -17,3 +17,12 @@
   `playbooks/first-principles.md`: if it is an approach finding, redesign; otherwise cut scope.
 - Why: the spec-gate checker took 6+ review rounds on 2026-10-31. The spec grew during the build (v2 merge, work
   breakdown, context packs, off-the-shelf validators, exemption policy) inside one 46-rule work item.
+
+## Feed review findings back into design (owner, 2026-10-31)
+- Every review (in the cycle workflow or a direct reviewer agent) returns findings tagged with a gap category and a class.
+  The parent appends the design- and spec-class ones to `docs/SPEC-GAP-LEDGER.md`: a new category gets a new row, and a
+  repeat adds evidence to the existing row.
+- Escape = a design-class finding in a category the item's `## Gap-ledger check` claimed. The goal is zero escapes:
+  review finds only implementation slips, never design gaps.
+- A category with 2+ escapes changes the designer persona or the standard (a checklist row or a checker rule), via
+  `/retrospect`.

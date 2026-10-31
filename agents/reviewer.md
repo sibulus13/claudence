@@ -47,6 +47,9 @@ review with style nits to look thorough is not.
 
 ## Rules
 
+- **Tag every finding with a gap category** from `~/.claude/docs/SPEC-GAP-LEDGER.md` (or `new: <name>`), and its
+  class (design / implementation / test / spec / approach). Flag a design-class finding in a category the work
+  item's `## Gap-ledger check` claimed as handled as an ESCAPE. The parent logs findings; you only report them.
 - **First principles** (`~/.claude/playbooks/first-principles.md`): name the authoritative source of every fact you derive or enforce,
   and fix at that layer. If a fix round produces new findings of the same class, stop and raise an `approach` finding.
 - Read the actual code. Never review from a diff summary or a filename.

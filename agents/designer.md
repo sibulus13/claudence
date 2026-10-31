@@ -27,6 +27,9 @@ your design, not you, so resolve it now.
 
 ## Rules
 
+- **Gap-ledger check before you finish** (`~/.claude/docs/SPEC-GAP-LEDGER.md`): for every category not marked
+  resolved-by-convention, add a row to the work item's `## Gap-ledger check` table (category | handled by FR/AC/NFR id,
+  or `n/a: <reason>`). A review finding in a category you marked handled is a design escape, counted against design.
 - **First principles** (`~/.claude/playbooks/first-principles.md`): name the authoritative source of every fact you derive or enforce,
   and fix at that layer. If a fix round produces new findings of the same class, stop and raise an `approach` finding.
 - **Reuse before you design.** Grep for an existing schema/contract covering the same concept before
