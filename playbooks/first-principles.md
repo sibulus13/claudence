@@ -30,7 +30,10 @@ Both were the same mistake: deriving or enforcing a fact from a proxy instead of
    - Never spend a third round on the same layer.
 4. **Question the premise.** Ask whether the requirement is needed as stated, and whether a smaller or different
    design removes the problem.
-5. **Prefer off-the-shelf** components that already own the hard part, such as DBOS for durable state or the
+5. **Research before choosing.** Before adopting a convention, tool or design that others will depend on, do a
+   quick web survey of current, widely adopted practice (model knowledge can be stale; cite sources and dates) and
+   a fleet survey of what already exists. Then adopt or adapt; never invent first.
+6. **Prefer off-the-shelf** components that already own the hard part, such as DBOS for durable state or the
    pre-commit framework for git hooks, over hand-rolled equivalents.
 
 ## Per role
