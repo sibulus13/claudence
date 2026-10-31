@@ -134,3 +134,40 @@ So nothing was *accidentally* dropped by the walk. The real blind spots were els
 - A first patch pass leaked a Python variable name into the Lua (`REPO_ALIASES[r.rel:gsub('" + BS + BS + "', ...)]`). It parsed as a valid Lua string, so it would not have crashed — aliases would simply have never resolved, silently reverting the fix. Caught by reading the generated code back; the `renders the product name` test now pins it.
 
 **Left open.** `EXTRA_PROJECTS` is a curated list, not a rule — a new `Life` sub-project has to be added by hand (the test will not notice an *absent* project, only a dead one). Whether `web/_misc/*` and `_Misc/job apps/*` should stay hidden is unconfirmed; they are currently pruned.
+
+## 2026-10-01 — Moto TikTok posting-time vs views analysis
+- Source: Notion Motorcycle Content Bank, 26 posted rows with Upload Time + Max View Count (2025-06-07 → 2026-08-31). Times stored UTC; converted to PDT (UTC-7).
+- Overall median 790 views. One outlier (4,900, "Asking me to come over after 10pm", Thu 22:50) dominates every mean.
+- Day part medians: late night 22-03 = 880 (n=8), day 09-17 = 820 (n=9), evening 17-22 = 450 (n=9). Late-night vs rest permutation p≈0.29.
+- Weekday: Mon-Thu median 905 (n=16) vs Fri-Sun 605 (n=10); permutation p≈0.25. Thu n=8 median 1,010; Tue n=2 / Fri n=2 lowest (noise).
+- 2025 median 820 vs 2026 median 550. Gap since previous post vs views: Spearman ρ=-0.01 (no cadence effect).
+- Verdict: no statistically reliable timing effect at n=26; content (hook) variance swamps timing. Directional lean only: Mon-Thu, late night or midday; avoid early evening.
+- Data gaps: Saves/TikTok URL/Format empty on all own posts; Max View Count is a manual snapshot (Aug 2026 posts likely understated).
+- Script: scratchpad moto.py (session-local).
+
+## 2026-10-16 — Crucible scheduled-task failures (Stock/Research 2026)
+
+- MarketOpen_WakeAndStartServices rc=1 (07:00 run): fleet + news-rebound OK, 0 orders due. system_health_check.py returns 1 on overall WARN (line 1087/1112); the only WARN was "Dashboard not found on ports 3000-3009". Dashboard wasn't up because Windows Update (TrustedInstaller) rebooted the box 3x at 01:31-01:35 and nobody logged on until 20:50. The 06:15 run's exit 2 is the designed "REFUSING: market open = False" — overwritten by the 07:00 result every day.
+- MCD_DailyIngestPipeline missed 10-15 + 10-16 (NumberOfMissedRuns=2): registered LogonType=Interactive (runs only while logged on) + WakeToRun=False (setup_mcd_daily_schedule.ps1:33-34). PC sleeps nightly and is woken at 06:15 by the market-wake task, so the 06:00 trigger always depends on StartWhenAvailable catch-up (worked 10-13/10-14 ~06:22).
+  - 10-16: post-update reboot left no logged-on session -> Interactive task cannot run. Confirmed.
+  - 10-15: woke 06:17, user logged on, catch-up still did not fire. Unconfirmed — TaskScheduler/Operational log is disabled. Hypothesis: RunOnlyIfNetworkAvailable=True evaluated before network was up on wake.
+- MCD_JobWatchdog rc=1: correct behaviour — it exits 1 when any job FAILs; it flagged the MCD miss.
+- MarketOpen survives because it is LogonType=Password, RunLevel=Highest, WakeToRun=True. MCD_JobWatchdog and NewsImpactMonitor_Daily share MCD's Interactive fragility.
+- Fix (needs elevated shell + Windows password, no agentic path): re-register MCD (and watchdog/newsmon) with -LogonType Password + -WakeToRun, mirroring setup_market_wake.ps1. Also: enable TaskScheduler/Operational log so the next catch-up miss is diagnosable; decide whether dashboard-down WARN should fail the order-placing task.
+
+## 2026-10-16 — Repo readiness for unattended work (researcher audit, read-only)
+
+- Foreman: 853/853 green, clean, pushed, tier=pre-traffic; STATE.md 20d old -> CONDITIONAL
+- cortex: 251/251 green, clean, pushed, tier declared; STATE.md 17d -> CONDITIONAL
+- Catwalk: build+test green, 1 dirty, last commit 16d; STATE.md 20d -> CONDITIONAL
+- Crucible (Stock/Research 2026): 4 dirty, no deploymentTier, gate (pre-commit hook) exceeded 180s audit cap -> NOT READY. Note: timeout was the audit's cap, not a demonstrated hang. Repo places (paper) orders.
+- pocket-agent: pre-implementation, no package.json -> NOT READY
+- second-brain (Life): 44 dirty, no tier/STATE.md/gate, not in Foreman -> NOT READY (it is the Scout target in the old reminder)
+- nuwa: archived, missing deploymentTier
+- Caveat: "stale" = 14-day threshold chosen for the audit; a quiet repo with an old STATE.md is not unstable.
+
+## 2026-10-31 10:00 hook stall root cause
+- Culprit: Remember plugin 0.43.1 `scripts/post-tool-hook.sh` (PostToolUse, no timeout). We disabled it last night by renaming its key in the plugin cache `hooks/hooks.json` (00:46). Its 3 stuck processes (32484, 16844, 18928) were already gone at 10:02.
+- Not ours: our telemetry (`log-tool-done.ps1`, async) and router (`harness_router.py post`, 90 s timeout) PostToolUse hooks were parked as suspects, have been re-enabled, and run with no stall.
+- Hypothesis (unconfirmed): the hook forks `save-session.sh` on Windows through wscript/nohup without redirecting stdin, so the hook process lives on until the save ends. Next check: re-enable it with a 10 s timeout and watch.
+- Risk: a plugin update rewrites the cache and re-enables the Remember PostToolUse hook with no timeout.
