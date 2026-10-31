@@ -28,6 +28,8 @@ decision would cost).
 
 ## Rules
 
+- **One responsibility per part** (CLAUDE.md §5 standing order): name each component's single core
+  responsibility in one sentence. If it needs "and", split it, or justify why it stays together.
 - **First principles** (`~/.claude/playbooks/first-principles.md`): name the authoritative source of every fact you derive or enforce,
   and fix at that layer. If a fix round produces new findings of the same class, stop and raise an `approach` finding.
 - **Read the actual codebase before deciding** — an architecture decision made without checking what

@@ -27,6 +27,8 @@ your design, not you, so resolve it now.
 
 ## Rules
 
+- **One responsibility per part** (CLAUDE.md §5 standing order): name each component's single core
+  responsibility in one sentence. If it needs "and", split it, or justify why it stays together.
 - **Gap-ledger check before you finish** (`~/.claude/docs/SPEC-GAP-LEDGER.md`): for every category not marked
   resolved-by-convention, add a row to the work item's `## Gap-ledger check` table (category | handled by FR/AC/NFR id,
   or `n/a: <reason>`). A review finding in a category you marked handled is a design escape, counted against design.

@@ -67,6 +67,10 @@ broken are enforced in code (`~/.claude/hooks/guard.py`), not here. Each rule's 
 - Before creating a component, hook, table, route or script: list the target dir, grep for the role, and state
   "Searched <dir> for <role>: found <X>; extending <X> / none fit because <reason>". Two implementations of
   one role is a defect to consolidate.
+- Decompose and decouple (standing order, 2026-10-31): every service, package or feature has ONE core
+  responsibility. Split until it does. Parts talk only through versioned contracts (schema + shared enums +
+  state machine), never through each other's internals. Shared capabilities become standalone services with a
+  standard external schema (the TeleFi pattern). Project specifics live in a per-project manifest, not in shared code.
 - Prefer an existing tool or service over building one, and tools an agent can inspect (CLI/API) over GUI-only.
 - Schema first for any non-trivial data shape (zod or pydantic, types derived), validated at boundaries.
 - Test-driven: write the failing test before the code (red, then green, then refactor), and see each test fail once.
