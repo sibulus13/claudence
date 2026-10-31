@@ -28,8 +28,8 @@ broken are enforced in code (`~/.claude/hooks/guard.py`), not here. Each rule's 
   folder; say which.
 - Moving a repo: `/repo-move`. Code derives paths from the repo root, never absolute repo paths.
 - Each theme folder has a CLAUDE.md with its shared rules; each repo has its own CLAUDE.md, `docs/` and memory.
-- Shared capabilities are sensors or actuators behind one contract (`~/.claude/docs/fleet/ARCHITECTURE_SENSE_ACT.md`):
-  notifications go through TeleFi, news through Augur. Fleet plans: `~/.claude/docs/fleet/` (private).
+- Shared capabilities are sensors or actuators behind one contract (`$FLEET_DOCS/ARCHITECTURE_SENSE_ACT.md`):
+  notifications go through TeleFi, news through Augur. Fleet plans: `$FLEET_DOCS` (default `D:/repo/docs`, private repo).
 
 ## 3. Autonomy and blockers
 - Loop: next unblocked milestone -> implement with its tests -> run the gate -> commit (conventional
@@ -98,7 +98,7 @@ broken are enforced in code (`~/.claude/hooks/guard.py`), not here. Each rule's 
   then summarize phase, last step and next action.
 - One canonical doc per concern. Decisions: `docs/DECISIONS.md`. Session detail: `docs/SESSION_LOG.md` under
   the docs root the SessionStart hook states.
-- Fleet-wide journal and roadmap: `~/.claude/docs/fleet/LEDGER.md` (private). Update it with `/ledger` at the end
+- Fleet-wide journal and roadmap: `$FLEET_DOCS/LEDGER.md` (private). Update it with `/ledger` at the end
   of a working session: one row per meaningful change with its why and commit ref.
 - Repos where agents run concurrently keep an `## Agentic Orchestration Rules` section.
 - Anything that produces an artifact also produces a pass/fail check of it (`~/.claude/playbooks/reliability.md`).
@@ -117,8 +117,8 @@ broken are enforced in code (`~/.claude/hooks/guard.py`), not here. Each rule's 
 | enforced rules | `~/.claude/hooks/guard.py`, `session_context.py` (tests: `~/.claude/tests/test_guard.py`) |
 | file-type rules / task playbooks | `~/.claude/rules/`, `~/.claude/playbooks/` |
 | skills, agents, workflows | `~/.claude/skills/`, `~/.claude/agents/`, `~/.claude/workflows/cycle.js` |
-| harness standard | `~/.claude/docs/fleet/reports/Agent harness engineering practices.md`, `~/.claude/docs/fleet/HARNESS_AUDIT.md` |
-| docs, by audience | public harness docs `~/.claude/docs/` (claudence) · private fleet-wide docs `~/.claude/docs/fleet/` (own local repo: ledger, plans, audits) · one project's docs `<repo>/docs/` · one project's memory `~/.claude/projects/D--repo-<Theme>-<project>/memory/` |
-| this folder | `~/.claude` is the public `claudence` repo: commit and push drift; `docs/fleet/` stays private (ignored) |
+| harness standard | `$FLEET_DOCS/reports/Agent harness engineering practices.md`, `$FLEET_DOCS/HARNESS_AUDIT.md` |
+| docs, by audience | public harness docs `~/.claude/docs/` (claudence) · private fleet-wide docs `$FLEET_DOCS` = `D:/repo/docs` (own repo: ledger, plans, audits) · one project's docs `<repo>/docs/` · one project's memory `~/.claude/projects/D--repo-<Theme>-<project>/memory/` |
+| this folder | `~/.claude` is the public `claudence` repo: commit and push drift; the private fleet docs live outside it, at `$FLEET_DOCS` |
 
 Sounds on Stop and PermissionRequest are configured globally; never play sounds or change the volume.
