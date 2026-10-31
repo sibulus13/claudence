@@ -47,6 +47,9 @@ review with style nits to look thorough is not.
 
 ## Rules
 
+- **Open every cited local line** in a work item's References and Operating envelope (does it exist and show what
+  is claimed?), and spot-check at least one web citation. A citation that does not hold up is an R finding
+  (asserted-not-verified-claim).
 - **Rate against the operating envelope.** A finding that needs an envelope assumption broken is F (future),
   not R, unless that assumption can break SILENTLY; then require a cheap detector that fails safe. Flag a
   spec that rebuilds something its References list as working, without a stated reason.

@@ -2,11 +2,13 @@
 
 ```mermaid
 flowchart TD
-  R[README] --> L{legacy: created on or before cutoff, neither section?}
+  R[README] --> K{CK-1: created a real date?}
+  K -- no --> X[CK-1 error, stop]
+  K -- yes --> L{legacy: in the frozen list, status not past cutoff status, neither section?}
   L -- yes --> W[one warning, no error]
   L -- no --> H[CK-4: headings present?]
   H --> O[CK-47: order]
-  O --> T[CK-48 References tables]
+  O --> T[CK-48 References tables and citations]
   O --> E[CK-49 Operating envelope table]
 ```
 
@@ -18,20 +20,168 @@ flowchart TD
 | FR-3 | added | CK-47 order |
 | FR-4 | added | CK-48 References |
 | FR-5 | added | CK-49 Operating envelope |
-| FR-6 | added | legacy warning |
+| FR-6 | added | legacy by frozen list, notice |
 | FR-7 | added | standard, templates, reviewer wording |
-| FR-8 | added | STATIC tier only |
+| FR-8 | added | tier binding |
+| FR-9 | added | citation resolution |
+| FR-10 | added | real-date check on created |
 
 ## Acceptance criteria
+Every AC below is tested by running its fixtures table (section Fixtures): one parametrized case per row, one fault per row, and the case asserts that the expected message substring appears in the finding line of the named rule and that the exit code is 1 (0 for a passing row). A row whose message differs is a failure even if the exit code matches.
+
 | AC | Traces | Given / when | Pass when | Fail when | Test |
 |---|---|---|---|---|---|
-| AC-1 | CAP-1, CAP-2, FR-1 | gen_heading_config.generate() runs on the edited standard, and `--check` runs once on the committed JSON and once after the standard's heading table is edited | the config lists `References` then `Operating envelope` first in both L0 lists, `leading` equals those two, `legacyThrough` equals the cutoff in the standard, `optional` equals the envelope for bugfix, research and experiment and is absent for every other type; `--check` exits 0 on the fresh JSON and 1 after the edit | any key is missing or differs, or `--check` exits 0 on a stale JSON | tests/test_gen_heading_config.py, tests/test_spec_references_envelope.py |
-| AC-2 | CAP-1, CAP-2, FR-2, FR-8 | spec_check runs on fixtures created 2026-11-01: a feature at spec-locked without `References`, a feature without `Operating envelope`, a nested feature, a bugfix without `Operating envelope`, a research item without it, and the same first feature at draft | the first two give one CK-4 error each naming the missing heading; the nested feature is required to carry both; the bugfix and research items give no CK-4 error for the envelope; the draft exits 0 | the bugfix or research item is rejected for the envelope, a feature missing either heading passes, or the draft is rejected | tests/test_spec_references_envelope.py |
-| AC-3 | CAP-3, FR-3 | spec_check runs at spec-locked on fixtures where `Purpose` precedes `References`, `Operating envelope` precedes `References`, an unrelated `## Notes` sits between them, or `Overview` follows `References` | each gives exactly one CK-47 error naming the offending heading; a README with Overview, References, Operating envelope, Purpose in that order gives none | any misordered fixture passes or is reported under another rule, or the ordered fixture is rejected | tests/test_spec_references_envelope.py |
-| AC-4 | CAP-4, FR-4, FR-5 | spec_check runs on fixtures that each change one thing: the Local header, the Web header or the Envelope header has one renamed column; the References section holds one table; it holds three tables | each renamed header gives a CK-48 (Local, Web) or CK-49 (Envelope) error that prints the expected header; a table count other than two gives a CK-48 error naming the count; the unchanged fixture gives none | a fixture passes, or the message does not name the table or the expected header | tests/test_spec_references_envelope.py |
-| AC-5 | CAP-4, FR-4, FR-5 | spec_check runs on three fixtures, each with one table that has the exact header and zero rows (Local, Web, Envelope) | each gives an error of its rule saying the table needs at least 1 row | any empty table passes, or it is reported without the table name | tests/test_spec_references_envelope.py |
-| AC-6 | CAP-4, FR-4 | spec_check runs on Local fixtures with one fault each: a source with no `path.ext:line`; a status outside working, partial, broken; a decision outside the four words; a decision with no reason; `none found` whose What-it-shows is not a search; `none found` beside another row; `none found` with a status other than `-` | each gives a CK-48 error naming the row and the cell; the passing fixtures give none: `D:\repo\x.js:129`, `C:/a/b.md:29-41`, and a `none found` row with `Searched D:/repo/ for` plus a backticked pattern | any faulty fixture passes, or a passing Windows-path fixture is rejected | tests/test_spec_references_envelope.py |
-| AC-7 | CAP-4, FR-4 | spec_check runs on Web fixtures with one fault each: a source that is a bare domain; a date `2026-13-40`; a date `31/10/2026`; `n/a` with no reason; an `n/a` row with a date other than `-` | each gives a CK-48 error naming the row and the cell; a row with a URL and `2026-10-31`, and a row `n/a: purely internal refactor` with `-` in the other cells, give none | any faulty fixture passes or a passing fixture is rejected | tests/test_spec_references_envelope.py |
-| AC-8 | CAP-4, FR-5 | spec_check runs on Envelope fixtures with one fault each: an empty observed cell; observed `TBD`; If violated `ignore: carry on`; If violated `keep` with no detail; If violated `Keep: x` in upper case | each gives a CK-49 error naming the row and the cell; `refuse: exit 1 with a named reason` gives none | any faulty fixture passes or the passing row is rejected | tests/test_spec_references_envelope.py |
-| AC-9 | CAP-5, FR-6 | spec_check runs at spec-locked on three fixtures: created 2026-10-31 with neither section; created 2026-11-01 with neither; created 2026-10-30 with `References` only; plus every existing docs/work README under ~/.claude | the first exits 0 with one `warn: CK-47` line naming the created date and both sections and no CK-4 error for them; the second gives CK-4 errors; the third gives a CK-4 error for the envelope; each existing item exits as it did before the change | the first fixture errors, or the second or third passes, or an existing item's exit code changes | tests/test_spec_references_envelope.py |
-| AC-10 | CAP-6, CAP-7, FR-7 | a test reads the two README templates, the standard and the reviewer text | each template has `References` then `Operating envelope` at the leading position (the experiment template marks the envelope as optional and deletable), tables whose headers equal the Row models' HEADER lists; the standard lists CK-47..CK-49 and the same four If-violated words, three statuses and four decision words as the constants; the standard and the reviewer text both state: rated F unless it can break silently, then a cheap detector is required | a template header differs from a model, a vocabulary word differs between the standard and the constants, or the rating sentence is missing from either file | tests/test_spec_references_envelope.py |
+| AC-1 | CAP-1, CAP-2, FR-1 | gen_heading_config.generate() and `--check` run per the rows of Fixtures AC-1 | every row of the table behaves as stated, including the pinned heading counts and order | any pinned count or order differs, or `--check` exits 0 on a stale JSON | tests/test_gen_heading_config.py, tests/test_spec_references_envelope.py |
+| AC-2 | CAP-1, CAP-2, CAP-3, FR-2, FR-3, FR-8 | spec_check runs on the rows of Fixtures AC-2 (README created 2026-11-01, not in the frozen list) | each faulty row gives exactly one finding of the named rule with the substring; each passing row gives none | a faulty row passes, is reported under another rule, or a passing row is rejected | tests/test_spec_references_envelope.py |
+| AC-3 | CAP-4, FR-4, FR-5 | spec_check runs on the rows of Fixtures AC-3 (table headers, table count, empty tables) | each faulty row gives a finding that names the table and, for a header, prints the expected header | a faulty row passes, or the message does not name the table | tests/test_spec_references_envelope.py |
+| AC-4 | CAP-4, FR-4 | spec_check runs on the rows of Fixtures AC-4 (Local cells) | each faulty row gives a CK-48 finding naming the row and the cell; each passing row gives none | a faulty row passes or a passing row, including the Windows-path row, is rejected | tests/test_spec_references_envelope.py |
+| AC-5 | CAP-8, FR-9 | spec_check runs on the rows of Fixtures AC-5 (citation resolution, in Local and Envelope cells, at spec-locked, building and shipped) | an unresolved token is a CK-48 or CK-49 error at spec-locked and building and a warning at shipped; a resolving token, in any path form, gives no finding | an unresolved token passes at spec-locked, is an error at shipped, or a resolving token is rejected | tests/test_spec_references_envelope.py |
+| AC-6 | CAP-4, FR-4 | spec_check runs on the rows of Fixtures AC-6 (Web cells) | each faulty row gives a CK-48 finding naming the row and the cell; each passing row gives none | a faulty row passes or a passing row is rejected | tests/test_spec_references_envelope.py |
+| AC-7 | CAP-4, FR-5 | spec_check runs on the rows of Fixtures AC-7 (Envelope cells) | each faulty row gives a CK-49 finding naming the row and the cell; each passing row gives none | a faulty row passes or a passing row is rejected | tests/test_spec_references_envelope.py |
+| AC-8 | CAP-5, FR-6, FR-10 | spec_check runs on the rows of Fixtures AC-8 against a fixture frozen list and against the committed one | legacy applies only to a listed item within its recorded status; every other row is strict; a bad date or a bad digest stops the run | an unlisted, back-dated, past-status or sectioned item is treated as legacy, or a bad digest is accepted | tests/test_spec_references_envelope.py, tests/test_work_item_schema.py |
+| AC-9 | CAP-9, FR-6 | the committed baseline snapshot legacy-baseline.json (exit code of the unmodified checker for every README under D:/repo/*/*/docs/work, D:/repo/*/docs/work and ~/.claude/docs/work) is compared with the modified checker's exit code for the same README, per the rows of Fixtures AC-9 | the exit codes are equal for every README still on disk; a README missing from disk is ignored | any README's exit code differs, a walk root does not exist, or the snapshot or frozen list is missing | tests/test_spec_references_envelope.py |
+| AC-10 | CAP-6, CAP-7, FR-7 | a test reads the two README templates, the standard and the reviewer text per the rows of Fixtures AC-10 | every row passes | any template header differs from a model, any vocabulary or count differs between the standard and the constants, or a required sentence is missing | tests/test_spec_references_envelope.py |
+
+## Fixtures
+Header of every table: fixture id, the single fault, and a substring the finding line must contain. A passing row has the fault `none` and the substring `no finding`. Row cells outside the stated fault are valid.
+
+### AC-1
+| Fixture | Single fault | Expected message contains |
+|---|---|---|
+| 1.1 | none: l0.full is exactly References, Operating envelope, Purpose, Non-goals, Capabilities, Non-functional requirements, Trade-offs, Patterns applied, Components chosen, Gate plan (10 entries) | no finding |
+| 1.2 | none: l0.lite is exactly References, Operating envelope, Purpose, Non-goals, Capabilities, Non-functional requirements, Gate plan (7 entries), and nestedBase equals it | no finding |
+| 1.3 | none: leading equals References, Operating envelope | no finding |
+| 1.4 | none: readme headings counts are feature 10, integration 11, data-collection 9, experiment 10 (References first, no envelope), research 5, bugfix 5, refactor 6 (both new headings first) | no finding |
+| 1.5 | none: optional equals Operating envelope for bugfix, research and experiment and is absent for the other four types | no finding |
+| 1.6 | the standard's L0 full line loses `References`, JSON not regenerated | stale |
+| 1.7 | the committed JSON has no `leading` key | stale |
+
+### AC-2
+| Fixture | Single fault | Expected message contains |
+|---|---|---|
+| 2.1 | feature at spec-locked, no References section | missing section `## References` |
+| 2.2 | feature at spec-locked, no Operating envelope section | missing section `## Operating envelope` |
+| 2.3 | nested feature (has parent) at spec-locked, no Operating envelope | missing section `## Operating envelope` |
+| 2.4 | bugfix at spec-locked, References present, no Operating envelope | no finding |
+| 2.5 | research at spec-locked, References present, no Operating envelope | no finding |
+| 2.6 | experiment at spec-locked, References present, Operating envelope present with a valid table | no finding |
+| 2.7 | feature at draft, no References and no Operating envelope | no finding |
+| 2.8 | Purpose appears before References | `## Purpose` must come after `## References` |
+| 2.9 | Operating envelope appears before References | `## Operating envelope` must come after `## References` |
+| 2.10 | an unrelated `## Notes` sits between References and Operating envelope | `## Notes` |
+| 2.11 | Overview appears after References | `## Overview` must come before `## References` |
+| 2.12 | order is Overview, References, Operating envelope, Purpose | no finding |
+| 2.13 | feature at killed, no References | no finding |
+
+### AC-3
+| Fixture | Single fault | Expected message contains |
+|---|---|---|
+| 3.1 | Local header has one renamed column | table header must be Source (file:line) |
+| 3.2 | Web header has one renamed column | table header must be Source (URL) |
+| 3.3 | Envelope header has one renamed column | table header must be Assumption |
+| 3.4 | References holds one table | needs exactly two tables, has 1 |
+| 3.5 | References holds three tables | needs exactly two tables, has 3 |
+| 3.6 | Local table has the exact header and zero rows | `Local` needs at least 1 row |
+| 3.7 | Web table has the exact header and zero rows | `Web` needs at least 1 row |
+| 3.8 | Envelope table has the exact header and zero rows | `Operating envelope` needs at least 1 row |
+| 3.9 | References tables written without pipes, so they do not parse as tables | needs exactly two tables, has 0 |
+| 3.10 | all three tables valid | no finding |
+
+### AC-4
+| Fixture | Single fault | Expected message contains |
+|---|---|---|
+| 4.1 | Source is a file name with no line number | `source` |
+| 4.2 | Status is `maybe` | `status` |
+| 4.3 | Decision starts with `extend:` | `decision` |
+| 4.4 | Decision is `wrap` with no colon and no reason | `decision` |
+| 4.5 | Decision is `wrap:` followed by nothing | `decision` |
+| 4.6 | Source is `none found` and What it shows is not a search | `Searched` |
+| 4.7 | Source is `none found` beside a second row | `none found` must be the only row |
+| 4.8 | Source is `none found` with Status `working` | `status` |
+| 4.9 | Source is a URL such as http://x:80 with no path.ext:line | `source` |
+| 4.10 | Source is D:\repo\Factory\foreman\core\worktrees.js:129 (Windows backslashes, resolves) | no finding |
+| 4.11 | Source is `none found`, Status `-`, shows begins `Searched D:/repo/ for` with a backticked pattern, Decision `n/a: greenfield` | no finding |
+
+### AC-5
+| Fixture | Single fault | Expected message contains |
+|---|---|---|
+| 5.1 | Local Source cites a file that does not exist, at spec-locked | does not exist |
+| 5.2 | Local Source cites line 99999 of an existing file, at spec-locked | has fewer lines |
+| 5.3 | Local Source cites a range 40-30 | range |
+| 5.4 | Local Source cites line 0 | line number must be at least 1 |
+| 5.5 | Local Source cites a file larger than MAX_CITED_BYTES (fixture sets the constant to 10 bytes) | too large to verify |
+| 5.6 | Envelope observed cell cites a missing file, at building | does not exist |
+| 5.7 | the unresolved token of 5.1, at shipped | warn: CK-48 |
+| 5.8 | Local Source with a lower-case drive letter and backslashes, d:\repo\Factory\foreman\core\merge.js:135 | no finding |
+| 5.9 | Local Source repo-relative, scripts/spec_check.py:52, with the root set to the harness | no finding |
+| 5.10 | Local Source starting with ~/, resolving under the home folder | no finding |
+
+### AC-6
+| Fixture | Single fault | Expected message contains |
+|---|---|---|
+| 6.1 | Source is a bare domain, example.com | `source` |
+| 6.2 | Date checked is 2026-13-40 | `date_checked` |
+| 6.3 | Date checked is 31/10/2026 | `date_checked` |
+| 6.4 | Date checked is 2999-01-01 | in the future |
+| 6.5 | Source is `n/a` with no reason | `source` |
+| 6.6 | Source is `n/a: purely internal refactor` with a date other than `-` | `date_checked` |
+| 6.7 | Source is a URL wrapped in angle brackets | `source` |
+| 6.8 | Decision is `ignore` with no reason | `decision` |
+| 6.9 | URL, date 2026-10-31, Decision `ignore: not relevant` | no finding |
+| 6.10 | Source `n/a: purely internal refactor`, every other cell `-` | no finding |
+
+### AC-7
+| Fixture | Single fault | Expected message contains |
+|---|---|---|
+| 7.1 | observed cell is empty | `observed` |
+| 7.2 | observed cell is `TBD` | `observed` |
+| 7.3 | observed cell is prose with no pointer ("we watch it carefully") | typed pointer |
+| 7.4 | If violated is `ignore: carry on` | `violated` |
+| 7.5 | If violated is `keep` with no detail | `violated` |
+| 7.6 | If violated is `Keep: x` in upper case | `violated` |
+| 7.7 | Assumption is empty | `assumption` |
+| 7.8 | observed has an AC-n pointer, If violated `refuse: exit 1 with a named reason` | no finding |
+| 7.9 | observed has a backticked command, If violated `defer: retry within 1 h` | no finding |
+| 7.10 | observed has a URL, If violated `flag: warn line, no block` | no finding |
+
+### AC-8
+Fixture frozen list lists the item keys named below with their recorded status. All rows are READMEs with type feature and neither section unless stated.
+
+| Fixture | Single fault | Expected message contains |
+|---|---|---|
+| 8.1 | none: listed with draft, status draft | warn: CK-47 |
+| 8.2 | none: listed with draft, status draft, so no CK-4 error for the sections | no finding of CK-4 |
+| 8.3 | listed with draft, status moved to spec-locked | missing section `## References` |
+| 8.4 | listed with building, status building | warn: CK-47 |
+| 8.5 | listed with building, status shipped | missing section `## References` |
+| 8.6 | not listed, created 2026-10-30 (back-dated), status spec-locked | missing section `## References` |
+| 8.7 | listed with draft, status draft, `created` edited to 2026-11-05 | warn: CK-47 |
+| 8.8 | listed with draft, status draft, but References heading added (envelope missing), at spec-locked | missing section `## Operating envelope` |
+| 8.9 | created is 2026-13-45 | CK-1 |
+| 8.10 | the fixture frozen list has one entry changed and the digest not recomputed | digest |
+| 8.11 | the frozen list file is missing | frozen list |
+| 8.12 | the committed list: each of claim-registry, worktree-reaper and branch-conventions under Lib/spindle is present with status draft | no finding |
+| 8.13 | gen_legacy_l0.py --write when the file exists | already exists |
+
+### AC-9
+| Fixture | Single fault | Expected message contains |
+|---|---|---|
+| 9.1 | for each snapshot entry whose README exists, the modified checker's exit code equals the snapshot's (one parametrized case per README) | no finding |
+| 9.2 | the snapshot lists a README no longer on disk | no finding |
+| 9.3 | one walk root directory does not exist | walk root |
+| 9.4 | the snapshot file is missing | baseline |
+| 9.5 | the snapshot has an exit code edited to differ from the checker | exit code |
+
+### AC-10
+| Fixture | Single fault | Expected message contains |
+|---|---|---|
+| 10.1 | template README.md: References then Operating envelope are the first two H2s after the title and diagram | no finding |
+| 10.2 | template README.md: the three table headers equal the HEADER lists of LocalRefRow, WebRefRow, EnvelopeRow | no finding |
+| 10.3 | template README.experiment.md: References first; Operating envelope marked optional and deletable | no finding |
+| 10.4 | template header edited by one word | header |
+| 10.5 | the standard's If-violated words, Local statuses and Decision words equal VIOLATED, LOCAL_STATUSES, DECISIONS | no finding |
+| 10.6 | the standard drops one vocabulary word | vocabulary |
+| 10.7 | the standard has rows CK-47, CK-48, CK-49, says CK-1..CK-49 at the enforcement row, and lists CK-47 in ALWAYS and CK-48, CK-49 in STATIC | no finding |
+| 10.8 | the standard lacks the rating sentence (F unless it can break silently, then a cheap detector) | rating |
+| 10.9 | the reviewer text lacks the sentence about opening each cited local line and spot-checking a web citation | cited local line |
+| 10.10 | the reviewer text and the standard both state the rating rule and the citation sentence | no finding |
