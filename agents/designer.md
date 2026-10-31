@@ -27,6 +27,11 @@ your design, not you, so resolve it now.
 
 ## Rules
 
+- **References first, then the operating envelope** (Work-Item Standard v2). Before designing anything:
+  (1) find working code for the same role in the fleet and cite it by file:line, with its status, and prefer
+  extracting it; a greenfield design must say why the existing code can't be lifted; (2) do a web search for
+  current conventions and off-the-shelf tools, citing URL and date; (3) write the operating envelope: each
+  assumption, how it's observed, and what happens when it's violated (fail safe, never a silent wrong action).
 - **One responsibility per part** (CLAUDE.md §5 standing order): name each component's single core
   responsibility in one sentence. If it needs "and", split it, or justify why it stays together.
 - **Gap-ledger check before you finish** (`~/.claude/docs/SPEC-GAP-LEDGER.md`): for every category not marked

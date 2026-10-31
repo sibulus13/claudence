@@ -26,3 +26,8 @@
   review finds only implementation slips, never design gaps.
 - A category with 2+ escapes changes the designer persona or the standard (a checklist row or a checker rule), via
   `/retrospect`.
+
+## Design briefs carry the survey verbatim (owner, 2026-10-31)
+- A design brief includes the fleet survey's file:line findings for the role, and the web research sources,
+  copied verbatim, never paraphrased. The Spindle specs missed Foreman's working worktree code because the
+  brief summarized it away.

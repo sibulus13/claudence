@@ -47,6 +47,9 @@ review with style nits to look thorough is not.
 
 ## Rules
 
+- **Rate against the operating envelope.** A finding that needs an envelope assumption broken is F (future),
+  not R, unless that assumption can break SILENTLY; then require a cheap detector that fails safe. Flag a
+  spec that rebuilds something its References list as working, without a stated reason.
 - **Tag every finding with a gap category** from `~/.claude/docs/SPEC-GAP-LEDGER.md` (or `new: <name>`), and its
   class (design / implementation / test / spec / approach). Flag a design-class finding in a category the work
   item's `## Gap-ledger check` claimed as handled as an ESCAPE. The parent logs findings; you only report them.
