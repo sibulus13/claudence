@@ -32,7 +32,11 @@ bug is not testing that code).
   public function, the CLI, the file a consumer reads, the message the owner sees. Not private
   helpers, call order, or how many times something is called.
 - **Kinds allowed** (global CLAUDE.md testing contract): a sanity/smoke test, one test per
-  acceptance criterion, and a regression test named after its incident. Nothing speculative.
+  acceptance criterion, a regression test named after its incident, and a contract test per
+  integration boundary (section 5). Nothing speculative.
+- **Test first** (adopted 2026-10-31). A test is written and seen red before the code that makes
+  it green; a reviewer checks the commit order or the stated red run. Spikes and research are exempt
+  until their code is kept.
 - **The change test:** a refactor that keeps the behaviour must keep the tests green. If a harmless
   rename, reorder or rewording breaks a test, the test pinned implementation: loosen it.
 
@@ -63,7 +67,27 @@ bug is not testing that code).
 - A flaky test is a failing test: fix the cause or delete it, never retry it into green.
 - Sandbox anything a test could write for real (autouse fixtures for spools, phones, prod paths).
 
-## 5. Review checklist (apply before committing a test)
+## 5. Contract tests (integration boundaries)
+- **One versioned schema per boundary, owned by the producer**: for example TeleFi
+  `telefi/schemas/envelope.v1.json`, or the job-lifecycle result schema (ADR-JL1).
+  Consumers pin the version.
+- **Shared fixtures**: the producer publishes valid and invalid example payloads beside the schema.
+  - The producer's suite asserts that everything it emits validates.
+  - Each consumer's suite asserts that it accepts every valid fixture and rejects every invalid one.
+  - A breaking change then fails CI on both sides before it ships.
+- **Test against the real boundary where it is cheap**: a real Postgres or DBOS database for workflow
+  tests, a temp spool dir for TeleFi, a temp git repo for worktrees. Mocks are only for paid or
+  remote APIs (Telegram, Notion, Claude).
+- **Lifecycle contract tests**, required for every ADR-JL1 runner:
+  - the same idempotency key starts twice and each step runs once;
+  - a kill in the middle of a step resumes without re-running completed steps;
+  - side effects are sent only after the record step commits;
+  - cleanup runs on failure;
+  - a simulated wake (clock jump) expires nothing.
+  - Reference: `dbos-smoke/smoke.mjs` (scratch), which is promoted into a shared test kit on the
+    first migration.
+
+## 6. Review checklist (apply before committing a test)
 1. Which contract does this freeze, in one sentence?
 2. What single outcome proves it?
 3. Did I see it fail when the behaviour broke?

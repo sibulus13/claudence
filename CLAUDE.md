@@ -69,7 +69,11 @@ broken are enforced in code (`~/.claude/hooks/guard.py`), not here. Each rule's 
   one role is a defect to consolidate.
 - Prefer an existing tool or service over building one, and tools an agent can inspect (CLI/API) over GUI-only.
 - Schema first for any non-trivial data shape (zod or pydantic, types derived), validated at boundaries.
-- Tests: sanity, one per acceptance criterion, and regression-first when a bug happens; see each fail once.
+- Test-driven: write the failing test before the code (red, then green, then refactor), and see each test fail once.
+  Write one behaviour test per acceptance criterion, plus a regression test first when a bug happens.
+- Contract tests at every integration boundary: the producer and the consumer both test against the same versioned
+  schema and fixtures (e.g. TeleFi `envelope.v1`, the job-lifecycle result schema), so a change breaks the build on
+  both sides. Detail: `~/.claude/rules/testing.md`.
 - No dead code, no magic numbers, error handling only at boundaries, secrets only from env.
 - Every subprocess, network call, lock wait and retry loop has a timeout and a bound. On expiry it reports a named
   failure; it never hangs and never silently skips (hooks: `~/.claude/rules/hooks.md`).
