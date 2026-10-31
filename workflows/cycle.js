@@ -21,6 +21,10 @@ if (a.scope !== 'spec' && !a.testCommand) throw new Error('cycle: testCommand is
 
 const WORK_DIR = `${a.repo}/docs/work/${a.workItem}`
 const TRACE_DIR = `${WORK_DIR}/cycles/${a.cycleId}`
+// Persistent spec for the work item (docs/specs/spec-gate.md format). the spec-gate git hook (scripts/spec_gate.py) refuses a source commit
+// without a `Spec:` trailer naming it, so this is enforced in code, not by this prompt.
+const SPEC_FILE = `docs/specs/${a.workItem}.md`
+const SPEC_CHECK = `python C:/Users/Michael/.claude/scripts/spec_check.py ${a.repo}/${SPEC_FILE}`
 const BUDGET_BY_SIZE = { S: 1, M: 2, L: 3 }
 const MAX_BUDGET = 3
 const owns = (a.owns || []).join(', ') || '(scope-wide)'
@@ -32,7 +36,7 @@ const FINDING = {
   properties: {
     id: { type: 'string' },
     severity: { type: 'string', enum: ['critical', 'warn', 'info'] },
-    class: { type: 'string', enum: ['design', 'implementation', 'test', 'spec'], description: 'where the ROOT CAUSE lives, not where it showed up' },
+    class: { type: 'string', enum: ['design', 'implementation', 'test', 'spec', 'approach'], description: 'where the ROOT CAUSE lives, not where it showed up; approach = this round repeats the class of the last round, so the layer or premise is wrong (playbooks/first-principles.md)' },
     where: { type: 'string', description: 'absolute path:line, or doc section' },
     what: { type: 'string' },
     fix: { type: 'string' },
@@ -116,6 +120,7 @@ You are the DESIGNER for cycle ${a.cycleId}, iteration ${iteration}, scope "${a.
 Brief: ${a.brief || '(read it from ' + WORK_DIR + '/README.md)'}
 Produce ${WHAT[a.scope]} under ${WORK_DIR}/. Follow C:/Users/Michael/.claude/skills/dark-factory/WORK-ITEM-STANDARD.md. Contract to honor: ${contract}. Owned files: ${owns}.
 ${priorFindings ? `REVISE the design to resolve these review findings (the root cause is in design):\n${findingsText(priorFindings)}` : ''}
+Write or update the persistent spec ${a.repo}/${SPEC_FILE} in the format of C:/Users/Michael/.claude/docs/specs/spec-gate.md: frontmatter (id=${a.workItem}, kind, status: draft, created), and an "## Acceptance criteria" table | AC | Given / when | Pass when | Fail when | Test | with one row per criterion, each naming the test file that will cite "${a.workItem}/AC-<n>". Run ${SPEC_CHECK} and make it exit 0.
 Design only: write no implementation code. Estimate the size honestly. List every assumption, and mark low-confidence irreversible ones truthfully.
 Write the GATE PLAN into ${WORK_DIR}/README.md under "## Gate plan" and return it. Keep it to the MINIMUM number of checks that catch regression risk: one per acceptance criterion or coupling point that could actually break. Choose per risk:
 - deterministic: exact assertion, blocking. Use it for logic, schemas and contracts, data transforms and state machines.
@@ -140,11 +145,12 @@ You are an INDEPENDENT ADVERSARIAL REVIEWER (${kind}) for cycle ${a.cycleId}, it
 You did not write this. Your job is to find what does NOT meet the intent in ${WORK_DIR}/README.md and the contract (${contract}), not to confirm that it is fine.
 First run \`git -C ${a.repo} status --short\` and \`git -C ${a.repo} diff --stat\`. If nothing under ${WORK_DIR} changed since the step you are reviewing, the only finding is "no changes produced" (critical, class design). Do not review stale content.
 ${isDesign ? `Review the design files under ${WORK_DIR}/: contradictions, missing edge cases, contract gaps, overlapping owns globs, and untestable criteria.` : `Review the implementation within owns (${owns}). Run the test command yourself: cd ${a.repo} && ${a.testCommand}. Report the REAL last line. Check spec fidelity, contract adherence, edge cases, and edits outside the owned files.`}
-${isDesign ? 'Check the gate plan: is each real regression risk covered by exactly one check of the right kind? Flag both gaps and padding (tests that pin nothing at risk).' : 'Check that every blocking gate-plan check exists and runs inside the test command, and that every previously fixed finding has its pinning regression test. A caveat you discover now needs a finding whose fix names the test to add.'}
+Run ${SPEC_CHECK} and report its output; a non-zero exit is a critical finding (class spec)${isDesign ? '' : ', and so is a test added in the same commit as the code it covers with no stated red run'}.
+${isDesign ? 'Check the gate plan: is each real regression risk covered by exactly one check of the right kind? Flag both gaps and padding (tests that pin nothing at risk). Every acceptance criterion must state a concrete pass AND fail condition.' : 'Check that every blocking gate-plan check exists and runs inside the test command, and that every previously fixed finding has its pinning regression test. A caveat you discover now needs a finding whose fix names the test to add.'}
 ${priorFindings && priorFindings.length ? `Earlier rounds raised these. FIRST check each: resolved, or still open (re-list it with priorId). Add a NEW finding only if it is genuinely blocking (R):
 ${findingsText(priorFindings)}
 ` : ''}Rate every finding R/F/H: R only if the item would be built WRONG or a criterion is UNTESTABLE. Missing polish, precision or nice-to-have is F or H, and F/H never block.
-Classify each finding by where the ROOT CAUSE lives: design / implementation / test / spec. Verdict: "pass" only when there are zero critical findings and (for code) green tests. Otherwise choose "fix-design" if any critical root cause is in design or spec, else "fix-implementation".`,
+Classify each finding by where the ROOT CAUSE lives: design / implementation / test / spec / approach. Use approach when this round's findings repeat the class of the earlier round's (new bypass forms, new consistency windows), and name the authoritative layer to move to. Verdict: "pass" only when there are zero critical findings and (for code) green tests. Otherwise choose "fix-design" if any critical root cause is in design, spec or approach, else "fix-implementation".`,
     { label: `${kind}:${a.workItem}#${iteration}`, phase: isDesign ? 'Design review' : 'Review', schema: REVIEW_OUT, agentType: 'reviewer', effort: 'high' },
   )
   const safe = out || { verdict: 'fix-implementation', testResult: 'reviewer returned nothing', findings: [] }
@@ -161,7 +167,13 @@ async function implement(iteration, findings) {
     `${AUTHORITY}
 You are the IMPLEMENTER for cycle ${a.cycleId}, iteration ${iteration}, scope "${a.scope}", work item ${a.workItem} in ${a.repo}.
 Treat the design under ${WORK_DIR}/ as law. Edit ONLY files matching: ${owns}. Import the contract (${contract}) and never redefine or edit it.
-${findings ? `Fix exactly these review findings and add a test that proves each one:\n${findingsText(findings)}` : 'Build it, with tests written alongside.'}
+${findings ? `Fix exactly these review findings and add a test that proves each one:\n${findingsText(findings)}` : 'Build it test-first.'}
+Test-first is mandatory. For each acceptance criterion in ${a.repo}/${SPEC_FILE}:
+- write the test first, citing "${a.workItem}/AC-<n>" in it;
+- run it and see it FAIL, and record that red run in your summary;
+- then write the code that makes it pass.
+Set the spec status to locked if it is still draft. Run ${SPEC_CHECK} until it exits 0.
+Commit with the trailer "Spec: ${SPEC_FILE}". The spec-gate git hook refuses a source commit on the default branch without it.
 Run: cd ${a.repo} && ${a.testCommand}. Get it green, then report the REAL final line.`,
     { label: `implement:${a.workItem}#${iteration}`, phase: 'Implement', schema: IMPL_OUT, agentType: 'implementer' },
   )

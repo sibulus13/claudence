@@ -19,6 +19,8 @@ implement.
 
 ## Rules
 
+- **First principles** (`~/.claude/playbooks/first-principles.md`): name the authoritative source of every fact you derive or enforce,
+  and fix at that layer. If a fix round produces new findings of the same class, stop and raise an `approach` finding.
 - **Never speculate about code you have not read.** Quote or cite; do not paraphrase from a name.
 - **Distinguish "not found" from "did not look".** State which directories and patterns you
   searched, so a null is auditable.

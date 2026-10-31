@@ -47,6 +47,8 @@ review with style nits to look thorough is not.
 
 ## Rules
 
+- **First principles** (`~/.claude/playbooks/first-principles.md`): name the authoritative source of every fact you derive or enforce,
+  and fix at that layer. If a fix round produces new findings of the same class, stop and raise an `approach` finding.
 - Read the actual code. Never review from a diff summary or a filename.
 - Do not propose refactors that are not defects.
 - Give a verdict when asked for one (e.g. `CONFIRMED` / `PLAUSIBLE` / `FAILED`) — a bare "looks

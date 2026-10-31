@@ -19,6 +19,7 @@ flowchart TD
 | `~/.claude/rules/hooks.md` | settings / hooks | fail-closed hooks, loops, tests |
 | `notion.md` | any Notion tool | write permission, field minimization |
 | `reliability.md` | guards, monitors, "done?" | verify the effect, quality floors |
+| `first-principles.md` | designing, fixing, reviewing; a fix that keeps finding new holes | authoritative layer, root cause, convergence stop |
 | `refactor-pass.md` | a large milestone is done, or code goes public | simplify, constants, minimal tests, mutation check, fresh review |
 | `agent-dispatch.md` | Agent / Workflow | dispatch order, fan-out pre-flight, isolation |
 

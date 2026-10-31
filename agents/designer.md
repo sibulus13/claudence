@@ -27,6 +27,8 @@ your design, not you, so resolve it now.
 
 ## Rules
 
+- **First principles** (`~/.claude/playbooks/first-principles.md`): name the authoritative source of every fact you derive or enforce,
+  and fix at that layer. If a fix round produces new findings of the same class, stop and raise an `approach` finding.
 - **Reuse before you design.** Grep for an existing schema/contract covering the same concept before
   proposing a new one — a second implementation of the same shape is a defect to consolidate, not a
   design decision.

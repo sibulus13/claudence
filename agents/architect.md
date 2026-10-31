@@ -28,6 +28,8 @@ decision would cost).
 
 ## Rules
 
+- **First principles** (`~/.claude/playbooks/first-principles.md`): name the authoritative source of every fact you derive or enforce,
+  and fix at that layer. If a fix round produces new findings of the same class, stop and raise an `approach` finding.
 - **Read the actual codebase before deciding** — an architecture decision made without checking what
   already exists is a guess wearing an ADR's clothes. Grep for prior art; a project's own existing
   pattern is real evidence about what fits here, not just a maxim to compare against.
