@@ -127,3 +127,15 @@ def test_cli_is_dry_run_it_deletes_nothing_and_writes_the_report(world):
     assert report["dryRun"] is True and len(report["findings"]) == 1
     assert d.exists()
     assert (root / "state" / "projects-sweep.pending.json").exists()
+
+
+def test_config_is_read_from_fleet_docs(world, tmp_path: Path, monkeypatch):
+    """fleet-docs-home/AC-3: upkeep.config.json is found under FLEET_DOCS."""
+    root, projects, cfg = world
+    mk(projects, "C--empty-old")
+    fleet = tmp_path / "fleet"
+    fleet.mkdir()
+    (fleet / "upkeep.config.json").write_text(json.dumps({"sweepMinAgeDays": 100}), encoding="utf-8")
+    monkeypatch.setenv("FLEET_DOCS", str(fleet))
+    assert ps.main(["--root", str(root)]) == 0
+    assert json.loads((root / "state" / "projects-sweep.pending.json").read_text(encoding="utf-8"))["findings"] == []

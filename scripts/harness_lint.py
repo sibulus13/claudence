@@ -12,7 +12,7 @@ Checks (ids are the `check` field of a finding):
   drift     (f) the harness repo has no uncommitted or untracked files
 
 Private inventory (deny patterns, repo root, budgets, skipped files) lives in a config file read at runtime,
-`<root>/docs/fleet/upkeep.config.json` by default (see upkeep_config.py); every key is optional. Writes the report to
+`$FLEET_DOCS/upkeep.config.json` by default (see upkeep_config.py); every key is optional. Writes the report to
 `<root>/state/harness-lint.pending.json`; --commit promotes it to `harness-lint.json` (--out), the baseline. --json
 prints it. `newFindings` are findings whose id is absent
 from the previous report, which is what the Cortex upkeep job turns into a TeleFi digest. Read-only otherwise.
@@ -28,6 +28,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+from fleet_paths import fleet_docs_dir
 from upkeep_config import HIDDEN, commit_pending, config_path, load_config, previous_ids, store_pending
 
 WALK_SKIP = {"_Archive", "node_modules", "worktrees", "foreman-worktrees", ".claude", ".git", ".next", ".venv"}
@@ -45,7 +46,12 @@ def finding(check: str, path: str, detail: str, key: str | None = None) -> dict:
     return {"id": f"{check}:{path}:{ident}", "check": check, "path": path, "detail": detail}
 
 
+FLEET_LABEL = "fleet:"  # fleet docs live outside the harness root; findings name them by this prefix + file name
+
+
 def rel(root: Path, p: Path) -> str:
+    if p.parent == fleet_docs_dir():
+        return FLEET_LABEL + p.name
     try:
         return p.relative_to(root).as_posix()
     except ValueError:
@@ -63,8 +69,9 @@ def read(p: Path) -> str:
 def scan_files(root: Path) -> list[Path]:
     """Every harness text file the path checks cover."""
     files = [root / "CLAUDE.md"]
-    for pattern in ("rules/*.md", "playbooks/*.md", "skills/*/SKILL.md", "agents/*.md", "docs/fleet/*.md"):
+    for pattern in ("rules/*.md", "playbooks/*.md", "skills/*/SKILL.md", "agents/*.md"):
         files += sorted(root.glob(pattern))
+    files += sorted(fleet_docs_dir().glob("*.md"))
     for mem in memory_dirs(root):
         files += sorted(mem.glob("*.md"))
     return [f for f in files if f.is_file()]
@@ -118,7 +125,7 @@ def check_deny(root: Path, cfg: dict, files: list[Path]) -> list[dict]:
     out = []
     for f in files:
         r = rel(root, f)
-        if r.startswith("docs/fleet/"):
+        if r.startswith(FLEET_LABEL):
             continue
         for n, line in enumerate(read(f).splitlines(), 1):
             if ignore and ignore.search(line):
@@ -254,7 +261,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--commit", action="store_true", help="promote the pending report to the baseline (after delivery)")
     args = ap.parse_args(argv)
     root = args.root
-    cfg = load_config(args.config or config_path(root))
+    cfg = load_config(args.config or config_path())
     out = args.out or root / "state" / "harness-lint.json"
     if args.commit:
         commit_pending(out)

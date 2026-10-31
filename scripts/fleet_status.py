@@ -1,6 +1,6 @@
 """Fleet progress checker: one snapshot of every project under D:/repo.
 
-    python ~/.claude/scripts/fleet_status.py [--root D:/repo] [--out ~/.claude/docs/fleet]
+    python ~/.claude/scripts/fleet_status.py [--root D:/repo] [--out $FLEET_DOCS]
 
 Writes fleet_status.json (machine-readable) and SNAPSHOT_<date>.md (one row per project), and prints
 a one-line-per-project summary. Read-only: it runs `git` queries and lists scheduled tasks, nothing
@@ -15,6 +15,8 @@ import re
 import subprocess
 from datetime import date, datetime, timezone
 from pathlib import Path
+
+from fleet_paths import REPO_ROOT, fleet_docs_dir
 
 GIT_TIMEOUT_S = 20
 TASK_TIMEOUT_S = 60
@@ -124,11 +126,15 @@ def to_markdown(snap: dict) -> str:
             f"(read-only). Folders without git: {', '.join(snap['no_git']) or 'none'}.\n\n" + "\n".join(rows) + "\n")
 
 
-def main() -> int:
+def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--root", default="D:/repo")
-    ap.add_argument("--out", default=str(Path.home() / ".claude" / "docs" / "fleet"))
-    a = ap.parse_args()
+    ap.add_argument("--root", default=str(REPO_ROOT))
+    ap.add_argument("--out", default=str(fleet_docs_dir()))
+    return ap
+
+
+def main() -> int:
+    a = build_parser().parse_args()
     snap = snapshot(Path(a.root))
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)

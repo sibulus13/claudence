@@ -1,6 +1,6 @@
 """Path-pin inventory: everything that would break if a repo under D:/repo moved.
 
-    python ~/.claude/scripts/path_pins.py [--root D:/repo] [--out ~/.claude/docs/fleet]
+    python ~/.claude/scripts/path_pins.py [--root D:/repo] [--out $FLEET_DOCS]
 
 Read-only. For every repo it finds who references that repo by absolute path:
   - code/config files in any repo (the move breaks them),
@@ -21,6 +21,7 @@ from collections import defaultdict
 from datetime import date
 from pathlib import Path
 
+from fleet_paths import REPO_ROOT, fleet_docs_dir
 from fleet_status import SKIP_DIRS, find_repos, git, scheduled_tasks
 
 PIN = re.compile(r"[dD]:(?:\\\\|\\|/)repo(?:\\\\|\\|/)([^\"'`\s<>|*?\])(,;]+(?: [0-9][^\"'`\s<>|*?\])(,;]*)?)")
@@ -127,11 +128,15 @@ def to_markdown(inv: dict) -> str:
             "Detail per file: `path_pins.json`.\n\n" + "\n".join(rows) + "\n")
 
 
-def main() -> int:
+def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--root", default="D:/repo")
-    ap.add_argument("--out", default=str(HOME / ".claude" / "docs" / "fleet"))
-    a = ap.parse_args()
+    ap.add_argument("--root", default=str(REPO_ROOT))
+    ap.add_argument("--out", default=str(fleet_docs_dir()))
+    return ap
+
+
+def main() -> int:
+    a = build_parser().parse_args()
     inv = inventory(Path(a.root))
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)

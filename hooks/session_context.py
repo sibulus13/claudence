@@ -16,6 +16,7 @@ from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+from fleet_paths import fleet_docs_dir  # noqa: E402
 from ledger_draft import ledger_has_day  # noqa: E402  (one definition of "the ledger has this day")
 
 STATE_DOCS = ("docs/STATE.md", "STATE.md", "workflow_state.md", "todo.md", "context.md", "docs/KNOWLEDGE.md",
@@ -34,13 +35,10 @@ def last_commit_epoch(root: Path) -> int:
     return int(r.stdout.strip() or 0)
 
 
-FLEET_DIR = Path.home() / ".claude" / "docs" / "fleet"
-DRAFTS_DIR = FLEET_DIR / "drafts"
-LEDGER_FILE = FLEET_DIR / "LEDGER.md"
-
-
-def pending_drafts(drafts_dir: Path = DRAFTS_DIR, ledger_file: Path = LEDGER_FILE) -> list[str]:
+def pending_drafts(drafts_dir: Path | None = None, ledger_file: Path | None = None) -> list[str]:
     """Draft days the ledger does not have a row for yet (a draft whose day is already curated is stale)."""
+    drafts_dir = drafts_dir or fleet_docs_dir() / "drafts"
+    ledger_file = ledger_file or fleet_docs_dir() / "LEDGER.md"
     if not drafts_dir.is_dir():
         return []
     ledger = ledger_file.read_text(encoding="utf-8", errors="replace") if ledger_file.exists() else ""
@@ -49,7 +47,7 @@ def pending_drafts(drafts_dir: Path = DRAFTS_DIR, ledger_file: Path = LEDGER_FIL
     return sorted(d for d in days if not ledger_has_day(ledger, date.fromisoformat(d)))
 
 
-def lines_for(cwd: str, source: str, drafts_dir: Path = DRAFTS_DIR, ledger_file: Path = LEDGER_FILE) -> list[str]:
+def lines_for(cwd: str, source: str, drafts_dir: Path | None = None, ledger_file: Path | None = None) -> list[str]:
     out = []
     pending = pending_drafts(drafts_dir, ledger_file)
     if pending:

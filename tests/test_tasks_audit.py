@@ -84,3 +84,16 @@ def test_empty_inventory_prints_an_empty_json_array_not_null():
     out = subprocess.run(["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(inv),
                           "-TaskPath", r"\NoSuchFolder" + "\\"], capture_output=True, text=True, check=True).stdout
     assert json.loads(out) == []
+
+
+def test_config_is_read_from_fleet_docs(tmp_path: Path, monkeypatch):
+    """fleet-docs-home/AC-3: upkeep.config.json is found under FLEET_DOCS."""
+    fleet = tmp_path / "fleet"
+    fleet.mkdir()
+    (fleet / "upkeep.config.json").write_text(json.dumps({"tasksIgnoreRegex": ["^bad$"]}), encoding="utf-8")
+    monkeypatch.setenv("FLEET_DOCS", str(fleet))
+    tasks = tmp_path / "tasks.json"
+    tasks.write_text(json.dumps([task("bad", result=1)]), encoding="utf-8")
+    root = tmp_path / "claude"
+    assert ta.main(["--root", str(root), "--tasks-file", str(tasks)]) == 0
+    assert json.loads((root / "state" / "tasks-audit.pending.json").read_text(encoding="utf-8"))["total"] == 0

@@ -38,3 +38,13 @@ def test_non_date_markdown_in_drafts_is_ignored(tmp_path: Path):
 def test_no_drafts_dir_or_empty_dir_says_nothing_about_the_ledger(tmp_path: Path):
     assert not any("ledger draft" in line for line in sc.lines_for(str(tmp_path), "startup", drafts_dir=tmp_path))
     assert not any("ledger draft" in line for line in sc.lines_for(str(tmp_path), "startup", drafts_dir=tmp_path / "x"))
+
+
+def test_default_drafts_and_ledger_come_from_fleet_docs(tmp_path: Path, monkeypatch):
+    """fleet-docs-home/AC-5: with no explicit paths the drafts dir and ledger are read under FLEET_DOCS."""
+    (tmp_path / "drafts").mkdir()
+    (tmp_path / "drafts" / "2026-10-27.md").write_text("x", encoding="utf-8")
+    (tmp_path / "drafts" / "2026-10-28.md").write_text("x", encoding="utf-8")
+    (tmp_path / "LEDGER.md").write_text("### 2026-10-28 (Wed)\n", encoding="utf-8")
+    monkeypatch.setenv("FLEET_DOCS", str(tmp_path))
+    assert sc.pending_drafts() == ["2026-10-27"]

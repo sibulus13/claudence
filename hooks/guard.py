@@ -2,7 +2,7 @@
 
 Reads the hook JSON on stdin; prints a permissionDecision JSON (deny or ask) with the reason, or nothing
 (allow). Registered in ~/.claude/settings.json for Bash|PowerShell|Write|Edit|MultiEdit|mcp__* tools.
-Design: ~/.claude/docs/fleet/HARNESS_AUDIT.md §3. Tests: ~/.claude/tests/test_guard.py.
+Design: $FLEET_DOCS/HARNESS_AUDIT.md §3. Tests: ~/.claude/tests/test_guard.py.
 Unattended runs (Foreman workers in bypassPermissions, scheduled jobs that set CLAUDE_UNATTENDED=1)
 skip the interactive-only rules (background long commands, Notion ask).
 """
@@ -16,8 +16,11 @@ import subprocess
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path("D:/repo")
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+from fleet_paths import REPO_ROOT  # noqa: E402  (one owner of the repo-tree root)
+
 LEGACY_CATEGORIES = {"ai", "bot", "data"}
+FLEET_DOCS_NAME = "docs"
 SHELL_TOOLS = {"Bash", "PowerShell"}
 EDIT_TOOLS = {"Write", "Edit", "MultiEdit", "NotebookEdit"}
 NOTION_WRITE = re.compile(r"^mcp__.*notion.*__notion-(create|update|move|duplicate|delete|restore|set|upload|"
@@ -104,6 +107,8 @@ def bad_repo_target(path: Path) -> bool:
     parts = [x.lower() for x in rel.parts]
     if not parts:
         return False
+    if parts == [FLEET_DOCS_NAME]:
+        return False  # the private fleet docs repo lives at <root>/docs
     return len(parts) == 1 or parts[0] in LEGACY_CATEGORIES or (parts[0] == "web" and parts[1:2] != ["personal"])
 
 

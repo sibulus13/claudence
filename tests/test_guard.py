@@ -110,3 +110,25 @@ def test_notion_write_asks_unless_unattended() -> None:
     assert run(tool, {}) == "ask"
     assert run(tool, {}, permission_mode="bypassPermissions") is None
     assert run("mcp__plugin_Notion_notion__notion-fetch", {}) is None
+
+
+def _bad_repo_target(path: str) -> bool:
+    out = subprocess.run([sys.executable, "-c", "import sys; sys.path.insert(0, sys.argv[1]); import guard; "
+                          "from pathlib import Path; print(guard.bad_repo_target(Path(sys.argv[2])))",
+                          str(HOOK.parent), path], capture_output=True, text=True, timeout=30,
+                         env={"PATH": "", "SYSTEMROOT": "C:/Windows"})
+    return out.stdout.strip() == "True"
+
+
+def test_repo_root_docs_is_allowed():
+    """fleet-docs-home/AC-8: the fleet docs repo may live at D:/repo/docs."""
+    assert not _bad_repo_target("D:/repo/docs")
+    assert not _bad_repo_target("D:/repo/Docs")
+    assert not _bad_repo_target("D:/repo/docs/x")
+
+
+@pytest.mark.parametrize("name", ["foo", "docs2", "ai", "web"])
+def test_other_bare_root_names_stay_denied(name):
+    """fleet-docs-home/AC-9: only the single name docs is exempt; the root itself is still not a target."""
+    assert _bad_repo_target(f"D:/repo/{name}")
+    assert not _bad_repo_target("D:/repo")

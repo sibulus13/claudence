@@ -1,7 +1,7 @@
 """D:/repo harness router: give a session started in D:/repo each project's own memory and hooks.
 
 Registered only in D:/repo/.claude/settings.json, so it never runs in a session started inside a project
-(that session loads the project's harness natively). Design: ~/.claude/docs/fleet/HARNESS_FROM_ROOT.md.
+(that session loads the project's harness natively). Design: $FLEET_DOCS/HARNESS_FROM_ROOT.md.
 
     python harness_router.py pre|post   (PreToolUse / PostToolUse, hook JSON on stdin)
 

@@ -4,11 +4,12 @@
 
 Each case launches `claude -p` from a cwd chosen so exactly one layer is in play, asks for a fact that only
 that layer carries, and where possible checks a side effect instead of trusting the model's words.
-Exit 0 only if every case passes. Design: ~/.claude/docs/fleet/HARNESS_AUDIT.md §5 step 7.
+Exit 0 only if every case passes. Design: $FLEET_DOCS/HARNESS_AUDIT.md §5 step 7.
 """
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import tempfile
@@ -34,18 +35,23 @@ class Case:
     check: Callable[[dict], str | None] | None = None   # side-effect check -> failure reason or None
 
 
-def claude(case: Case) -> dict:
+def session_env(tmp: Path) -> dict:
+    """fleet-docs-home/AC-6: headless sessions run hooks that read the fleet docs; give them an empty private one."""
+    return {**os.environ, "FLEET_DOCS": str(tmp / "fleet-docs")}
+
+
+def claude(case: Case, env: dict) -> dict:
     r = subprocess.run([CLAUDE, "-p", case.prompt, "--output-format", "json", "--model", "sonnet",
                         "--max-budget-usd", BUDGET_USD, "--allowedTools", case.tools],
-                       cwd=case.cwd, capture_output=True, text=True, timeout=TIMEOUT_S, stdin=subprocess.DEVNULL)
+                       cwd=case.cwd, env=env, capture_output=True, text=True, timeout=TIMEOUT_S, stdin=subprocess.DEVNULL)
     try:
         return json.loads(r.stdout)
     except json.JSONDecodeError:
         return {"result": f"(no JSON) rc={r.returncode} {r.stdout[-300:]} {r.stderr[-300:]}"}
 
 
-def evaluate(case: Case) -> tuple[str, bool, str]:
-    out = claude(case)
+def evaluate(case: Case, env: dict) -> tuple[str, bool, str]:
+    out = claude(case, env)
     text = (out.get("result") or "").lower()
     missing = [e for e in case.expect if e.lower() not in text]
     present = [a for a in (case.absent or []) if a.lower() in text]
@@ -115,7 +121,7 @@ def main() -> int:
              ["router", "catwalk"], check=router_fired),
     ]
     with ThreadPoolExecutor(max_workers=len(cases)) as pool:
-        results = list(pool.map(evaluate, cases))
+        results = list(pool.map(lambda c: evaluate(c, session_env(tmp)), cases))
     for name, ok, detail in results:
         print(f"{'PASS' if ok else 'FAIL'}  {name}  | {detail}", flush=True)
     shutil.rmtree(tmp, ignore_errors=True)

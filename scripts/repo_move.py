@@ -19,10 +19,14 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-ROOT = Path("D:/repo")
+from fleet_paths import REPO_ROOT, fleet_docs_dir
+
+ROOT = REPO_ROOT
 HISTORY = Path.home() / ".claude" / "projects"
-FLEET = Path.home() / ".claude" / "docs" / "fleet"
-LOG = FLEET / "MOVES.jsonl"
+
+
+def moves_log() -> Path:
+    return fleet_docs_dir() / "MOVES.jsonl"
 
 
 def slug(rel: str) -> str:
@@ -36,7 +40,7 @@ def history_dirs(rel: str) -> list[Path]:
 
 
 def pins_for(rel: str) -> list[str]:
-    inv = FLEET / "path_pins.json"
+    inv = fleet_docs_dir() / "path_pins.json"
     if not inv.is_file():
         return ["path_pins.json missing: run path_pins.py"]
     out = []
@@ -67,7 +71,7 @@ def move(src: str, dst: str, dry: bool) -> dict:
 
 
 def undo() -> int:
-    batches = [json.loads(l) for l in LOG.read_text(encoding="utf-8").splitlines() if l.strip()]
+    batches = [json.loads(l) for l in moves_log().read_text(encoding="utf-8").splitlines() if l.strip()]
     last = batches[-1]
     for m in reversed([m for m in last["moves"] if m["status"] == "moved"]):
         r = move(m["to"], m["from"], dry=False)
@@ -94,7 +98,7 @@ def main() -> int:
         for pin in r.get("open_pins", []):
             print("      pin", pin)
     if not a.dry_run:
-        with LOG.open("a", encoding="utf-8", newline="\n") as f:
+        with moves_log().open("a", encoding="utf-8", newline="\n") as f:
             f.write(json.dumps({"at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "moves": results}) + "\n")
     return 0 if all(r["status"] in ("moved", "dry-run") for r in results) else 1
 

@@ -67,14 +67,27 @@ def test_a_path_check_skip_exempts_historical_files(root: Path):
     assert not of(lint(root, {"pathCheckSkip": ["rules/a.md"]}), "paths")
 
 
-def test_b_deny_list_hits_outside_fleet_docs_only_and_ignore_line_exempts_history(root: Path):
+def test_b_deny_list_hits_outside_fleet_docs_only_and_ignore_line_exempts_history(root: Path, tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("FLEET_DOCS", str(tmp_path / "fleet"))
     (root / "rules" / "a.md").write_text("uses CronCreate here\nCronCreate was retired\n", encoding="utf-8")
-    (root / "docs" / "fleet").mkdir(parents=True)
-    (root / "docs" / "fleet" / "L.md").write_text("CronCreate\n", encoding="utf-8")
+    (tmp_path / "fleet").mkdir()
+    (tmp_path / "fleet" / "L.md").write_text("CronCreate\n", encoding="utf-8")
     cfg = {"denyList": [{"pattern": "CronCreate", "label": "cron"}], "denyIgnoreLine": "retired"}
     found = of(lint(root, cfg), "deny")
     assert [f["path"] for f in found] == ["rules/a.md"]
     assert "line 1" in found[0]["detail"]
+
+
+def test_fleet_docs_linted_via_resolver(root: Path, tmp_path: Path, monkeypatch):
+    """fleet-docs-home/AC-4: fleet docs outside the harness root are path-checked, labelled fleet:<name>, deny-exempt."""
+    fleet = tmp_path / "fleet"
+    fleet.mkdir()
+    monkeypatch.setenv("FLEET_DOCS", str(fleet))
+    (fleet / "L.md").write_text("CronCreate and `~/gone-xyz/f.md`\n", encoding="utf-8")
+    cfg = {"denyList": [{"pattern": "CronCreate", "label": "cron"}]}
+    report = lint(root, cfg)
+    assert [f["path"] for f in of(report, "paths")] == ["fleet:L.md"]
+    assert of(report, "deny") == []
 
 
 def test_c_parity_flags_unindexed_note_and_dangling_index_link(root: Path):

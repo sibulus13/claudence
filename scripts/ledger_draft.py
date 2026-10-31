@@ -18,6 +18,7 @@ import subprocess
 from datetime import date, timedelta
 from pathlib import Path
 
+from fleet_paths import fleet_docs_dir
 from upkeep_config import HIDDEN, commit_pending, config_path, load_config, previous_ids, store_pending, write_atomic
 
 MAX_DEPTH = 4
@@ -84,7 +85,7 @@ def plan(root: Path, cfg: dict, end: date, days: int, out_dir: Path, previous: s
     """Draft every unledgered day in the window (never overwriting a draft the curator may be editing).
 
     A flagged day is new when its finding id is not in `previous`, the committed (delivered) ids; None = all new."""
-    ledger = root / cfg["ledgerFile"]
+    ledger = fleet_docs_dir() / cfg["ledgerFile"]
     ledger_text = ledger.read_text(encoding="utf-8") if ledger.exists() else ""
     report = []
     for back in range(days):
@@ -116,7 +117,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--commit", action="store_true", help="promote the pending report to the baseline (after delivery)")
     args = ap.parse_args(argv)
-    cfg = load_config(args.config or config_path(args.root))
+    cfg = load_config(args.config or config_path())
     state = args.state or args.root / "state" / "ledger-draft.json"
     if args.commit:
         commit_pending(state)

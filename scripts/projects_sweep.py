@@ -103,7 +103,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--commit", action="store_true", help="promote the pending report to the baseline (after delivery)")
     args = ap.parse_args(argv)
-    cfg = load_config(args.config or config_path(args.root))
+    cfg = load_config(args.config or config_path())
     out = args.out or args.root / "state" / "projects-sweep.json"
     if args.commit:
         commit_pending(out)

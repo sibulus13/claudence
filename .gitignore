@@ -76,8 +76,7 @@ plans/
 # tiktok-sync scheduled run logs (runtime state)
 logs/
 
-# fleet inventory: private project/Notion state, never published (claudence is public)
-docs/fleet/
+# the private fleet docs moved out of this repo (2026-10-31): they live at $FLEET_DOCS (default D:/repo/docs)
 
 # Runtime output of scripts/ (lint reports) and bytecode
 state/

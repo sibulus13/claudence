@@ -1,7 +1,7 @@
 """Shared runtime config for the harness upkeep scripts (harness_lint, ledger_draft, projects_sweep, tasks_audit).
 
 Private inventory (repo tree, deny patterns, task names, skip lists) is never committed here: it is read from
-`<root>/docs/fleet/upkeep.config.json` (docs/fleet is a private, git-ignored folder). Every key is optional.
+`<fleet docs>/upkeep.config.json` (the private fleet docs folder, `$FLEET_DOCS`, see fleet_paths.py). Every key is optional.
 """
 from __future__ import annotations
 
@@ -10,6 +10,8 @@ import json
 import os
 import subprocess
 from pathlib import Path
+
+from fleet_paths import fleet_docs_dir
 
 # Child processes (git, powershell) must not flash a console window when a daemon launches the scripts.
 HIDDEN: dict = {"creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0)}
@@ -28,8 +30,8 @@ DEFAULTS: dict = {
         "projectIndexBytes": 25_000,
         "repoClaudeMdLines": 200,
     },
-    "ledgerFile": "docs/fleet/LEDGER.md",
-    "draftsDir": "docs/fleet/drafts",
+    "ledgerFile": "LEDGER.md",  # relative to the fleet docs dir
+    "draftsDir": "drafts",
     "ledgerDraftMinCommits": 10,  # a day above this with no LEDGER row is flagged
     "sweepMinAgeDays": 7,
     "sweepTempPatterns": [  # projects/ dir-name regexes (cwd under Temp or a probe) that are clutter
@@ -47,8 +49,8 @@ DEFAULTS: dict = {
 }
 
 
-def config_path(root: Path) -> Path:
-    return root / "docs" / "fleet" / "upkeep.config.json"
+def config_path() -> Path:
+    return fleet_docs_dir() / "upkeep.config.json"
 
 
 def load_config(path: Path) -> dict:

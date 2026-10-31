@@ -27,10 +27,17 @@ def commit(repo: Path, msg: str, when: str = STAMP) -> None:
                    capture_output=True)
 
 
+def fleet(root: Path) -> Path:
+    return root.parent / "fleet"
+
+
 @pytest.fixture
-def world(tmp_path: Path):
+def world(tmp_path: Path, monkeypatch):
+    """fleet-docs-home/AC-3: the ledger, drafts and upkeep config live under FLEET_DOCS, not under the harness root."""
     root = tmp_path / "claude"
-    (root / "docs" / "fleet").mkdir(parents=True)
+    root.mkdir()
+    monkeypatch.setenv("FLEET_DOCS", str(tmp_path / "fleet"))
+    (tmp_path / "fleet").mkdir()
     tree = tmp_path / "repos"
     app = tree / "Theme" / "app"
     app.mkdir(parents=True)
@@ -63,7 +70,7 @@ def test_plan_drafts_an_unledgered_day_flags_it_and_is_new_once(world):
     root, app, cfg = world
     for i in range(3):
         commit(app, f"feat: {i}")
-    out = root / "docs" / "fleet" / "drafts"
+    out = fleet(root) / "drafts"
     first = ld.plan(root, cfg, DAY, 1, out)[0]
     assert first["commits"] == 3 and first["flagged"] and first["new"]
     assert (out / "2026-10-28.md").read_text(encoding="utf-8").count("| Theme/app |") == 3
@@ -89,7 +96,7 @@ def test_plan_does_not_flag_a_quiet_day_and_skips_a_ledgered_day(world):
     out = root / "drafts"
     quiet = ld.plan(root, cfg, DAY, 1, out)[0]
     assert quiet["commits"] == 1 and not quiet["flagged"]
-    (root / "docs" / "fleet" / "LEDGER.md").write_text("### 2026-10-28 (Wed)\n", encoding="utf-8")
+    (fleet(root) / "LEDGER.md").write_text("### 2026-10-28 (Wed)\n", encoding="utf-8")
     (out / "2026-10-28.md").unlink()
     done = ld.plan(root, cfg, DAY, 1, out)[0]
     assert done["ledgered"] and done["draft"] is None and not (out / "2026-10-28.md").exists()
@@ -105,15 +112,15 @@ def test_plan_covers_the_lookback_window(world):
 
 def test_cli_json_never_touches_the_ledger_and_reports_new_findings(world, tmp_path: Path):
     root, app, cfg = world
-    ledger = root / "docs" / "fleet" / "LEDGER.md"
+    ledger = fleet(root) / "LEDGER.md"
     ledger.write_text("### 2026-10-29 (Thu)\nrow\n", encoding="utf-8")
     before = ledger.read_bytes()
     for i in range(3):
         commit(app, f"feat: {i}")
-    (root / "docs" / "fleet" / "upkeep.config.json").write_text(
+    (fleet(root) / "upkeep.config.json").write_text(
         json.dumps({"repoRoot": cfg["repoRoot"], "ledgerDraftMinCommits": 2}), encoding="utf-8")
     cmd = [sys.executable, str(Path(ld.__file__)), "2026-10-28", "--root", str(root), "--days", "1",
-           "--out", str(root / "docs" / "fleet" / "drafts"), "--json"]
+           "--out", str(fleet(root) / "drafts"), "--json"]
     out = json.loads(subprocess.run(cmd, capture_output=True, text=True, check=True).stdout)
     assert [f["id"] for f in out["newFindings"]] == ["ledger-draft:2026-10-28"]
     assert ledger.read_bytes() == before
