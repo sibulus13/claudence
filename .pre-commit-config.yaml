@@ -1,0 +1,18 @@
+# Fleet git hooks (work item: ~/.claude/docs/work/spec-gate/). Copied into each repo as .pre-commit-config.yaml by
+# ~/.claude/scripts/install_fleet_hooks.py; `pre-commit install` then wires both stages.
+default_install_hook_types: [pre-commit, commit-msg]
+repos:
+  - repo: local
+    hooks:
+      - id: portable-filenames
+        name: file names are ASCII with no spaces
+        language: fail
+        entry: "rename to ASCII letters, digits, . _ - only (no spaces):"
+        files: '[^\x21-\x7e]'
+        stages: [pre-commit]
+      - id: spec-gate
+        name: source commits cite a building or shipped work item (docs/work)
+        language: unsupported
+        entry: python C:/Users/Michael/.claude/scripts/spec_gate.py
+        always_run: true
+        stages: [commit-msg]
