@@ -4,9 +4,9 @@
 flowchart TD
   R[README] --> K{CK-1: created a real date?}
   K -- no --> X[CK-1 error, stop]
-  K -- yes --> L{legacy: in the frozen list, status not past cutoff status, neither section?}
-  L -- yes --> W[one warning, no error]
-  L -- no --> H[CK-4: headings present?]
+  K -- yes --> H[CK-4: headings present?]
+  G[spec_gate: staged README enters spec-locked or building?] -- yes --> Q[--require-sections: a missing section is an error]
+  G -- no --> W[a missing section is a warning]
   H --> O[CK-47: order]
   O --> T[CK-48 References tables and citations]
   O --> E[CK-49 Operating envelope table]
@@ -16,11 +16,11 @@ flowchart TD
 | ID | Change | Note |
 |---|---|---|
 | FR-1 | added | generated config keys |
-| FR-2 | added | CK-4 filters for optional and legacy |
+| FR-2 | added | CK-4 optional filter; missing leading section is a warning unless required |
 | FR-3 | added | CK-47 order |
 | FR-4 | added | CK-48 References |
 | FR-5 | added | CK-49 Operating envelope |
-| FR-6 | added | legacy by frozen list, notice |
+| FR-6 | added | spec_gate transition trigger (any commit entering spec-locked or building) |
 | FR-7 | added | standard, templates, reviewer wording |
 | FR-8 | added | tier binding |
 | FR-9 | added | citation resolution |
@@ -32,14 +32,14 @@ Every AC below is tested by running its fixtures table (section Fixtures): one p
 | AC | Traces | Given / when | Pass when | Fail when | Test |
 |---|---|---|---|---|---|
 | AC-1 | CAP-1, CAP-2, FR-1 | gen_heading_config.generate() and `--check` run per the rows of Fixtures AC-1 | every row of the table behaves as stated, including the pinned heading counts and order | any pinned count or order differs, or `--check` exits 0 on a stale JSON | tests/test_gen_heading_config.py, tests/test_spec_references_envelope.py |
-| AC-2 | CAP-1, CAP-2, CAP-3, FR-2, FR-3, FR-8 | spec_check runs on the rows of Fixtures AC-2 (README created 2026-11-01, not in the frozen list) | each faulty row gives exactly one finding of the named rule with the substring; each passing row gives none | a faulty row passes, is reported under another rule, or a passing row is rejected | tests/test_spec_references_envelope.py |
+| AC-2 | CAP-1, CAP-2, CAP-3, FR-2, FR-3, FR-8 | spec_check runs on the rows of Fixtures AC-2 (run with `--require-sections`) | each faulty row gives exactly one finding of the named rule with the substring; each passing row gives none | a faulty row passes, is reported under another rule, or a passing row is rejected | tests/test_spec_references_envelope.py |
 | AC-3 | CAP-4, FR-4, FR-5 | spec_check runs on the rows of Fixtures AC-3 (table headers, table count, empty tables) | each faulty row gives a finding that names the table and, for a header, prints the expected header | a faulty row passes, or the message does not name the table | tests/test_spec_references_envelope.py |
 | AC-4 | CAP-4, FR-4 | spec_check runs on the rows of Fixtures AC-4 (Local cells) | each faulty row gives a CK-48 finding naming the row and the cell; each passing row gives none | a faulty row passes or a passing row, including the Windows-path row, is rejected | tests/test_spec_references_envelope.py |
 | AC-5 | CAP-8, FR-9 | spec_check runs on the rows of Fixtures AC-5 (citation resolution, in Local and Envelope cells, at spec-locked, building and shipped) | an unresolved token is a CK-48 or CK-49 error at spec-locked and building and a warning at shipped; a resolving token, in any path form, gives no finding | an unresolved token passes at spec-locked, is an error at shipped, or a resolving token is rejected | tests/test_spec_references_envelope.py |
 | AC-6 | CAP-4, FR-4 | spec_check runs on the rows of Fixtures AC-6 (Web cells) | each faulty row gives a CK-48 finding naming the row and the cell; each passing row gives none | a faulty row passes or a passing row is rejected | tests/test_spec_references_envelope.py |
 | AC-7 | CAP-4, FR-5 | spec_check runs on the rows of Fixtures AC-7 (Envelope cells) | each faulty row gives a CK-49 finding naming the row and the cell; each passing row gives none | a faulty row passes or a passing row is rejected | tests/test_spec_references_envelope.py |
-| AC-8 | CAP-5, FR-6, FR-10 | spec_check runs on the rows of Fixtures AC-8 against a fixture frozen list and against the committed one | legacy applies only to a listed item within its recorded status; every other row is strict; a bad date or a bad digest stops the run | an unlisted, back-dated, past-status or sectioned item is treated as legacy, or a bad digest is accepted | tests/test_spec_references_envelope.py, tests/test_work_item_schema.py |
-| AC-9 | CAP-9, FR-6 | the committed baseline snapshot legacy-baseline.json (exit code of the unmodified checker for every README under D:/repo/*/*/docs/work, D:/repo/*/docs/work and ~/.claude/docs/work) is compared with the modified checker's exit code for the same README, per the rows of Fixtures AC-9 | the exit codes are equal for every README still on disk; a README missing from disk is ignored | any README's exit code differs, a walk root does not exist, or the snapshot or frozen list is missing | tests/test_spec_references_envelope.py |
+| AC-8 | CAP-5, FR-6, FR-10 | real commits in a temp repo with the spec-gate hook installed, per the rows of Fixtures AC-8 | a commit whose staged README enters spec-locked or building without valid sections is rejected (docs-only commits included); every other row lands; a bad date is a CK-1 error | a gated transition lands without sections, an ungated commit is rejected, or a git error lets the commit through | tests/test_spec_gate_transition.py, tests/test_work_item_schema.py |
+| AC-9 | CAP-9, FR-8 | a one-shot build-time gate (not a permanent test): spec_check runs standalone over every README under D:/repo/*/*/docs/work, D:/repo/*/docs/work and ~/.claude/docs/work with the old and the new checker, per the rows of Fixtures AC-9 | no README moves from exit 0 to exit 1; a missing section shows only as a warning | any README moves from 0 to 1, or a walk root does not exist | scripts/gates/new_rules_regression.py |
 | AC-10 | CAP-6, CAP-7, FR-7 | a test reads the two README templates, the standard and the reviewer text per the rows of Fixtures AC-10 | every row passes | any template header differs from a model, any vocabulary or count differs between the standard and the constants, or a required sentence is missing | tests/test_spec_references_envelope.py |
 
 ## Fixtures
@@ -145,32 +145,27 @@ Header of every table: fixture id, the single fault, and a substring the finding
 | 7.10 | observed has a URL, If violated `flag: warn line, no block` | no finding |
 
 ### AC-8
-Fixture frozen list lists the item keys named below with their recorded status. All rows are READMEs with type feature and neither section unless stated.
+Each row is a real commit in a temp repo with the hook installed; the README has type feature and no References or Operating envelope sections unless stated.
 
 | Fixture | Single fault | Expected message contains |
 |---|---|---|
-| 8.1 | none: listed with draft, status draft | warn: CK-47 |
-| 8.2 | none: listed with draft, status draft, so no CK-4 error for the sections | no finding of CK-4 |
-| 8.3 | listed with draft, status moved to spec-locked | missing section `## References` |
-| 8.4 | listed with building, status building | warn: CK-47 |
-| 8.5 | listed with building, status shipped | missing section `## References` |
-| 8.6 | not listed, created 2026-10-30 (back-dated), status spec-locked | missing section `## References` |
-| 8.7 | listed with draft, status draft, `created` edited to 2026-11-05 | warn: CK-47 |
-| 8.8 | listed with draft, status draft, but References heading added (envelope missing), at spec-locked | missing section `## Operating envelope` |
-| 8.9 | created is 2026-13-45 | CK-1 |
-| 8.10 | the fixture frozen list has one entry changed and the digest not recomputed | digest |
-| 8.11 | the frozen list file is missing | frozen list |
-| 8.12 | the committed list: each of claim-registry, worktree-reaper and branch-conventions under Lib/spindle is present with status draft | no finding |
-| 8.13 | gen_legacy_l0.py --write when the file exists | already exists |
+| 8.1 | a docs-only commit moves the README from draft to spec-locked, no sections | missing section `## References` |
+| 8.2 | a docs-only commit moves the README from spec-locked to building, no sections | missing section `## References` |
+| 8.3 | a commit creates a README directly at spec-locked, no sections | missing section `## References` |
+| 8.4 | a commit moves the README to spec-locked with References but no Operating envelope | missing section `## Operating envelope` |
+| 8.5 | a commit moves the README to spec-locked with valid sections | no finding |
+| 8.6 | a commit creates a README at draft, no sections | no finding |
+| 8.7 | a commit edits a shipped README's text without a status change | no finding |
+| 8.8 | a commit moves the README from building to shipped, no sections | no finding |
+| 8.9 | `created` is 2026-13-45 | CK-1 |
+| 8.10 | `git show HEAD:<path>` fails (corrupt object simulated) | failed closed |
 
 ### AC-9
 | Fixture | Single fault | Expected message contains |
 |---|---|---|
-| 9.1 | for each snapshot entry whose README exists, the modified checker's exit code equals the snapshot's (one parametrized case per README) | no finding |
-| 9.2 | the snapshot lists a README no longer on disk | no finding |
+| 9.1 | every README under the walk roots keeps its exit code or moves 1 to 0 (one case per README) | no finding |
+| 9.2 | a README that passed before gets a new error from the new rules | exit code |
 | 9.3 | one walk root directory does not exist | walk root |
-| 9.4 | the snapshot file is missing | baseline |
-| 9.5 | the snapshot has an exit code edited to differ from the checker | exit code |
 
 ### AC-10
 | Fixture | Single fault | Expected message contains |

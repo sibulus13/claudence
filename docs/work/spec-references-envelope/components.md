@@ -8,15 +8,15 @@ flowchart TD
   end
   subgraph After
     A1[heading table plus leading and optional notation]
-    A2[section-checks: CK-4 filters, CK-47 order and legacy notice, CK-48 References, CK-49 envelope]
+    A2[section-checks: CK-4 filters, CK-47 order, CK-48 References, CK-49 envelope]
     A3[Row models: LocalRefRow, WebRefRow, EnvelopeRow]
-    A4[frozen list of legacy items, written once by gen_legacy_l0.py]
+    A4[transition-gate: spec_gate requires the sections when a staged README enters spec-locked or building]
   end
 ```
 
 | Component | Owned files | Public interface |
 |---|---|---|
-| section-checks | `scripts/spec_check.py`, `scripts/work_item_md.py`, `scripts/work_item_schema.py`, `contracts/work-item.v2.json`, `scripts/gen_heading_config.py`, `contracts/work-item.headings.v2.json` (generated), `scripts/gen_legacy_l0.py`, `contracts/work-item.legacy-l0.v1.json` (generated once), `skills/dark-factory/WORK-ITEM-STANDARD.md`, `skills/dark-factory/templates/work-item/README.md`, `skills/dark-factory/templates/work-item/README.experiment.md`, `tests/test_spec_references_envelope.py`, `tests/test_gen_heading_config.py`, `tests/fixtures/work-items/**`, `tests/fixtures/work-items/legacy-baseline.json` (generated once) | `spec_check.py README.md` (unchanged CLI; new rule ids CK-47, CK-48, CK-49); `gen_legacy_l0.py --write / --baseline / --check` |
+| section-checks | `scripts/spec_check.py`, `scripts/work_item_md.py`, `scripts/work_item_schema.py`, `contracts/work-item.v2.json`, `scripts/gen_heading_config.py`, `contracts/work-item.headings.v2.json` (generated), `scripts/spec_gate.py`, `skills/dark-factory/WORK-ITEM-STANDARD.md`, `skills/dark-factory/templates/work-item/README.md`, `skills/dark-factory/templates/work-item/README.experiment.md`, `tests/test_spec_references_envelope.py`, `tests/test_gen_heading_config.py`, `tests/test_spec_gate_transition.py`, `tests/fixtures/work-items/**` | `spec_check.py README.md [--require-sections]` (new rule ids CK-47, CK-48, CK-49); `spec_gate.py` (unchanged CLI; new trigger) |
 
 One component. Its single responsibility: validate the References and Operating envelope sections of one README against the standard. The generators, the Row models and the standard text are its inputs and are changed with it, in the same pass, because splitting them would let the headings, the table headers and the prose disagree. The reviewer agent text (`agents/reviewer.md`) is governance: this item specifies one added sentence (below) which the parent session applies; a test reads it.
 
@@ -56,19 +56,17 @@ def findings(frontmatter: dict) -> list[tuple[str, str]]     # signature unchang
 # scripts/gen_heading_config.py
 def generate(standard: Path = STANDARD) -> dict      # adds: "leading": list[str], readme[type]["optional"]: list[str] (key absent when empty)
 
-# scripts/gen_legacy_l0.py   (run once, today, before spec_check.py changes)
-ROOT_GLOBS = ("*/*/docs/work", "*/docs/work")        # relative to fleet_paths.REPO_ROOT; plus the harness root ~/.claude/docs/work
-def item_key(readme: Path) -> str                    # "Lib/spindle/docs/work/claim-registry"; ".claude/docs/work/spec-gate" for the harness
-def generate_index() -> dict                         # the frozen list (schema below)
-def main(argv: list[str]) -> int                     # --write (refuses if the file exists), --baseline (refuses if the file exists), --check
-
 # scripts/spec_check.py
-def load_legacy_index(path: Path = LEGACY_INDEX) -> dict   # verifies the digest; a mismatch or a missing file raises ToolError (exit 2)
-def is_legacy_l0(item: Item) -> bool                 # key in the list AND rank(status) <= rank(status at cutoff) AND neither leading heading present
+def sections_required(item: Item, require: bool) -> bool   # True when --require-sections was passed (the transition gate)
 def required_headings(item: Item) -> dict[str, list[tuple[str, str]]]   # signature unchanged; see FR-2
-def ck47(item: Item, rep: Report) -> None            # binds ALWAYS: legacy notice; at STATIC statuses also the order check
+def ck47(item: Item, rep: Report) -> None            # STATIC: order check; a missing section is a warning, an error under --require-sections
 def ck48(item: Item, rep: Report) -> None            # References section; STATIC
 def ck49(item: Item, rep: Report) -> None            # Operating envelope section; STATIC
+
+# scripts/spec_gate.py
+GATED = ("spec-locked", "building")             # read from spec_check's tier sets, not re-spelled
+def entering_gated(head_status: str | None, staged_status: str) -> bool   # staged in GATED and (head absent or head != staged)
+def gated_readmes(tree: IndexTree) -> list[Path]     # every staged docs/work/*/README.md for which entering_gated is true
 ```
 
 Config and data contracts (all generated; none hand-written):
@@ -77,14 +75,11 @@ Config and data contracts (all generated; none hand-written):
 |---|---|---|---|---|
 | `contracts/work-item.headings.v2.json` | `leading` | list of string | yes | the two headings, in order, that follow `Overview` and precede everything else: `References`, `Operating envelope` |
 | `contracts/work-item.headings.v2.json` | `readme.TYPE.optional` | list of string | no (absent when empty) | headings of the type validated if present and never required, nested or not |
-| `contracts/work-item.legacy-l0.v1.json` | `cutoff` | string `2026-10-31` | yes | the date the list was frozen |
-| `contracts/work-item.legacy-l0.v1.json` | `generatedBy` | string | yes | `scripts/gen_legacy_l0.py` |
-| `contracts/work-item.legacy-l0.v1.json` | `statusOrder` | list of string | yes | `draft`, `spec-locked`, `building`, `shipped`; the rank used by `is_legacy_l0` |
-| `contracts/work-item.legacy-l0.v1.json` | `items` | object key to status | yes | every README under the walk roots whose frontmatter status is in `statusOrder` and which has neither `References` nor `Operating envelope` at generation time; value = its status then |
-| `contracts/work-item.legacy-l0.v1.json` | `digest` | string `sha256:` plus hex | yes | over the sorted lines `key status` joined by newline |
-| `tests/fixtures/work-items/legacy-baseline.json` | one entry per README under the walk roots | key to exit code | yes | the exit code of the unmodified spec_check for every README at generation time, any status, any format |
 
-The walk roots: `D:/repo/*/*/docs/work` (this includes `D:/repo/Lib/*/docs/work`), `D:/repo/*/docs/work`, and `~/.claude/docs/work`. A root directory that does not exist is an error of the generator, never skipped. The key is the folder path relative to `fleet_paths.REPO_ROOT` when the README is under it, else `<root folder name>/docs/work/<id>`.
+
+The walk roots for the one-shot AC-9 gate: `D:/repo/*/*/docs/work` (this includes `D:/repo/Lib/*/docs/work`), `D:/repo/*/docs/work`, and `~/.claude/docs/work`, derived from `fleet_paths.REPO_ROOT`. A root that does not exist fails the gate, never skipped.
+
+Transition rule (the authoritative fact is the commit): `spec_gate.py` runs on every commit, not only source commits. For each staged `docs/work/*/README.md`, it reads the staged frontmatter status from the index and the HEAD status with `git show HEAD:<path>` (absent for a new file). When `entering_gated` is true, it runs `spec_check.py --require-sections` on the staged tree and rejects the commit on any CK-47, CK-48 or CK-49 finding. A draft, a shipped item, or a commit that leaves the status unchanged is not gated; the standalone checker reports a missing section there as a warning only. A git error or an unreadable status is a rejection (fail closed).
 
 Cell rules (each failing cell is one finding, rule `CK-48` or `CK-49`, line format `rule: README.md: message` as for CK-5):
 
@@ -120,30 +115,30 @@ Reviewer sentence to add to `agents/reviewer.md` (applied by the parent session,
 | FR | Requirement |
 |---|---|
 | FR-1 | `generate()` reads the standard's heading table and emits `References` then `Operating envelope` at the start of both L0 lists, `leading`, and `optional` for experiment, research and bugfix (`Operating envelope`); the counts are pinned by AC-1; `--check` fails on a stale JSON |
-| FR-2 | `required_headings` never requires a heading in the type's `optional` list (nested items included), and omits the `leading` headings for a legacy item (`is_legacy_l0`); CK-4 reports any other missing leading heading |
+| FR-2 | `required_headings` never requires a heading in the type's `optional` list (nested items included); a missing leading heading is a CK-47 warning, and an error under `--require-sections` |
 | FR-3 | `ck47` requires the leading headings present in a README to be the first level-2 headings after an optional `Overview`, in `leading` order; the finding names the offending heading |
 | FR-4 | `ck48` requires the `References` section to hold exactly two tables, Local then Web, each with the exact header (compared case- and whitespace-insensitively like every Row model), at least one row, and rows that pass LocalRefRow and WebRefRow |
 | FR-5 | `ck49` validates the `Operating envelope` section when present: exact header, at least one row, rows that pass EnvelopeRow including the typed observed pointer |
-| FR-6 | An item is legacy only per `is_legacy_l0`; for a legacy item `ck47` emits one `warn: CK-47` line naming the missing sections and the status at the cutoff, and `ck48`, `ck49` and the CK-4 leading check emit nothing; an item with either leading heading, an item not in the list, and an item whose status has passed its status at the cutoff are never legacy |
+| FR-6 | `spec_gate.py` requires the sections exactly when a staged work-item README enters spec-locked or building (`entering_gated`), on any commit including docs-only ones; it runs `spec_check.py --require-sections` and rejects on any CK-47, CK-48 or CK-49 finding; a git or status-read error rejects |
 | FR-7 | The standard, both README templates and the reviewer rating wording carry the sections, tables, vocabularies and rule; a test reads them and compares with the constants |
-| FR-8 | CK-47 binds at ALWAYS (the legacy notice, for statuses draft, spec-locked, building, shipped) and runs its order check at the STATIC statuses only; CK-48 and CK-49 bind at STATIC; a `killed` or `promoted` item gets no notice and no check |
+| FR-8 | CK-47, CK-48 and CK-49 bind at STATIC; present sections are always fully checked (malformed is an error); a missing section is a warning unless `--require-sections`; a `killed` or `promoted` item gets no check |
 | FR-9 | `resolve_citation` resolves every LOCAL_CITE token as defined above; unresolved is an error at `spec-locked` and `building`, a warning at `shipped` |
-| FR-10 | The schema layer rejects a `created` that is not a real calendar date as a CK-1 finding, before any other rule; a CK-1 failure ends the run, so such an item is never legacy |
+| FR-10 | The schema layer rejects a `created` that is not a real calendar date as a CK-1 finding, before any other rule; a CK-1 failure ends the run |
 
 ### Data
-Reads: the README body through `Doc` (level-2 headings, tables), frontmatter `type`, `status`, `parent`; `contracts/work-item.headings.v2.json`; `contracts/work-item.legacy-l0.v1.json`; the cited files. The authoritative sources: the heading table and the sentence naming the leading headings in the standard (for the heading config); the frozen list, generated once from the folders on disk, for legacy status (the author cannot edit it; `created` is no longer read for this); the cited file itself for citation resolution. Writes: nothing at check time. The generators write the three generated files once.
+Reads: the README body through `Doc` (level-2 headings, tables), frontmatter `type`, `status`, `parent`; `contracts/work-item.headings.v2.json`; the cited files; for the gate, the staged and HEAD versions of each work-item README. The authoritative sources: the heading table and the sentence naming the leading headings in the standard (for the heading config); the commit itself (staged index versus HEAD) for whether the sections are required, which no author-editable field or list can change; the cited file itself for citation resolution. Writes: nothing at check time. The heading generator writes its config; nothing else is generated.
 
 Standard text added (the Implementer writes the prose; this is its required content):
 1. L0 description: `## References` and `## Operating envelope` are items 1 and 2 of the section order, after the optional `## Overview` and before `## Purpose`; each table's exact header and cell rules (the tables above); the typed observed pointer; the `If violated` vocabulary with its four definitions and the statement that it is checked syntactically only.
 2. L0 full and lite heading lists begin with `References`, `Operating envelope`.
 3. Heading table rows: refactor gains both; bugfix, research and experiment gain `References` and the notation `(optional: `Operating envelope`)`; the sentence naming the leading headings.
 4. Per-type profile table: a References/envelope column (feature, integration, data-collection, refactor: required/required; experiment, research, bugfix: required/optional).
-5. Checker rules: rows CK-47, CK-48, CK-49 with pass and fail fixtures; line 23 becomes CK-1..CK-49; the ALWAYS and STATIC lists at line 326 gain CK-47 (ALWAYS) and CK-48, CK-49 (STATIC); the CK-4 row notes the legacy exclusion and the CK-1 row notes the real-date check.
+5. Checker rules: rows CK-47, CK-48, CK-49 with pass and fail fixtures; line 23 becomes CK-1..CK-49; the ALWAYS and STATIC lists at line 326 gain CK-47 (ALWAYS) and CK-48, CK-49 (STATIC); the CK-1 row notes the real-date check; the spec gate row notes the transition trigger.
 6. Migration section (below).
 7. A short section "Reviewer rating against the envelope": a finding that needs an envelope assumption broken is rated F, not R, unless the assumption can break silently; then a cheap detector (a check that ends in keep, refuse, flag or defer) is required and its absence is rated R. A spec that rebuilds something its References list as working, without a stated reason, is flagged. The reviewer opens each cited local line and spot-checks a web citation.
 8. `wrap` means extend in place; `extract` means lift the code into the new thing (so the Decision words cover all reuse).
 
-Migration (chosen: a frozen list of the items that exist at the cutoff, not a per-item flag and not the `created` date): `scripts/gen_legacy_l0.py --write` runs once, before any change to `spec_check.py`, and records every README under the walk roots that has neither section, with its status at that moment. An item is legacy only while its folder is in the list, it still has neither heading, and its status has not passed the recorded one. Effects: a recorded draft warns while it is a draft and is strict from `spec-locked` (the Spindle drafts branch-conventions, claim-registry and worktree-reaper must convert before they are locked); a recorded `building` item warns until it ships. Adding either heading ends legacy at once, so whoever touches an item to add one must add both. Back-dating `created` or adding a key changes nothing, because neither is read. The list is write-once and digest-checked; nothing is edited in the existing items. Reason against a `legacy-l0: true` flag or a date cutoff: both are facts the author of the item can edit.
+Migration (chosen: bind on the commit transition, owner-approved scope cut 2026-10-31; no exemption list, no date cutoff, no flag): nothing is grandfathered and nothing finished is rewritten. Existing items keep passing when checked standalone (a missing section is a warning). A commit that moves an item into spec-locked or building must add valid sections, so the Spindle drafts (branch-conventions, claim-registry, worktree-reaper) convert when they lock. Items already at building (spec-gate, spec-gate-checker, fleet-docs-home) are not gated until a later move into a gated status, and shipped is not gated. Rejected: a `created`-date cutoff and a `legacy-l0` flag (both author-editable) and a frozen generated list (regenerating it silently re-grandfathers new items; review round 2, NEW-2).
 
 ### Failure modes
 | Failure | Detection | Handling |
@@ -151,11 +146,10 @@ Migration (chosen: a frozen list of the items that exist at the cutoff, not a pe
 | a References or envelope table does not parse as a table | zero tables in the section | CK-48 or CK-49 error, exit 1 |
 | a cell is outside its vocabulary or form | the Row model validator | one finding per cell, naming rule, row and column |
 | a cited path does not exist, is too large, or has fewer lines than cited | `resolve_citation` | CK-48 or CK-49 error at spec-locked and building, warning at shipped |
-| `created` is missing or not a real date | CK-1 (schema layer plus `date.fromisoformat`; runs first) | CK-1 error and no further rules, so the item is never legacy |
-| the frozen list is missing or its digest does not match | `load_legacy_index` | ToolError, exit 2, the gate rejects (never treated as empty) |
+| `created` is missing or not a real date | CK-1 (schema layer plus `date.fromisoformat`; runs first) | CK-1 error and no further rules |
+| the gate cannot read the HEAD or staged status of a README | `git show` error, or no status | the commit is rejected (fail closed) |
 | `leading` missing from the heading config | key lookup at start | error exit 2 naming the key; the gate rejects (never defaults to lenient) |
 | the committed config is stale | `gen_heading_config.py --check` exits 1 | the gate fails |
-| a generator would overwrite its frozen output | file exists | exit 1, nothing written |
 | node helper missing or timed out | existing ToolError | exit 2, the gate rejects |
 
 ### Budget
