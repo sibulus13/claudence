@@ -7,10 +7,11 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from datetime import date
 from typing import ClassVar
 
 from markdown_it import MarkdownIt
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, ValidationInfo, field_validator
 
 MD = MarkdownIt("commonmark").enable("table")
 NFR_KINDS = ("fault-injection", "latency-bench", "cost-budget", "extensibility", "fitness", "observability",
@@ -210,6 +211,138 @@ class FrRow(Row):
     HEADER, RULE = ["FR", "Requirement"], "CK-13"
     fr: str = Field(pattern=r"^FR-\d+$", json_schema_extra=ck("CK-13"))
     requirement: str = Field(min_length=1, json_schema_extra=ck("CK-13"))
+
+
+# References and Operating envelope (docs/work/spec-references-envelope)
+LOCAL_STATUSES = ("working", "partial", "broken")
+DECISIONS = ("extract", "wrap", "replace", "ignore")
+VIOLATED = ("keep", "refuse", "flag", "defer")
+NO_OBSERVATION = ("-", "n/a", "none", "tbd", "todo", "assumed")
+# A bare citation: a path whose extension starts with a letter (so `3.5:1`, `v1.2:3`, `127.0.0.1:8080` are prose), not
+# glued to a longer token. A path with a space is cited whole inside backticks.
+LOCAL_CITE = re.compile(r"(?<![\w./\\:-])(?:[A-Za-z]:[\\/]|~/|/)?[\w.-]+(?:[\\/][\w.-]+)*\.[A-Za-z]\w*:\d+(?:-\d+)?"
+                        r"(?!\w)")  # prose may follow: "a.md:29: text", "a.md:29."
+QUOTED_CITE = re.compile(r"`([^`\n]+?\.[A-Za-z]\w*:\d+(?:-\d+)?)`")
+URLS = re.compile(r"https?://\S+")
+OBSERVED_POINTER = re.compile(rf"{EVIDENCE_TOKEN}|{LOCAL_CITE.pattern}|`[^`]+`|https?://\S+")
+URL = re.compile(r"^https?://[^\s<>]+$")
+NONE_FOUND = "none found"
+
+
+def citations(cell: str) -> list[str]:
+    """Every `path.ext:line[-line]` a cell cites: whole backticked spans first, then bare ones outside backticks and URLs."""
+    quoted = QUOTED_CITE.findall(cell)
+    rest = URLS.sub(" ", QUOTED_CITE.sub(" ", cell))
+    return quoted + LOCAL_CITE.findall(rest)
+
+
+def word_reason(v: str, words: tuple[str, ...], what: str) -> str:
+    m = re.match(r"^([a-z/]+): (\S.*)$", v)
+    if not m or m.group(1) not in words:
+        raise ValueError(f"must be `word: reason` with word one of {', '.join(words)} ({what})")
+    return v
+
+
+class LocalRefRow(Row):
+    HEADER = ["Source (file:line)", "Status (working / partial / broken)", "What it shows",
+              "Decision (extract / wrap / replace / ignore) + reason"]
+    RULE = "CK-48"
+    source: str = Field(min_length=1, json_schema_extra=ck("CK-48"))
+    status: str = Field(min_length=1, json_schema_extra=ck("CK-48"))
+    shows: str = Field(min_length=1, json_schema_extra=ck("CK-48"))
+    decision: str = Field(min_length=1, json_schema_extra=ck("CK-48"))
+
+    @property
+    def none_found(self) -> bool:
+        return self.source.lower() == NONE_FOUND
+
+    @field_validator("source")
+    @classmethod
+    def cites(cls, v: str) -> str:
+        if v.lower() != NONE_FOUND and not citations(v):
+            raise ValueError("needs a `path.ext:line` citation, or exactly `none found`")
+        return v
+
+    @field_validator("status")
+    @classmethod
+    def known_status(cls, v: str, info: ValidationInfo) -> str:
+        none = str(info.data.get("source", "")).lower() == NONE_FOUND
+        if (none and v != "-") or (not none and v not in LOCAL_STATUSES):
+            raise ValueError(f"must be one of {', '.join(LOCAL_STATUSES)} (exactly `-` on a `none found` row)")
+        return v
+
+    @field_validator("shows")
+    @classmethod
+    def search_named(cls, v: str, info: ValidationInfo) -> str:
+        if str(info.data.get("source", "")).lower() == NONE_FOUND and not re.match(r"^Searched \S*/\S*.*`[^`]+`", v):
+            raise ValueError("a `none found` row must say `Searched <path> for `<pattern>``")
+        return v
+
+    @field_validator("decision")
+    @classmethod
+    def decided(cls, v: str, info: ValidationInfo) -> str:
+        none = str(info.data.get("source", "")).lower() == NONE_FOUND
+        return word_reason(v, ("n/a",) if none else DECISIONS, "n/a on a `none found` row")
+
+
+class WebRefRow(Row):
+    HEADER, RULE = ["Source (URL)", "Date checked", "What it shows", "Decision"], "CK-48"
+    source: str = Field(min_length=1, json_schema_extra=ck("CK-48"))
+    date_checked: str = Field(min_length=1, json_schema_extra=ck("CK-48"))
+    shows: str = Field(min_length=1, json_schema_extra=ck("CK-48"))
+    decision: str = Field(min_length=1, json_schema_extra=ck("CK-48"))
+
+    @field_validator("source")
+    @classmethod
+    def url_or_na(cls, v: str) -> str:
+        if not (URL.match(v) or re.match(r"^n/a: \S", v)):
+            raise ValueError("must be an http(s) URL with no angle brackets, or `n/a: <reason>`")
+        return v
+
+    @field_validator("date_checked")
+    @classmethod
+    def real_past_date(cls, v: str, info: ValidationInfo) -> str:
+        if str(info.data.get("source", "")).startswith("n/a"):
+            if v != "-":
+                raise ValueError("must be exactly `-` on an `n/a` row")
+            return v
+        try:
+            day = date.fromisoformat(v) if re.match(r"^\d{4}-\d{2}-\d{2}$", v) else None
+        except ValueError:
+            day = None
+        if day is None:
+            raise ValueError("must be a real date YYYY-MM-DD")
+        if day > date.today():
+            raise ValueError(f"{v} is in the future")
+        return v
+
+    @field_validator("decision")
+    @classmethod
+    def decided(cls, v: str, info: ValidationInfo) -> str:
+        if str(info.data.get("source", "")).startswith("n/a"):
+            if v != "-":
+                raise ValueError("must be exactly `-` on an `n/a` row")
+            return v
+        return word_reason(v, DECISIONS, "web reference")
+
+
+class EnvelopeRow(Row):
+    HEADER, RULE = ["Assumption", "How it is observed (not hoped)", "If violated"], "CK-49"
+    assumption: str = Field(min_length=1, json_schema_extra=ck("CK-49"))
+    observed: str = Field(min_length=1, json_schema_extra=ck("CK-49"))
+    violated: str = Field(min_length=1, json_schema_extra=ck("CK-49"))
+
+    @field_validator("observed")
+    @classmethod
+    def typed_pointer(cls, v: str) -> str:
+        if v.lower() in NO_OBSERVATION or not OBSERVED_POINTER.search(v):
+            raise ValueError("needs a typed pointer: AC-n, config:/decision:, path.ext:line, a backticked command, or a URL")
+        return v
+
+    @field_validator("violated")
+    @classmethod
+    def fail_safe(cls, v: str) -> str:
+        return word_reason(v, VIOLATED, "checked syntactically only")
 
 
 def norm(cells: list[str]) -> list[str]:

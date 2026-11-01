@@ -230,13 +230,21 @@ def test_ac6_v2_trailer_naming_missing_or_misshapen_path_is_rejected(repo2: Path
     assert r.returncode != 0 and reason in r.stderr
 
 
+def seed_status(repo: Path, status: str) -> None:
+    """Make `status` the HEAD state without the hook (the lifecycle forbids reaching some of them from building)."""
+    set_status(repo, status)
+    git(repo, "add", "-A")
+    git(repo, "commit", "-qm", f"chore: seed {status}", "--no-verify", "--allow-empty")
+
+
 @pytest.mark.parametrize("status", ["draft", "spec-locked", "killed", "promoted"])
 def test_ac6_v2_source_commit_needs_a_building_or_shipped_item(repo2: Path, status: str) -> None:
     # spec-gate/AC-6
-    set_status(repo2, status)
+    seed_status(repo2, status)
     write(repo2, "src/app.py", "x = 2\n")
     r = commit(repo2, "-am", f"feat: x\n\n{TRAILER}")
-    assert r.returncode != 0 and "CK-26" in r.stderr
+    # promoted on a feature is also invalid frontmatter (CK-1), which the lifecycle gate may report first
+    assert r.returncode != 0 and ("CK-26" in r.stderr or (status == "promoted" and "CK-1" in r.stderr)), r.stderr
 
 
 def test_ac6_v2_an_invalid_building_item_is_rejected_with_the_checkers_problems(repo2: Path) -> None:
@@ -261,7 +269,8 @@ def test_ac7_v2_building_and_shipped_items_let_a_source_commit_land(repo2: Path)
 
 def test_ac7_v2_spec_locked_item_is_fine_on_an_exempt_commit_but_a_broken_one_is_not(repo2: Path) -> None:
     # spec-gate/AC-7
-    set_status(repo2, "spec-locked")
+    seed_status(repo2, "spec-locked")
+    write(repo2, "tests/red_test.txt", "demo/AC-1\n")
     git(repo2, "add", "-A")
     assert commit(repo2, "-m", f"test: red tests\n\n{TRAILER}").returncode == 0
     p = repo2 / README_REL

@@ -1,0 +1,19 @@
+{
+  "$comment": "Work-item status lifecycle (owner-approved 2026-10-31). The spec gate rejects any status move that is not an edge here. Work item: docs/work/spec-references-envelope.",
+  "version": 1,
+  "initial": "draft",
+  "states": ["draft", "spec-locked", "building", "shipped", "killed", "promoted"],
+  "edges": [
+    ["draft", "spec-locked"],
+    ["spec-locked", "draft"],
+    ["spec-locked", "building"],
+    ["building", "shipped"],
+    ["draft", "killed"],
+    ["spec-locked", "killed"],
+    ["building", "killed"],
+    ["shipped", "killed"]
+  ],
+  "typeEdges": {
+    "experiment": [["draft", "promoted"], ["spec-locked", "promoted"], ["building", "promoted"], ["shipped", "promoted"]]
+  }
+}

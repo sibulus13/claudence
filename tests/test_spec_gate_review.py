@@ -64,7 +64,8 @@ def test_the_staged_version_of_the_readme_is_what_counts(repo2: Path) -> None:
     set_status(repo2, "draft")  # staged draft, so rejected even though HEAD says building
     git(repo2, "add", README_REL)
     r = staged_only_src_commit(repo2)
-    assert r.returncode != 0 and "CK-26" in r.stderr
+    # the staged status is what is judged: the lifecycle gate rejects the staged move building -> draft first
+    assert r.returncode != 0 and ("CK-26" in r.stderr or "move not allowed: building -> draft" in r.stderr), r.stderr
 
 
 # ---- finding 2: detached HEAD fails closed ----

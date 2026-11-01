@@ -31,10 +31,12 @@ def names(text: str) -> list[str]:
 def readme_entry(cell: str, l0: dict[str, list[str]]) -> dict:
     conditional = [{"heading": m.group(1), "status": m.group(2)}
                    for m in re.finditer(r"\(`([^`]+)` added when status is `([^`]+)`\)", cell)]
+    optional = [h for m in re.finditer(r"\(optional: ([^)]*)\)", cell) for h in names(m.group(1))]
     cell = re.sub(r"\([^)]*\)", "", cell)
     base = next((l0[k] for k in ("full", "lite") if f"L0 {k}" in cell), [])
     entry = {"headings": [*base, *names(cell)]}
-    return {**entry, **({"conditional": conditional} if conditional else {})}
+    return {**entry, **({"conditional": conditional} if conditional else {}),
+            **({"optional": optional} if optional else {})}
 
 
 def file_entries(cell: str) -> list[dict]:
@@ -58,6 +60,7 @@ def generate(standard: Path = STANDARD) -> dict:
                  if hasattr(t, "text") and "L0 full" in t.text)
     full, lite = (names(re.search(rf'"L0 {k}"(?: headings)?:([^.]*)\.', intro).group(1)) for k in ("full", "lite"))
     l0 = {"full": full, "lite": lite}
+    leading = names(re.search(r"The leading headings, in order[^:]*:([^(]*)\(", intro).group(1))
     tables = [t for s in doc.sections(3) if s.title.startswith("Required headings per type") for t in s.tables]
     readme, nested, files = {}, [], {}
     for row in tables[0].rows:
@@ -67,15 +70,26 @@ def generate(standard: Path = STANDARD) -> dict:
             readme[row[0]] = readme_entry(row[1], l0)
     for row in tables[1].rows:
         files[row[0].strip("`")] = file_entries(row[1])
-    return {"source": "skills/dark-factory/WORK-ITEM-STANDARD.md", "l0": l0, "readme": readme, "nestedBase": nested,
-            "files": files}
+    return {"source": "skills/dark-factory/WORK-ITEM-STANDARD.md", "l0": l0, "leading": leading, "readme": readme,
+            "nestedBase": nested, "files": files}
+
+
+def render(standard: Path = STANDARD) -> str:
+    return json.dumps(generate(standard), indent=2) + "\n"
+
+
+def stale(output: Path = OUTPUT, standard: Path = STANDARD) -> str:
+    """`stale` when the committed config differs from a fresh generation, else an empty string."""
+    return "" if output.read_text(encoding="utf-8") == render(standard) else "stale"
 
 
 def main(argv: list[str]) -> int:
-    text = json.dumps(generate(), indent=2) + "\n"
     if "--check" in argv:
-        return 0 if OUTPUT.read_text(encoding="utf-8") == text else 1
-    OUTPUT.write_text(text, encoding="utf-8", newline="\n")
+        verdict = stale()
+        if verdict:
+            print(f"{OUTPUT.name} is {verdict}: run python scripts/gen_heading_config.py", file=sys.stderr)
+        return 1 if verdict else 0
+    OUTPUT.write_text(render(), encoding="utf-8", newline="\n")
     return 0
 
 

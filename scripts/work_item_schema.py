@@ -31,4 +31,11 @@ def message_of(error) -> str:
 def findings(frontmatter: dict) -> list[tuple[str, str]]:
     """(rule id, message) for every schema violation, in a stable order."""
     errors = sorted(VALIDATOR.iter_errors(frontmatter), key=lambda e: [str(p) for p in e.absolute_path])
-    return list(dict.fromkeys((rule_of(e), message_of(e)) for e in errors))
+    found = list(dict.fromkeys((rule_of(e), message_of(e)) for e in errors))
+    created = frontmatter.get("created")
+    if isinstance(created, str) and len(created) == len("YYYY-MM-DD"):
+        try:
+            datetime.date.fromisoformat(created)
+        except ValueError:
+            found.append((FALLBACK_RULE, f"`created` {created} is not a real date"))  # the schema pattern alone accepts it
+    return found

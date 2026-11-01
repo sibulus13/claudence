@@ -11,6 +11,7 @@ accepted until migration ends.
 """
 from __future__ import annotations
 
+import json
 import re
 import subprocess
 import sys
@@ -18,6 +19,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import spec_check  # noqa: E402
+import yaml  # noqa: E402
 
 SOURCE = re.compile(r"(\.(py|[cm]?[jt]sx?|ps1|psm1|lua|go|rs|sh|bat|cmd|rb|java|cs|php|sql|vbs|vue|svelte|html|css|"
                     r"c|cc|cpp|h|hpp|kt|kts|swift|scala|ex|exs|ipynb|m|r|pl|tf)|(^|/)Dockerfile)$", re.I)
@@ -55,7 +57,111 @@ def default_branch() -> str | None:
     return next((b for b in ("main", "master") if b in branches), None)
 
 
+LIFECYCLE = json.loads((spec_check.CLAUDE / "contracts" / "work-item.lifecycle.v1.json").read_text(encoding="utf-8"))
+LEADING = re.compile(r"^## (References|Operating envelope)\s*$", re.M | re.I)
+WARNINGS: list[str] = []  # printed by main; a warning never blocks the commit
+
+
+MERGING = ("MERGE_HEAD", "SQUASH_MSG")  # a merge or squash commit carries several commits' moves at once
+
+
+def frontmatter_of(text: str | None) -> dict | None:
+    """The frontmatter read the same way the checker reads it (yaml); None when absent or unreadable."""
+    m = re.match(r"^---\r?\n(.*?)\r?\n---", text or "", re.S)
+    try:
+        fm = yaml.safe_load(m.group(1)) if m else None
+    except yaml.YAMLError:
+        return None
+    return fm if isinstance(fm, dict) else None
+
+
+def status_of(text: str | None) -> str | None:
+    fm = frontmatter_of(text)
+    return str(fm["status"]) if fm and fm.get("status") is not None else None
+
+
+def head_text(path: str) -> str | None:
+    """The HEAD version of a file; None when it is absent, HEAD is unborn, or the object cannot be read."""
+    if subprocess.run(["git", "cat-file", "-e", f"HEAD:{path}"], capture_output=True, timeout=GIT_TIMEOUT_S).returncode:
+        return None
+    try:
+        return git("show", f"HEAD:{path}")
+    except GateError:
+        return None  # an unreadable HEAD version counts as absent, so a commit that repairs it is not blocked
+
+
+def reachable(frm: str, item_type: str) -> set[str]:
+    """Every state a chain of allowed moves reaches from `frm`, `frm` included."""
+    edges = LIFECYCLE["edges"] + LIFECYCLE["typeEdges"].get(item_type, [])
+    seen, todo = {frm}, [frm]
+    while todo:
+        here = todo.pop()
+        for a, b in edges:
+            if a == here and b not in seen:
+                seen.add(b)
+                todo.append(b)
+    return seen
+
+
+def move_allowed(frm: str | None, to: str, item_type: str, *, merging: bool) -> bool:
+    """One commit makes one move; a merge or squash may carry a chain of them (each was gated on its own branch)."""
+    if frm is None:
+        return merging or to == LIFECYCLE["initial"]
+    if merging:
+        return to in reachable(frm, item_type)
+    edges = LIFECYCLE["edges"] + LIFECYCLE["typeEdges"].get(item_type, [])
+    return frm == to or [frm, to] in edges
+
+
+def staged_readmes() -> list[tuple[str, str]]:
+    """(staged path, HEAD path) per added, changed or renamed work-item README; a rename is a move, never a creation."""
+    out = git("diff", "--cached", "--name-status", "-M", "-z", "--diff-filter=ACMR").split("\0")
+    pairs, i = [], 0
+    while i < len(out) - 1:
+        kind = out[i]
+        if kind.startswith(("R", "C")):
+            old, new, i = out[i + 1], out[i + 2], i + 3
+        else:
+            old = new = out[i + 1]
+            i += 2
+        if WORK_ITEM.match(new):
+            pairs.append((new, old if kind.startswith("R") else new))
+    return pairs
+
+
+def lifecycle_problem(tree: spec_check.Tree, readmes: list[tuple[str, str]], merging: bool) -> str | None:
+    """Every staged work-item README makes an allowed move and passes its tier (contracts/work-item.lifecycle.v1.json)."""
+    for path, head_path in readmes:
+        status = status_of(tree.read(path))
+        head = head_text(head_path)
+        head_fm = frontmatter_of(head)
+        before = status_of(head)
+        moved = head is None or before != status
+        if status not in LIFECYCLE["states"]:
+            if moved:
+                return f"{path}: status `{status}` is not a lifecycle state ({', '.join(LIFECYCLE['states'])})"
+            WARNINGS.append(f"warn: {path}: status `{status}` is not a lifecycle state; fix it when the item next moves")
+            continue
+        repair = head is not None and before not in LIFECYCLE["states"]  # an unreadable HEAD status may be repaired
+        # The committed type decides the type edges, so retyping cannot unlock a move in the same commit.
+        item_type = str((head_fm or spec_check.Item(tree, path).fm or {}).get("type"))
+        if not repair and not move_allowed(before if head is not None else None, status, item_type, merging=merging):
+            hint = "; a new item starts at draft (a folder rename is detected as a move)" if head is None else ""
+            return f"{path}: move not allowed: {before or '(new)'} -> {status}{hint}"
+        errors, warnings = spec_check.check_work_item(tree, path, require_sections=True)
+        historical = not moved and head is not None and not LEADING.search(head)
+        if errors and not historical:
+            return f"{path} is not committable: {'; '.join(errors[:4])}"
+        WARNINGS.extend(f"warn: {e}" for e in errors)
+    return None
+
+
 def reason_to_reject(message: str) -> str | None:
+    root = Path(git("rev-parse", "--show-toplevel").strip())
+    merging = any(Path(git("rev-parse", "--git-path", name).strip()).exists() for name in MERGING)
+    lifecycle = lifecycle_problem(spec_check.IndexTree(root), staged_readmes(), merging)  # first, on every branch
+    if lifecycle:
+        return lifecycle
     if any(Path(git("rev-parse", "--git-path", name).strip()).exists() for name in IN_PROGRESS):
         return None  # concluding a merge/rebase/cherry-pick/revert: the replayed commits carry their own specs
     branch = git("symbolic-ref", "-q", "--short", "HEAD", ok_codes=(0, 1)).strip()
@@ -127,6 +233,8 @@ def main(argv: list[str]) -> int:
         why = reason_to_reject(Path(argv[0]).read_text(encoding="utf-8", errors="replace"))
     except (GateError, OSError, spec_check.ToolError, subprocess.TimeoutExpired) as e:
         why = f"gate error, so the commit is rejected (fails closed): {e}"
+    for line in WARNINGS:
+        print(f"spec-gate: {line}", file=sys.stderr)
     if why:
         print(f"spec-gate: {why}", file=sys.stderr)
         return 1

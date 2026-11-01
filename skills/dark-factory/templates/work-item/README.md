@@ -33,6 +33,26 @@ flowchart TD
   M1[M1 contracts] --> M2[M2 components] --> M3[M3 integration]
 ```
 
+## References
+
+### Local
+
+| Source (file:line) | Status (working / partial / broken) | What it shows | Decision (extract / wrap / replace / ignore) + reason |
+|---|---|---|---|
+| EXAMPLE D:/repo/<theme>/<repo>/src/<file>.js:<line> | working | EXAMPLE: the working code for the same role | extract: EXAMPLE lift it instead of rebuilding |
+
+### Web
+
+| Source (URL) | Date checked | What it shows | Decision |
+|---|---|---|---|
+| EXAMPLE https://<convention or tool docs> | YYYY-MM-DD | EXAMPLE: the current convention | wrap: EXAMPLE adopt it |
+
+## Operating envelope
+
+| Assumption | How it is observed (not hoped) | If violated |
+|---|---|---|
+| EXAMPLE one machine, one orchestrator | EXAMPLE AC-<n> | refuse: EXAMPLE reject and report a named reason |
+
 ## Purpose
 <One paragraph for the owner: the problem and the outcome.>
 

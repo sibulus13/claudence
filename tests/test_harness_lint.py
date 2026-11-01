@@ -22,7 +22,10 @@ def git(root: Path, *args: str) -> None:
 
 
 @pytest.fixture
-def root(tmp_path: Path) -> Path:
+def root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    # isolate from the real fleet docs: FLEET_DOCS is set for real since 2026-10-31
+    (tmp_path / "fleet-empty").mkdir()
+    monkeypatch.setenv("FLEET_DOCS", str(tmp_path / "fleet-empty"))
     r = tmp_path / "claude"
     (r / "projects" / "proj" / "memory").mkdir(parents=True)
     (r / "CLAUDE.md").write_text("# global\nsee [rules](rules/a.md)\n", encoding="utf-8")

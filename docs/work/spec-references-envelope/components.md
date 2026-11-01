@@ -32,7 +32,8 @@ LOCAL_STATUSES = ("working", "partial", "broken")
 DECISIONS      = ("extract", "wrap", "replace", "ignore")
 VIOLATED       = ("keep", "refuse", "flag", "defer")
 NO_OBSERVATION = ("-", "n/a", "none", "tbd", "todo", "assumed")   # whole-cell, case-insensitive
-LOCAL_CITE     : re.Pattern   # one token "path.ext:line" or "path.ext:line-line"; shared by Local Source and Envelope observed
+LOCAL_CITE     : re.Pattern   # one bare token "path.ext:line[-line]"; the extension starts with a letter, so 3.5:1, v1.2:3 and 127.0.0.1:8080 are prose
+citations(cell) -> list[str]  # whole backticked `path with space.ext:line` spans first, then bare LOCAL_CITE tokens outside backticks and URLs
 OBSERVED_POINTER : re.Pattern # EVIDENCE_TOKEN | LOCAL_CITE | a backticked command | an http(s) URL
 MAX_CITED_BYTES = 5_000_000   # a cited file larger than this is an error "too large to verify"
 
@@ -67,8 +68,8 @@ def ck49(item: Item, rep: Report) -> None            # Operating envelope sectio
 LIFECYCLE = "contracts/work-item.lifecycle.v1.json"   # {initial, states, edges: [[from, to], ...], typeEdges: {experiment: [["*", "promoted"]]}}
 def staged_item(tree: IndexTree, path: Path) -> Item   # yaml Item loader over the staged blob; unreadable or out-of-enum status raises
 def head_status(path: Path) -> str | None            # None when absent at HEAD (git cat-file -e) or HEAD is unborn
-def move_allowed(frm: str | None, to: str, item_type: str) -> bool   # (None, draft) or an edge of the lifecycle file
-def preexisting(path: Path) -> bool                   # the README existed at the commit that landed this item (git merge-base check)
+def move_allowed(frm: str | None, to: str, item_type: str, *, merging: bool) -> bool   # (None, draft) or one edge; in a merge or squash, any state reachable by edges (and any state for a new item)
+def historical(head_text: str | None, moved: bool) -> bool   # no status move and the HEAD version has neither leading section
 ```
 
 Config and data contracts (all generated; none hand-written):
@@ -81,18 +82,18 @@ Config and data contracts (all generated; none hand-written):
 
 The walk roots for the one-shot AC-9 gate: `D:/repo/*/*/docs/work` (this includes `D:/repo/Lib/*/docs/work`), `D:/repo/*/docs/work`, and `~/.claude/docs/work`, derived from `fleet_paths.REPO_ROOT`. A root that does not exist fails the gate, never skipped.
 
-Lifecycle rule (the state machine is data; guards attach to its transitions): `spec_gate.py` runs this check FIRST, before its default-branch and merge or rebase early returns, on every commit. For each staged `docs/work/*/README.md` it reads the staged status with the yaml Item loader and the HEAD status (`head_status`). (1) The move must satisfy `move_allowed`; otherwise reject, naming the move. (2) The staged status must pass its tier (`spec_check.py` at that status, with `--require-sections` from spec-locked on), unless the status did not change and `preexisting` is true, in which case the findings are warnings. An unreadable or out-of-enum staged status rejects; an unreadable HEAD version counts as absent.
+Lifecycle rule (the state machine is data; guards attach to its transitions): `spec_gate.py` runs this check FIRST, before its default-branch and merge or rebase early returns, on every commit. For each staged `docs/work/*/README.md` it reads the staged status with the yaml Item loader and the HEAD status (`head_status`). (1) The move must satisfy `move_allowed`; otherwise reject, naming the move. A merge or squash commit (MERGE_HEAD or SQUASH_MSG present) carries a chain of moves that were each gated on their branch, so it accepts any state reachable from the HEAD status (review finding 1, 2026-10-31). A rename (`git diff -M`) is compared with the HEAD version at its old path, so it is a move, never a creation. The HEAD type decides the type edges, so retyping cannot unlock `promoted` in the same commit. An unreadable HEAD status may be repaired to any lifecycle state; the tier check still applies. (2) The staged status must pass its tier (`spec_check.py` at that status, with `--require-sections` from spec-locked on), unless the status did not change and the HEAD version has neither leading section (a historical item), in which case the findings are warnings. An unreadable or out-of-enum staged status rejects; an unreadable HEAD version counts as absent.
 
 Cell rules (each failing cell is one finding, rule `CK-48` or `CK-49`, line format `rule: README.md: message` as for CK-5):
 
 | Table | Cell | Accepts | Rejects |
 |---|---|---|---|
-| Local | Source | exactly `none found`, or text containing one or more LOCAL_CITE tokens (the path may start with a drive letter and may use `/` or `\`) | anything else |
+| Local | Source | exactly `none found`, or text containing one or more `citations()` tokens (the path may start with a drive letter and may use `/` or `\`; a path with a space is cited inside backticks) | anything else |
 | Local | Status | one of LOCAL_STATUSES; exactly `-` on a `none found` row | other words |
 | Local | What it shows | non-empty; on a `none found` row it must start `Searched`, then a path containing `/`, then a backtick-quoted pattern | empty; a `none found` row with no search |
 | Local | Decision | `word: reason` with word in DECISIONS and a non-empty reason; `n/a: reason` on a `none found` row only | a bare word, other words, an empty reason |
 | Local | row set | a `none found` row is the only row of the table | `none found` beside other rows |
-| Local, Envelope | every LOCAL_CITE token in Source, What it shows, and How it is observed | resolves per `resolve_citation` (below) | a token that does not resolve |
+| Local, Envelope | every `citations()` token in Source, What it shows, and How it is observed | resolves per `resolve_citation` (below) | a token that does not resolve |
 | Web | Source | `http://` or `https://` followed by non-space characters, with no angle brackets; or `n/a: reason` | a bare domain, text |
 | Web | Date checked | a real calendar date `YYYY-MM-DD` no later than today (`date.fromisoformat` and a comparison with `date.today()`); exactly `-` on an `n/a` row | other formats, impossible dates, a future date |
 | Web | What it shows, Decision | Decision uses the same `word: reason` form; both are exactly `-` on an `n/a` row | empty cells |
@@ -124,7 +125,7 @@ Reviewer sentence to add to `agents/reviewer.md` (applied by the parent session,
 | FR-6 | `spec_gate.py`, before its branch and in-progress early returns, checks every staged work-item README: the status move must be an edge of `contracts/work-item.lifecycle.v1.json` (creation only as draft), and the staged status must pass its tier; a pre-existing README whose status did not change only warns; an unreadable or out-of-enum status rejects |
 | FR-7 | The standard, both README templates and the reviewer rating wording carry the sections, tables, vocabularies and rule; a test reads them and compares with the constants |
 | FR-8 | CK-47, CK-48 and CK-49 bind at STATIC; present sections are always fully checked (malformed is an error); a missing section is a warning unless `--require-sections`; a `killed` or `promoted` item gets no check |
-| FR-9 | `resolve_citation` resolves every LOCAL_CITE token as defined above; unresolved is an error at `spec-locked` and `building`, a warning at `shipped` |
+| FR-9 | `resolve_citation` resolves every `citations()` token as defined above; unresolved is an error at `spec-locked` and `building`, a warning at `shipped` |
 | FR-10 | The schema layer rejects a `created` that is not a real calendar date as a CK-1 finding, before any other rule; a CK-1 failure ends the run |
 
 ### Data

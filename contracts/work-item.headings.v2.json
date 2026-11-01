@@ -2,6 +2,8 @@
   "source": "skills/dark-factory/WORK-ITEM-STANDARD.md",
   "l0": {
     "full": [
+      "References",
+      "Operating envelope",
       "Purpose",
       "Non-goals",
       "Capabilities",
@@ -12,6 +14,8 @@
       "Gate plan"
     ],
     "lite": [
+      "References",
+      "Operating envelope",
       "Purpose",
       "Non-goals",
       "Capabilities",
@@ -19,9 +23,15 @@
       "Gate plan"
     ]
   },
+  "leading": [
+    "References",
+    "Operating envelope"
+  ],
   "readme": {
     "feature": {
       "headings": [
+        "References",
+        "Operating envelope",
         "Purpose",
         "Non-goals",
         "Capabilities",
@@ -34,6 +44,8 @@
     },
     "integration": {
       "headings": [
+        "References",
+        "Operating envelope",
         "Purpose",
         "Non-goals",
         "Capabilities",
@@ -47,6 +59,8 @@
     },
     "data-collection": {
       "headings": [
+        "References",
+        "Operating envelope",
         "Purpose",
         "Non-goals",
         "Capabilities",
@@ -58,6 +72,7 @@
     },
     "experiment": {
       "headings": [
+        "References",
         "Purpose",
         "Non-goals",
         "Gate plan",
@@ -73,26 +88,39 @@
           "heading": "Promoted to",
           "status": "promoted"
         }
+      ],
+      "optional": [
+        "Operating envelope"
       ]
     },
     "research": {
       "headings": [
+        "References",
         "Question",
         "Sources",
         "Findings",
         "Recommendation"
+      ],
+      "optional": [
+        "Operating envelope"
       ]
     },
     "bugfix": {
       "headings": [
+        "References",
         "Root cause",
         "Observed vs expected",
         "Acceptance criteria",
         "Gate plan"
+      ],
+      "optional": [
+        "Operating envelope"
       ]
     },
     "refactor": {
       "headings": [
+        "References",
+        "Operating envelope",
         "Motivation",
         "What got simpler",
         "Acceptance criteria",
@@ -101,6 +129,8 @@
     }
   },
   "nestedBase": [
+    "References",
+    "Operating envelope",
     "Purpose",
     "Non-goals",
     "Capabilities",

@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import posixpath
 import re
 import subprocess
@@ -31,7 +32,8 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import work_item_schema  # noqa: E402
-from work_item_md import AcRow, CapRow, ChosenRow, Doc, Fence, FrRow, NfrRow, PatternRow, Section, Table, TradeoffRow, parse_rows  # noqa: E402
+from work_item_md import (AcRow, CapRow, ChosenRow, Doc, EnvelopeRow, Fence, FrRow, LocalRefRow, citations, NfrRow,  # noqa: E402
+                          PatternRow, Section, Table, TradeoffRow, WebRefRow, parse_rows)
 
 CLAUDE = Path(__file__).resolve().parents[1]
 HEADINGS = json.loads((CLAUDE / "contracts" / "work-item.headings.v2.json").read_text(encoding="utf-8"))
@@ -44,12 +46,13 @@ LAYER_FILES = {"architecture": "architecture.md", "component": "components.md", 
                "data": "data.md"}
 MAX_ACS = 15
 MAX_PARTICIPANTS = 5
+MAX_CITED_BYTES = 5_000_000  # a cited file larger than this cannot be verified (CK-48, CK-49)
 COMPONENT_H3S = ["Interface", "Functional requirements", "Data", "Failure modes", "Budget"]
 AC_TYPES = {"feature", "integration", "bugfix", "refactor", "data-collection"}  # types that must carry an AC table
 L0_TYPES = {"feature", "integration", "data-collection"}  # types with a Capabilities section
 
 ALWAYS = {"CK-1", "CK-2", "CK-3", "CK-18"}
-STATIC = ALWAYS | {f"CK-{n}" for n in (*range(4, 18), 19, 21, 22, 23)}
+STATIC = ALWAYS | {f"CK-{n}" for n in (*range(4, 18), 19, 21, 22, 23, 47, 48, 49)}
 EXEC = STATIC | {"CK-20", "CK-24"}
 SHIPPED = EXEC | {"CK-25"}
 TIERS = {"draft": ALWAYS, "spec-locked": STATIC, "building": EXEC, "shipped": SHIPPED, "killed": ALWAYS | {"CK-21"},
@@ -324,15 +327,18 @@ class Report:
             self.err(rule, file, msg)
 
 
-def check_item(readme: Path, root: Path | None = None, for_source_commit: bool = False) -> tuple[list[str], list[str]]:
+def check_item(readme: Path, root: Path | None = None, for_source_commit: bool = False,
+               require_sections: bool = False) -> tuple[list[str], list[str]]:
     """Check a work item on disk. Returns (error lines, warning lines). Raises OSError when the README is unreadable."""
     root = (root or readme.resolve().parents[3]).resolve()
     rel = readme.resolve().relative_to(root).as_posix()
-    return check_work_item(DiskTree(root), rel, for_source_commit)
+    return check_work_item(DiskTree(root), rel, for_source_commit, require_sections)
 
 
-def check_work_item(tree: Tree, readme: str, for_source_commit: bool = False) -> tuple[list[str], list[str]]:
+def check_work_item(tree: Tree, readme: str, for_source_commit: bool = False,
+                    require_sections: bool = False) -> tuple[list[str], list[str]]:
     item = Item(tree, readme)
+    item.require_sections = require_sections
     enabled = set(TIERS.get(item.status, ALWAYS)) | ({"CK-26"} if for_source_commit else set())
     rep = Report(enabled)
     if for_source_commit and item.status not in ("building", "shipped"):
@@ -365,7 +371,7 @@ def required_headings(item: Item) -> dict[str, list[tuple[str, str]]]:
     if item.parent:  # a nested spec has the lite L0 plus its type's own headings
         heads = HEADINGS["nestedBase"] + [h for h in heads if h not in HEADINGS["l0"]["full"]]
     heads += [c["heading"] for c in entry.get("conditional", []) if c["status"] == item.status]
-    out = {"README.md": [(h, "CK-4") for h in dict.fromkeys(heads)]}
+    out = {"README.md": [(h, "CK-4") for h in dict.fromkeys(heads) if h not in HEADINGS["leading"]]}
     for layer, name in LAYER_FILES.items():
         if item.layer(layer) == "none" or item.files[name] is None:
             continue
@@ -708,7 +714,99 @@ def ck25(item: Item, rep: Report) -> None:
             rep.err("CK-25", "README.md", f"evidence path `{p}` does not exist under the item folder")
 
 
-RULES.extend([("CK-4", ck4), ("CK-5", ck5), ("CK-6", ck6), ("CK-7", ck7), ("CK-8", ck8), ("CK-10", ck10), ("CK-11", ck11),
+# ---------------------------------------------------------------- References and Operating envelope (CK-47..49)
+
+def resolve_citation(token: str, root: Path) -> str | None:
+    """None when `path.ext:line[-line]` names an existing file with that many lines, else the reason it does not."""
+    path_part, _, lines = token.rpartition(":")
+    path = path_part.replace("\\", "/")
+    if path.startswith("~/"):
+        path = str(Path.home()) + path[1:]
+    p = Path(path) if re.match(r"^([A-Za-z]:/|/)", path) else root / path
+    target = Path(os.path.normcase(os.path.normpath(p)))
+    a, _, b = lines.partition("-")
+    first, last = int(a), int(b or a)
+    if first < 1:
+        return f"`{token}`: line number must be at least 1"
+    if first > last:
+        return f"`{token}`: range {first}-{last} runs backwards"
+    if not target.is_file():
+        return f"`{token}`: {path_part} does not exist"
+    if target.stat().st_size > MAX_CITED_BYTES:
+        return f"`{token}`: file is too large to verify"
+    count = len(target.read_text(encoding="utf-8", errors="replace").splitlines())
+    if last > count:
+        return f"`{token}`: {path_part} has fewer lines ({count}) than cited"
+    return None
+
+
+def cite_findings(item: Item, rule: str, rep: Report, cells: list[str]) -> None:
+    say = rep.warn if item.status == "shipped" else rep.err  # shipped history may drift; anything live must resolve
+    for cell in cells:
+        for token in citations(cell):
+            why = resolve_citation(token, item.tree.root)
+            if why:
+                say(rule, "README.md", why)
+
+
+def leading_required(item: Item) -> list[str]:
+    optional = set(HEADINGS["readme"].get(item.type, {}).get("optional", []))
+    return [h for h in HEADINGS["leading"] if h not in optional or item.parent]
+
+
+def ck47(item: Item, rep: Report) -> None:
+    """Presence and order of the leading sections: right after an optional Overview, References then the envelope."""
+    seq = [t for lvl, t, _ in item.doc.headings if lvl == 2]
+    lower = [t.lower() for t in seq]
+    say = rep.err if getattr(item, "require_sections", False) else rep.warn
+    for h in leading_required(item):
+        if h.lower() not in lower:
+            say("CK-47", "README.md", f"missing section `## {h}`")
+    present = [h for h in HEADINGS["leading"] if h.lower() in lower]
+    if not present:
+        return
+    if "overview" in lower and lower.index("overview") > lower.index(present[0].lower()):
+        rep.err("CK-47", "README.md", f"`## Overview` must come before `## {present[0]}`")
+        return
+    start = 1 if lower and lower[0] == "overview" else 0
+    actual = seq[start:start + len(present)]
+    for got, want in zip(actual, present):
+        if got.lower() != want.lower():
+            rep.err("CK-47", "README.md", f"`## {got}` must come after `## {want}`")
+            return
+
+
+def ck48(item: Item, rep: Report) -> None:
+    section = item.doc.section("References")
+    if section is None:
+        return
+    tables = section.tables
+    if len(tables) != 2:
+        rep.err("CK-48", "README.md", f"`References` needs exactly two tables, has {len(tables)}")
+        return
+    for name, table, model in (("Local", tables[0], LocalRefRow), ("Web", tables[1], WebRefRow)):
+        rows, found = parse_rows(table, model)
+        rep.add("README.md", [(r, f"`{name}`: {m}") for r, m in found])
+        if not rows and not found:
+            rep.err("CK-48", "README.md", f"`{name}` needs at least 1 row")
+        if model is LocalRefRow:
+            if any(r.none_found for r in rows) and len(table.rows) > 1:
+                rep.err("CK-48", "README.md", "`Local`: `none found` must be the only row")
+            cite_findings(item, "CK-48", rep, [c for r in rows for c in (r.source, r.shows)])
+
+
+def ck49(item: Item, rep: Report) -> None:
+    section = item.doc.section("Operating envelope")
+    if section is None:
+        return
+    rows, found = parse_rows(section.first_table, EnvelopeRow) if section.first_table else ([], [])
+    rep.add("README.md", [(r, f"`Operating envelope`: {m}") for r, m in found])
+    if not rows and not found:
+        rep.err("CK-49", "README.md", "`Operating envelope` needs at least 1 row")
+    cite_findings(item, "CK-49", rep, [r.observed for r in rows])
+
+
+RULES.extend([("CK-47", ck47), ("CK-48", ck48), ("CK-49", ck49), ("CK-4", ck4), ("CK-5", ck5), ("CK-6", ck6), ("CK-7", ck7), ("CK-8", ck8), ("CK-10", ck10), ("CK-11", ck11),
               ("CK-12", ck12_13_14), ("CK-15", ck15), ("CK-16", ck16), ("CK-17", ck17), ("CK-19", ck19), ("CK-20", ck20),
               ("CK-21", ck21), ("CK-22", ck22), ("CK-23", ck23), ("CK-24", ck24), ("CK-25", ck25)])
 
@@ -790,6 +888,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("spec", type=Path, help="docs/work/<id>/README.md (or a legacy docs/specs/<slug>.md)")
     ap.add_argument("--root", type=Path, help="repo root that test paths are relative to (default: README.parents[3])")
     ap.add_argument("--for-source-commit", action="store_true", help="also require status building or shipped (CK-26)")
+    ap.add_argument("--require-sections", action="store_true",
+                    help="a missing References or Operating envelope is an error, not a warning (the lifecycle gate)")
     a = ap.parse_args(argv)
     parts = a.spec.resolve().parts
     legacy = any(x == "docs" and y == "specs" for x, y in zip(parts, parts[1:]))
@@ -806,7 +906,7 @@ def main(argv: list[str] | None = None) -> int:
             if found:
                 print("\n".join(found))
             return 1 if found else 0
-        errors, warnings = check_work_item(DiskTree(root), rel, a.for_source_commit)
+        errors, warnings = check_work_item(DiskTree(root), rel, a.for_source_commit, a.require_sections)
     except (OSError, ValueError, ToolError) as e:
         print(f"spec_check: {a.spec}: {e}", file=sys.stderr)
         return 2

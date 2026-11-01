@@ -56,3 +56,11 @@ def test_every_ck_the_schema_owns_has_an_invalid_fixture() -> None:
     # spec-gate-checker/AC-1
     owned = {load(p)[0] for p in (FIXTURES / "invalid").glob("*.yaml")}
     assert {"CK-1", "CK-2", "CK-3", "CK-17", "CK-21", "CK-25"} <= owned
+
+
+def test_created_must_be_a_real_calendar_date() -> None:
+    # spec-references-envelope/AC-8 (FR-10): the pattern alone accepts 2026-13-45
+    import work_item_schema
+    bad = work_item_schema.findings({"id": "x", "type": "feature", "status": "draft", "created": "2026-13-45",
+                                     "owner": "o", "touches": [], "layers": {}})
+    assert any(rule == "CK-1" and "real date" in msg for rule, msg in bad), bad

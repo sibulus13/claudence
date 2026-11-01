@@ -20,7 +20,7 @@ flowchart TD
 | ACs | list in functional.md, free form | one table, one id scheme `<id>/AC-<n>`, each AC traced to a CAP, FR or NFR; more than 15 ACs forces a split |
 | NFRs | free text | target + named verification method from a closed list |
 | Nesting | undefined | trigger rule; a nested spec is a sibling work item with `parent:` |
-| Enforcement | Phase 7.5 file-presence check | `spec_check.py` rules CK-1..CK-46 in tiers + git `Spec:` trailer |
+| Enforcement | Phase 7.5 file-presence check | `spec_check.py` rules CK-1..CK-49 in tiers + git `Spec:` trailer |
 | Frontmatter | id type status touches layers evidence | adds `created owner` (required by the checker) and optional `lifecycle parent children nestTrigger nestWhy supersededBy introducedBy`. Catwalk ignores the new keys |
 
 ## The spine (unchanged)
@@ -61,17 +61,17 @@ Work items stay at `docs/work/<id>/` (Catwalk already reads this path). `<id>` =
 
 ### Required headings per type, exact text (mechanical basis of CK-4) [v2]
 
-Match is case-insensitive on the H2 text. "L0 full" headings: `Purpose`, `Non-goals`, `Capabilities`, `Non-functional requirements`, `Trade-offs`, `Patterns applied`, `Components chosen`, `Gate plan`. "L0 lite": `Purpose`, `Non-goals`, `Capabilities`, `Non-functional requirements`, `Gate plan`.
+Match is case-insensitive on the H2 text. The leading headings, in order, right after an optional `Overview`: `References`, `Operating envelope` (presence and order are CK-47; CK-4 never requires them). "L0 full" headings: `References`, `Operating envelope`, `Purpose`, `Non-goals`, `Capabilities`, `Non-functional requirements`, `Trade-offs`, `Patterns applied`, `Components chosen`, `Gate plan`. "L0 lite": `References`, `Operating envelope`, `Purpose`, `Non-goals`, `Capabilities`, `Non-functional requirements`, `Gate plan`.
 
 | type | README H2 headings required (in addition to the frontmatter) |
 |---|---|
 | feature | L0 full |
 | integration | L0 full + `External contract` |
 | data-collection | L0 lite + `Sample size`, `Stopping rule` |
-| experiment | `Purpose`, `Non-goals`, `Gate plan`, `Hypothesis`, `Metric`, `Control vs variant`, `Kill/adopt threshold`, `Timebox`, `Result` (`Promoted to` added when status is `promoted`) |
-| research | `Question`, `Sources`, `Findings`, `Recommendation` |
-| bugfix | `Root cause`, `Observed vs expected`, `Acceptance criteria`, `Gate plan` |
-| refactor | `Motivation`, `What got simpler`, `Acceptance criteria`, `Gate plan` |
+| experiment | `References`, `Purpose`, `Non-goals`, `Gate plan`, `Hypothesis`, `Metric`, `Control vs variant`, `Kill/adopt threshold`, `Timebox`, `Result` (`Promoted to` added when status is `promoted`) (optional: `Operating envelope`) |
+| research | `References`, `Question`, `Sources`, `Findings`, `Recommendation` (optional: `Operating envelope`) |
+| bugfix | `References`, `Root cause`, `Observed vs expected`, `Acceptance criteria`, `Gate plan` (optional: `Operating envelope`) |
+| refactor | `References`, `Operating envelope`, `Motivation`, `What got simpler`, `Acceptance criteria`, `Gate plan` |
 | nested spec (any type with `parent`) | L0 lite (plus the type's own headings) |
 
 `introducedBy` (bugfix) is a **frontmatter key**, format `<repo>#<issue>@<mergeSha>`, optional, not a heading.
@@ -89,14 +89,18 @@ Match is case-insensitive on the H2 text. "L0 full" headings: `Purpose`, `Non-go
 
 Sections in order, exact H2 headings (these do not collide with Catwalk's experiment-card headings Hypothesis/Metric/Result/Promoted when the type is feature or integration):
 
-1. `## Purpose` and `## Non-goals`.
-2. `## Capabilities`: rows `| CAP | Statement |`, ids `CAP-<n>`. Statement forms: "The user can …", "The service must …", "The service must not …". Guidance 5-10 rows: fewer means the item is too thin for a full L0 and more means it is two items; the checker lints the range (warn), it is not a hard rule. Every capability is traced by at least one AC (CK-12).
-3. `## Non-functional requirements`: `| NFR | Target | Method | Evidence |`, ids `NFR-<n>`. Target is measurable. Method starts with a kind token from the list below. Evidence has the exact format below. Every NFR is traced by an AC (CK-10).
-4. `## Trade-offs`: `| Option | Latency | Cost | Maintenance | Extensibility | Refactorability | Verdict |`, at least 2 rows, exactly one verdict `chosen`.
-5. `## Patterns applied`: `| Pattern | Where | Why |`, at least 1 row.
-6. `## Components chosen`: `| Need | Chosen (off the shelf) | Rejected | Why rejected |`, at least 1 row. A need built in-house says so in "Chosen" and states why nothing off the shelf fit.
-7. `## Gate plan` (v1): risk, deterministic|qualitative, check, blocking|advisory.
-8. Multi-package items also carry `## Overview` (at most 300 words; see Context packs). Type-specific sections from the heading table.
+1. `## References`: two tables, Local then Web, each with at least one row.
+   - Local `| Source (file:line) | Status (working / partial / broken) | What it shows | Decision (extract / wrap / replace / ignore) + reason |`: working prior art in the fleet, cited by `path.ext:line`, with a status (`working`, `partial`, `broken`) and a decision (`extract`, `wrap`, `replace`, `ignore`) written `word: reason`. An empty search is one row `none found` | `-` | `Searched <path> for `<pattern>`` | `n/a: <reason>`. Every cited local line must resolve to an existing file with that many lines (CK-48).
+   - Web `| Source (URL) | Date checked | What it shows | Decision |`: current conventions and off-the-shelf tools, a URL and a real YYYY-MM-DD date no later than today, or one row `n/a: <reason>` with `-` elsewhere.
+2. `## Operating envelope` (optional for bugfix, research, experiment): `| Assumption | How it is observed (not hoped) | If violated |`. The observed cell carries a typed pointer (an `AC-n`, `config:` or `decision:` token, a `path.ext:line`, a backticked command, or a URL). The If violated cell is `word: detail` with word one of `keep`, `refuse`, `flag`, `defer`, all meaning no destructive or irreversible action happens on the violated path; it is checked syntactically only.
+3. `## Purpose` and `## Non-goals`.
+4. `## Capabilities`: rows `| CAP | Statement |`, ids `CAP-<n>`. Statement forms: "The user can …", "The service must …", "The service must not …". Guidance 5-10 rows: fewer means the item is too thin for a full L0 and more means it is two items; the checker lints the range (warn), it is not a hard rule. Every capability is traced by at least one AC (CK-12).
+5. `## Non-functional requirements`: `| NFR | Target | Method | Evidence |`, ids `NFR-<n>`. Target is measurable. Method starts with a kind token from the list below. Evidence has the exact format below. Every NFR is traced by an AC (CK-10).
+6. `## Trade-offs`: `| Option | Latency | Cost | Maintenance | Extensibility | Refactorability | Verdict |`, at least 2 rows, exactly one verdict `chosen`.
+7. `## Patterns applied`: `| Pattern | Where | Why |`, at least 1 row.
+8. `## Components chosen`: `| Need | Chosen (off the shelf) | Rejected | Why rejected |`, at least 1 row. A need built in-house says so in "Chosen" and states why nothing off the shelf fit.
+9. `## Gate plan` (v1): risk, deterministic|qualitative, check, blocking|advisory.
+10. Multi-package items also carry `## Overview` (at most 300 words; see Context packs). Type-specific sections from the heading table.
 
 **Evidence cell format:** one or more tokens joined by ` + `: `AC-<n>`, `config:<repo-relative path>`, `decision:<R-id>` (the `DECISIONS.md` row id). Regex: `^(AC-\d+|config:[^\s+]+|decision:[\w.-]+)( \+ (AC-\d+|config:[^\s+]+|decision:[\w.-]+))*$`. Example: `AC-7 + config:.dependency-cruiser.cjs`.
 
@@ -323,7 +327,7 @@ Interface: `spec_check.py <path/to/README.md> [--root <repo>] [--for-source-comm
 **Tiers (explicit sets, no ordering):**
 - ALWAYS = every status: CK-1, CK-2, CK-3, CK-18.
 - `killed`, `promoted`: ALWAYS plus CK-21.
-- STATIC = {`spec-locked`, `building`, `shipped`}: ALWAYS + CK-4..CK-17, CK-19, CK-21..CK-23, CK-27..CK-36, CK-38, CK-41, CK-43, CK-44, CK-45(b), CK-46 (CK-46 and CK-43 only warn; CK-27..CK-46 apply to multi-package feature and integration items). CK-23 (more than 15 ACs needs children) binds at STATIC only: a `draft` may exceed 15 while being written.
+- STATIC = {`spec-locked`, `building`, `shipped`}: ALWAYS + CK-4..CK-17, CK-19, CK-21..CK-23, CK-47..CK-49, CK-27..CK-36, CK-38, CK-41, CK-43, CK-44, CK-45(b), CK-46 (CK-46 and CK-43 only warn; CK-27..CK-46 apply to multi-package feature and integration items). CK-23 (more than 15 ACs needs children) binds at STATIC only: a `draft` may exceed 15 while being written.
 - EXEC = {`building`, `shipped`}: STATIC + CK-20, CK-24, CK-37, CK-39, CK-40, CK-42.
 - SHIPPED = {`shipped`}: EXEC + CK-25.
 - `draft`: ALWAYS only (placeholders and missing sections are allowed).
@@ -357,6 +361,9 @@ Interface: `spec_check.py <path/to/README.md> [--root <repo>] [--for-source-comm
 | CK-24 | external NFR evidence: each `config:` path exists in the repo; each `decision:` row exists in `docs/DECISIONS.md` with status `confirmed` | EXEC |
 | CK-25 | every path in frontmatter `evidence` exists under the item folder | SHIPPED |
 | CK-26 | `--for-source-commit`: status is `building` or `shipped` | flag |
+| CK-47 | the leading sections: present (a missing one is a warning, an error under `--require-sections`, which the lifecycle gate passes from spec-locked on) and, when present, the first H2s after an optional `Overview`, References then Operating envelope | STATIC |
+| CK-48 | References: exactly two tables (Local, Web), exact headers, at least one row each, LocalRefRow and WebRefRow cells; every cited local `path.ext:line` resolves (error at spec-locked and building, warning at shipped) | STATIC |
+| CK-49 | Operating envelope: exact header, at least one row, EnvelopeRow cells (typed observed pointer; `keep`, `refuse`, `flag` or `defer` outcome); cited local lines resolve | STATIC |
 
 No rule inspects the git branch (the experiment-on-main constraint is expressed by CK-3 instead). No rule runs tests.
 
@@ -453,3 +460,9 @@ If any is built, add the key to `WorkItemFrontmatterSchema` and to the frontmatt
 8. Locked-contract immutability beyond the Digest (for example a commit-time check against git history) is not specified; the Digest catches edits only once it is filled in.
 9. `ext:` references are limited to parent, child or sibling items and skip milestone ordering across items; stricter cross-item ordering is open.
 10. The isolation gate command (sparse checkout then build and test, fed by `--sparse`) is named in the Gate plan but not yet written.
+
+## Lifecycle and the reviewer rating [v2]
+
+The status lifecycle is data: `contracts/work-item.lifecycle.v1.json`. A spec is created only as `draft`; the allowed moves are draft to spec-locked, spec-locked to draft (reopen), spec-locked to building, building to shipped, any status to killed, and experiment to promoted. The commit gate rejects a move outside the file and a staged status that fails its tier, on every branch.
+
+Reviewer rating against the envelope: a finding that needs an envelope assumption broken is rated F, not R, unless the assumption can break silently; then a cheap detector that ends in `keep`, `refuse`, `flag` or `defer` is required, and its absence is rated R. A spec that rebuilds something its References list as working, without a stated reason, is flagged. The reviewer opens each cited local line and spot-checks a web citation.

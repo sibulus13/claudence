@@ -24,7 +24,7 @@ def test_committed_config_matches_the_standard() -> None:
 def test_generated_tables_carry_the_standards_headings() -> None:
     # spec-gate-checker/AC-2
     cfg = gen_heading_config.generate()
-    assert cfg["readme"]["feature"]["headings"] == cfg["l0"]["full"] and len(cfg["l0"]["full"]) == 8
+    assert cfg["readme"]["feature"]["headings"] == cfg["l0"]["full"] and len(cfg["l0"]["full"]) == 10
     assert cfg["readme"]["integration"]["headings"][-1] == "External contract"
     assert cfg["readme"]["data-collection"]["headings"][-2:] == ["Sample size", "Stopping rule"]
     assert cfg["readme"]["experiment"]["conditional"] == [{"heading": "Promoted to", "status": "promoted"}]
