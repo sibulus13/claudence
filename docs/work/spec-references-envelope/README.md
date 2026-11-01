@@ -1,7 +1,7 @@
 ---
 id: spec-references-envelope
 type: feature
-status: draft
+status: spec-locked
 touches: [harness]
 layers:
   architecture: none
@@ -21,7 +21,8 @@ flowchart TD
   G[gen_heading_config.py] --> J[work-item.headings.v2.json]
   J --> K
   S[WORK-ITEM-STANDARD.md heading table] --> G
-  C[spec_gate.py: every staged work-item README at spec-locked, building or shipped] -->|--require-sections| K
+  LC[work-item.lifecycle.v1.json: allowed status moves] --> C[spec_gate.py: move allowed? staged status passes its tier?]
+  C --> K
   RV[reviewer: rates findings against the envelope] --> R
 ```
 
@@ -41,7 +42,7 @@ Owner decision 2026-10-31: this item dogfoods the rule it introduces, so it star
 | C:/Users/Michael/.claude/scripts/work_item_md.py:138-239 | working | The pydantic Row base, CapRow/NfrRow/AcRow models with per-field rule ids, and parse_rows (exact-header check, one finding per bad cell). EVIDENCE_TOKEN is defined at scripts/work_item_md.py:18. | wrap: three new Row subclasses, parse_rows unchanged; EVIDENCE_TOKEN imported for the observed-pointer rule, not re-spelled |
 | C:/Users/Michael/.claude/contracts/work-item.v2.json:31 | partial | The frontmatter schema, the source of the CK-1 rules; `created` is checked by a pattern only, so `2026-13-45` passes (the check lives in scripts/work_item_schema.py:31-34, which maps schema errors to rule ids). | wrap: add a real-date check at this layer, reported as CK-1 |
 | C:/Users/Michael/.claude/scripts/fleet_paths.py:13 | working | REPO_ROOT, the one owner of the fleet tree root (env FLEET_ROOT, else D:/repo). | extract: the AC-9 walk roots derive from it; no path is spelled twice |
-| C:/Users/Michael/.claude/scripts/spec_gate.py:1 | working | The commit-msg gate reads the staged index (IndexTree) for the cited work item; reading the HEAD version of a README is new. | extend: check every staged work-item README by the invariant below, before its branch and merge early returns |
+| C:/Users/Michael/.claude/scripts/spec_gate.py:1 | working | The commit-msg gate reads the staged index (IndexTree) for the cited work item; reading the HEAD version of a README is new. | extend: for every staged work-item README, check the status move against the lifecycle file and the staged status against its tier, before the branch and merge early returns |
 | D:/repo/Factory/catwalk/src/lib/work-items.ts:107-137 | working | Catwalk reads only the experiment headings Hypothesis, Metric, Verdict or Result, Promoted to; every other H2 is ignored, case-insensitive. | ignore: no Catwalk change needed; References and Operating envelope collide with none of its aliases |
 | C:/Users/Michael/.claude/agents/reviewer.md:53-55 | partial | The rating rule (and the citation-opening sentence at reviewer.md:50-52) already exists in the reviewer and designer agent text (agents/designer.md:30-34), with no standard, template or checker behind it. Searched C:/Users/Michael/.claude/scripts, contracts, skills and tests for `Operating envelope` and `## References` (case-sensitive): no match. | extract: the standard becomes the source of the wording; the agent text gets one added sentence (citation spot-check) and a test keeps both consistent |
 
@@ -63,14 +64,14 @@ Owner decision 2026-10-31: this item dogfoods the rule it introduces, so it star
 | Tables are read by markdown-it-py with tables enabled, so the new tables are real tables in the token stream | AC-3: a References section whose tables do not parse yields zero tables and a named CK-48 finding | refuse: the checker reports CK-48 or CK-49 and exits 1; it never treats an unparsed table as a pass |
 | The standard's heading table is the only source of the required headings | AC-1 and the gate command `python scripts/gen_heading_config.py --check` compare the committed JSON with a fresh generation | refuse: the gate fails on a stale config; the committed JSON is never hand-edited to pass |
 | `created` is a real date (a schema pattern alone accepts 2026-13-45) | AC-8: the schema layer `contracts/work-item.v2.json:31` plus a `date.fromisoformat` check report CK-1 before any other rule runs | refuse: CK-1 stops the run |
-| The staged state is the authoritative fact: every staged work-item README whose status (read with the yaml Item loader) is spec-locked, building or shipped must carry valid References and Operating envelope sections, on every branch and during merges and rebases; the one exception is a README whose HEAD version has the same status and neither section (an untouched historical spec), which only warns; a status outside the enum, or an unreadable staged README, rejects | AC-8: real commits in a temp repo, on main and on a feature branch, including amend, creation at shipped, quoted status, and an untouched historical README | refuse: the commit is rejected; the historical exception only warns |
+| The lifecycle is the contract: two rules observed from the commit: (1) the status move from HEAD (absent for a new file) to the staged README must be an edge of contracts/work-item.lifecycle.v1.json; (2) the staged status must pass its tier (spec-locked STATIC, which includes References and Operating envelope; building EXEC; shipped SHIPPED); a README whose HEAD status equals its staged status and that predates this item is checked at its tier as warnings only | AC-8: T1 to T9, real commits in a temp repo | refuse: a move outside the lifecycle, or a staged status that fails its tier, rejects the commit |
 | The node helper (markdownlint) is available for CK-4 | existing FR-5 of spec-gate-checker at docs/work/spec-gate-checker/components.md:29: a missing or timed-out helper is a ToolError | refuse: exit 2, the gate rejects; CK-4 is never skipped |
 | A cited local path:line resolves to a file with at least that many lines | AC-5: CK-48 resolves every cited token at check time (Windows and POSIX forms) | refuse: CK-48 error at spec-locked and building, exit 1 |
 | A shipped item's cited lines may later drift or vanish as the cited code changes | AC-5: the same resolution runs at shipped and is downgraded to a warning | flag: a warn line names the token; no block on a shipped item |
 | A cited line says what its row claims (resolution proves only that the line exists) | the reviewer sentence at agents/reviewer.md:50-52, asserted in AC-10 | refuse: the reviewer rates it R (asserted-not-verified-claim), which blocks the lock |
 
 ## Purpose
-Specs keep escaping review because the author never looked at working code that already exists and never said which conditions the design relies on. Today's ledger rows show it: the Spindle specs rebuilt worktree handling without citing Foreman's working code, and branch-conventions reviews kept finding cases outside the real setup. This item makes two README sections required and machine-checked: References (prior art in the fleet and on the web, each with a decision, local citations resolved) and Operating envelope (each assumption, a typed pointer to how it is observed, and a fail-safe outcome if it breaks). The rule binds on the commit, the authoritative fact: every staged work-item README at spec-locked, building or shipped must carry valid sections, on every branch, or the spec gate rejects the commit. An untouched historical spec (HEAD has the same status and neither section) only warns, so nothing finished has to be rewritten; once a spec has the sections it can never lose them. The Spindle drafts (branch-conventions, claim-registry, worktree-reaper) therefore add both sections when they lock.
+Specs keep escaping review because the author never looked at working code that already exists and never said which conditions the design relies on. Today's ledger rows show it: the Spindle specs rebuilt worktree handling without citing Foreman's working code, and branch-conventions reviews kept finding cases outside the real setup. This item makes two README sections required and machine-checked: References (prior art in the fleet and on the web, each with a decision, local citations resolved) and Operating envelope (each assumption, a typed pointer to how it is observed, and a fail-safe outcome if it breaks). The rule binds on the commit, the authoritative fact: the lifecycle is enforced: a spec is created only as draft, and every move (draft to spec-locked, spec-locked to building, building to shipped, reopen to draft, any to killed, experiment to promoted) is checked against one lifecycle file. The staged status must pass its tier, so a spec reaches spec-locked only with valid References and Operating envelope, and an edit that breaks a locked spec is rejected. A spec that predates this item and makes no move only warns, so nothing finished has to be rewritten. The Spindle drafts (branch-conventions, claim-registry, worktree-reaper) therefore add both sections when they lock.
 
 ## Non-goals
 - Judging whether a decision or an observation is a good one (design review does); the `If violated` cell is checked syntactically only (its first word and a non-empty detail), never for whether the outcome is really safe.
@@ -87,7 +88,7 @@ Specs keep escaping review because the author never looked at working code that 
 | CAP-2 | The service must require a `## Operating envelope` section in feature, integration, data-collection and refactor items, and accept it as optional in bugfix, research and experiment items |
 | CAP-3 | The service must reject a README whose References and Operating envelope sections are not the first sections after Overview, in that order |
 | CAP-4 | The service must reject a References or Operating envelope table whose header, row count or row cells break the rules, naming the rule and the cell |
-| CAP-5 | The service must reject any commit, on any branch and docs-only included, in which a staged work-item README at spec-locked, building or shipped lacks valid References and Operating envelope sections, unless its HEAD version has the same status and neither section |
+| CAP-5 | The service must reject any commit, on any branch, whose staged work-item README makes a status move outside the lifecycle, or whose staged status fails its tier (spec-locked requires valid References and Operating envelope) |
 | CAP-6 | The service must tell the reviewer to rate a finding that needs an envelope assumption broken as F, unless the assumption can break silently, in which case a cheap detector is required, and to open each cited local line |
 | CAP-7 | The user can start a new item from the README templates and get both sections with the exact table headers |
 | CAP-8 | The service must reject a cited local path:line that does not resolve to an existing file with at least that many lines |
@@ -110,7 +111,7 @@ None.
 |---|---|---|
 | single source, generated config | heading table to work-item.headings.v2.json to spec_check | a hand-copied heading list drifts (hand-copied-enum) |
 | closed vocabulary validated by a model | LocalRefRow, WebRefRow, EnvelopeRow | a free-text cell cannot be checked |
-| enforce an invariant on the staged state (observe, never predict a delta) | spec_gate.py checks every staged work-item README | a delta rule had bypasses (entry at shipped, amend, branches, quoted status); a state invariant has none of them |
+| state machine as data, guards on transitions | contracts/work-item.lifecycle.v1.json read by spec_gate | the lifecycle is written down once; every guard attaches to a transition or a tier, so no rule has to anticipate arbitrary jumps |
 
 ## Components chosen
 | Need | Chosen (off the shelf) | Rejected | Why rejected |
@@ -141,7 +142,7 @@ None.
 | invariant-checked-on-one-path-only | AC-2 and AC-3 run on every type and on a nested spec; AC-10 runs the same Row models over both templates; the required-or-warning decision is read from one function used by CK-47, CK-48 and CK-49 |
 | signal-consumer-enumeration | AC-1: the consumers of the config are spec_check.py, gen_heading_config.py, tests/test_gen_heading_config.py (hard-coded 8 headings, updated) and the spec-gate-checker components.md text; the readers of the tier sets are spec_check.py:51-56 and the standard's :326 |
 | cross-platform-path-identity | AC-5: one canonical form (forward slashes, case-folded drive letter, `~` expanded, repo-relative resolved against `--root`) and Windows-shaped fixtures; AC-9 walk roots derive from fleet_paths.REPO_ROOT |
-| authoritative-source | the rule binds on the staged state of each README, read with the yaml Item loader from the index (HEAD only for the historical exception), never from an editable field or list (AC-8); headings, order and optional come from the heading table (AC-1); `created` validity from the schema layer (AC-8); a cited line's existence from the file itself (AC-5) |
+| authoritative-source | the lifecycle file is the one source of allowed moves; statuses are read with the yaml Item loader from the index and HEAD, never from an editable exemption (AC-8); headings, order and optional come from the heading table (AC-1); `created` validity from the schema layer (AC-8); a cited line's existence from the file itself (AC-5) |
 | fail-closed-on-unknown | AC-3 to AC-7 (an unparsed table or unknown word is an error); AC-8 (a staged README at a gated status without valid sections, an out-of-enum status, or a bad date is never lenient); AC-5 (a missing or oversize file is an error) |
 | destructive-op-proof | n/a: read-only checker; the heading generator only rewrites its own config |
 | liveness-and-time | n/a: no locks or leases; the future-date check uses the date only (AC-6 uses a far-future fixture) |
@@ -150,12 +151,12 @@ None.
 | split-state | n/a: no mutable state and no exemption list |
 | untestable-ac | one fault per fixture row with a specific message substring (every AC fixtures table); named mutation survivors in the Gate plan |
 | scope-drift-oversize | 10 ACs; Non-goals name the deferred pieces |
-| enforcement-allowlist | AC-2 (envelope optional for bugfix, research, experiment), AC-8 (every staged README at spec-locked, building or shipped; the untouched-historical exception) and AC-9 (no existing item turns from passing to failing); killed and promoted items run only the ALWAYS tier |
+| enforcement-allowlist | AC-2 (envelope optional for bugfix, research, experiment), AC-8 (every lifecycle move and tier; the pre-existing exception) and AC-9 (no existing item turns from passing to failing); killed and promoted items run only the ALWAYS tier |
 | hand-copied-enum | AC-10: the vocabularies in the standard equal the constants in work_item_md.py; the gated statuses come from the spec_check tier sets, not re-spelled |
 | escape-record | n/a: a record row, not a spec category |
 
 ## Open questions
-- OQ-1: Resolved by the owner-approved scope cut of 2026-10-31: no exemption list and no delta rule. Every staged work-item README at spec-locked, building or shipped must carry valid sections, except an untouched historical one (HEAD has the same status and neither section), which warns.
+- OQ-1: Resolved 2026-10-31 (owner approved the lifecycle table): creation only as draft; spec-locked may reopen to draft; any status may move to killed; experiment may move to promoted. The pre-existing exception covers specs that predate this item and make no move.
 - OQ-2: Citation resolution depends on the cited machine's files. An item citing D:/repo paths fails CK-48 on a machine without them. Default: acceptable, the fleet is one machine; shipped items only warn.
 - OQ-3: Assumed defaults for types the owner did not name: data-collection requires both sections (through L0 lite); experiment requires References and treats the envelope as optional. Revisit if experiments start hiding real assumptions.
 - OQ-4: The order rule is Python over level-2 headings, not MD043. Revisit if MD043 gains an adjacency form.
