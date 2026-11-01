@@ -75,8 +75,8 @@
             "type": "command",
             "command": "powershell.exe -NoProfile -File $USERPROFILE/.claude/telemetry/notify-attention.ps1 -Reason stop -Silent",
             "shell": "bash",
-            "async": true,
-            "timeout": 30
+            "timeout": 30,
+            "async": true
           }
         ]
       }
@@ -88,8 +88,8 @@
             "type": "command",
             "command": "powershell.exe -NoProfile -File $USERPROFILE/.claude/telemetry/record-compact.ps1",
             "shell": "bash",
-            "async": true,
-            "timeout": 15
+            "timeout": 15,
+            "async": true
           }
         ]
       }
@@ -101,15 +101,15 @@
             "type": "command",
             "command": "powershell.exe -NoProfile -File $USERPROFILE/.claude/telemetry/log-permission.ps1",
             "shell": "bash",
-            "async": true,
-            "timeout": 10
+            "timeout": 10,
+            "async": true
           },
           {
             "type": "command",
             "command": "powershell.exe -NoProfile -File $USERPROFILE/.claude/telemetry/notify-attention.ps1 -Reason permission -Sound ding-half.wav",
             "shell": "bash",
-            "async": true,
-            "timeout": 10
+            "timeout": 10,
+            "async": true
           }
         ]
       }
@@ -133,8 +133,8 @@
             "type": "command",
             "command": "powershell.exe -NoProfile -File $USERPROFILE/.claude/telemetry/log-tool-done.ps1",
             "shell": "bash",
-            "async": true,
-            "timeout": 10
+            "timeout": 10,
+            "async": true
           }
         ]
       }
@@ -161,11 +161,12 @@
     "sentry@claude-plugins-official": true,
     "discord@claude-plugins-official": true
   },
+  "outputStyle": "terse-ledger",
   "feedbackDrafts": "notify",
   "effortLevel": "high",
   "modelSettings": {
     "claude-opus-5-5": {
-      "effortLevel": "medium"
+      "effortLevel": "high"
     }
   },
   "autoUpdatesChannel": "latest",
@@ -178,6 +179,5 @@
   "remoteControlAtStartup": true,
   "inputNeededNotifEnabled": true,
   "agentPushNotifEnabled": true,
-  "voiceEnabled": true,
-  "outputStyle": "terse-ledger"
+  "voiceEnabled": true
 }
