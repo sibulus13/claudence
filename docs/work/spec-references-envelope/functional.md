@@ -5,8 +5,9 @@ flowchart TD
   R[README] --> K{CK-1: created a real date?}
   K -- no --> X[CK-1 error, stop]
   K -- yes --> H[CK-4: headings present?]
-  G[spec_gate: staged README enters spec-locked or building?] -- yes --> Q[--require-sections: a missing section is an error]
-  G -- no --> W[a missing section is a warning]
+  G[spec_gate, first check, every branch: staged README at spec-locked, building or shipped?] -- yes --> X2{HEAD same status and no sections?}
+  X2 -- no --> Q[--require-sections: a missing or malformed section rejects]
+  X2 -- yes --> W[historical: warning only]
   H --> O[CK-47: order]
   O --> T[CK-48 References tables and citations]
   O --> E[CK-49 Operating envelope table]
@@ -20,7 +21,7 @@ flowchart TD
 | FR-3 | added | CK-47 order |
 | FR-4 | added | CK-48 References |
 | FR-5 | added | CK-49 Operating envelope |
-| FR-6 | added | spec_gate transition trigger (any commit entering spec-locked or building) |
+| FR-6 | added | spec_gate staged-state invariant, first check on every branch |
 | FR-7 | added | standard, templates, reviewer wording |
 | FR-8 | added | tier binding |
 | FR-9 | added | citation resolution |
@@ -38,7 +39,7 @@ Every AC below is tested by running its fixtures table (section Fixtures): one p
 | AC-5 | CAP-8, FR-9 | spec_check runs on the rows of Fixtures AC-5 (citation resolution, in Local and Envelope cells, at spec-locked, building and shipped) | an unresolved token is a CK-48 or CK-49 error at spec-locked and building and a warning at shipped; a resolving token, in any path form, gives no finding | an unresolved token passes at spec-locked, is an error at shipped, or a resolving token is rejected | tests/test_spec_references_envelope.py |
 | AC-6 | CAP-4, FR-4 | spec_check runs on the rows of Fixtures AC-6 (Web cells) | each faulty row gives a CK-48 finding naming the row and the cell; each passing row gives none | a faulty row passes or a passing row is rejected | tests/test_spec_references_envelope.py |
 | AC-7 | CAP-4, FR-5 | spec_check runs on the rows of Fixtures AC-7 (Envelope cells) | each faulty row gives a CK-49 finding naming the row and the cell; each passing row gives none | a faulty row passes or a passing row is rejected | tests/test_spec_references_envelope.py |
-| AC-8 | CAP-5, FR-6, FR-10 | real commits in a temp repo with the spec-gate hook installed, per the rows of Fixtures AC-8 | a commit whose staged README enters spec-locked or building without valid sections is rejected (docs-only commits included); every other row lands; a bad date is a CK-1 error | a gated transition lands without sections, an ungated commit is rejected, or a git error lets the commit through | tests/test_spec_gate_transition.py, tests/test_work_item_schema.py |
+| AC-8 | CAP-5, FR-6, FR-10 | real commits in a temp repo with the spec-gate hook installed, per the rows of Fixtures AC-8 | each rejecting row is rejected with its substring; each landing row lands | any rejecting row lands, any landing row is rejected, or a git error lets a commit through | tests/test_spec_gate_staged.py, tests/test_work_item_schema.py |
 | AC-9 | CAP-9, FR-8 | a one-shot build-time gate (not a permanent test): spec_check runs standalone over every README under D:/repo/*/*/docs/work, D:/repo/*/docs/work and ~/.claude/docs/work with the old and the new checker, per the rows of Fixtures AC-9 | no README moves from exit 0 to exit 1; a missing section shows only as a warning | any README moves from 0 to 1, or a walk root does not exist | scripts/gates/new_rules_regression.py |
 | AC-10 | CAP-6, CAP-7, FR-7 | a test reads the two README templates, the standard and the reviewer text per the rows of Fixtures AC-10 | every row passes | any template header differs from a model, any vocabulary or count differs between the standard and the constants, or a required sentence is missing | tests/test_spec_references_envelope.py |
 
@@ -149,16 +150,16 @@ Each row is a real commit in a temp repo with the hook installed; the README has
 
 | Fixture | Single fault | Expected message contains |
 |---|---|---|
-| 8.1 | a docs-only commit moves the README from draft to spec-locked, no sections | missing section `## References` |
-| 8.2 | a docs-only commit moves the README from spec-locked to building, no sections | missing section `## References` |
-| 8.3 | a commit creates a README directly at spec-locked, no sections | missing section `## References` |
-| 8.4 | a commit moves the README to spec-locked with References but no Operating envelope | missing section `## Operating envelope` |
-| 8.5 | a commit moves the README to spec-locked with valid sections | no finding |
-| 8.6 | a commit creates a README at draft, no sections | no finding |
-| 8.7 | a commit edits a shipped README's text without a status change | no finding |
-| 8.8 | a commit moves the README from building to shipped, no sections | no finding |
-| 8.9 | `created` is 2026-13-45 | CK-1 |
-| 8.10 | `git show HEAD:<path>` fails (corrupt object simulated) | failed closed |
+| 8.1 | a docs-only commit on main moves the README from draft to spec-locked, no sections | missing section `## References` |
+| 8.2 | a commit creates a README directly at shipped, no sections | missing section `## References` |
+| 8.3 | a commit on a feature branch moves the README to spec-locked, no sections | missing section `## References` |
+| 8.4 | an amend removes both sections from a spec-locked README that had them | missing section `## References` |
+| 8.5 | a later commit keeps status spec-locked and deletes the Operating envelope | missing section `## Operating envelope` |
+| 8.6 | the staged status is written `"spec-locked"` (quoted), no sections | missing section `## References` |
+| 8.7 | the staged status is `Spec-Locked` (out of enum) | status |
+| 8.8 | a commit edits the text of a shipped README whose HEAD version has the same status and neither section | warn: CK-47 |
+| 8.9 | a commit moves the README to spec-locked with valid sections | no finding |
+| 8.10 | `git show HEAD:<path>` fails on a corrupt object while the staged README is valid at spec-locked with sections | no finding |
 
 ### AC-9
 | Fixture | Single fault | Expected message contains |
@@ -176,7 +177,7 @@ Each row is a real commit in a temp repo with the hook installed; the README has
 | 10.4 | template header edited by one word | header |
 | 10.5 | the standard's If-violated words, Local statuses and Decision words equal VIOLATED, LOCAL_STATUSES, DECISIONS | no finding |
 | 10.6 | the standard drops one vocabulary word | vocabulary |
-| 10.7 | the standard has rows CK-47, CK-48, CK-49, says CK-1..CK-49 at the enforcement row, and lists CK-47 in ALWAYS and CK-48, CK-49 in STATIC | no finding |
+| 10.7 | the standard has rows CK-47, CK-48, CK-49, says CK-1..CK-49 at the enforcement row, and lists CK-47, CK-48, CK-49 in STATIC | no finding |
 | 10.8 | the standard lacks the rating sentence (F unless it can break silently, then a cheap detector) | rating |
 | 10.9 | the reviewer text lacks the sentence about opening each cited local line and spot-checking a web citation | cited local line |
 | 10.10 | the reviewer text and the standard both state the rating rule and the citation sentence | no finding |

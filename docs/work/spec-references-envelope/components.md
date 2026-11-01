@@ -10,13 +10,13 @@ flowchart TD
     A1[heading table plus leading and optional notation]
     A2[section-checks: CK-4 filters, CK-47 order, CK-48 References, CK-49 envelope]
     A3[Row models: LocalRefRow, WebRefRow, EnvelopeRow]
-    A4[transition-gate: spec_gate requires the sections when a staged README enters spec-locked or building]
+    A4[staged-state gate: spec_gate requires the sections on every staged work-item README at spec-locked, building or shipped]
   end
 ```
 
 | Component | Owned files | Public interface |
 |---|---|---|
-| section-checks | `scripts/spec_check.py`, `scripts/work_item_md.py`, `scripts/work_item_schema.py`, `contracts/work-item.v2.json`, `scripts/gen_heading_config.py`, `contracts/work-item.headings.v2.json` (generated), `scripts/spec_gate.py`, `skills/dark-factory/WORK-ITEM-STANDARD.md`, `skills/dark-factory/templates/work-item/README.md`, `skills/dark-factory/templates/work-item/README.experiment.md`, `tests/test_spec_references_envelope.py`, `tests/test_gen_heading_config.py`, `tests/test_spec_gate_transition.py`, `tests/fixtures/work-items/**` | `spec_check.py README.md [--require-sections]` (new rule ids CK-47, CK-48, CK-49); `spec_gate.py` (unchanged CLI; new trigger) |
+| section-checks | `scripts/spec_check.py`, `scripts/work_item_md.py`, `scripts/work_item_schema.py`, `contracts/work-item.v2.json`, `scripts/gen_heading_config.py`, `contracts/work-item.headings.v2.json` (generated), `scripts/spec_gate.py`, `skills/dark-factory/WORK-ITEM-STANDARD.md`, `skills/dark-factory/templates/work-item/README.md`, `skills/dark-factory/templates/work-item/README.experiment.md`, `tests/test_spec_references_envelope.py`, `tests/test_gen_heading_config.py`, `tests/test_spec_gate_staged.py`, `tests/fixtures/work-items/**` | `spec_check.py README.md [--require-sections]` (new rule ids CK-47, CK-48, CK-49); `spec_gate.py` (unchanged CLI; new trigger) |
 
 One component. Its single responsibility: validate the References and Operating envelope sections of one README against the standard. The generators, the Row models and the standard text are its inputs and are changed with it, in the same pass, because splitting them would let the headings, the table headers and the prose disagree. The reviewer agent text (`agents/reviewer.md`) is governance: this item specifies one added sentence (below) which the parent session applies; a test reads it.
 
@@ -57,16 +57,17 @@ def findings(frontmatter: dict) -> list[tuple[str, str]]     # signature unchang
 def generate(standard: Path = STANDARD) -> dict      # adds: "leading": list[str], readme[type]["optional"]: list[str] (key absent when empty)
 
 # scripts/spec_check.py
-def sections_required(item: Item, require: bool) -> bool   # True when --require-sections was passed (the transition gate)
+def sections_required(item: Item, require: bool) -> bool   # True under --require-sections (passed by the staged-state gate)
 def required_headings(item: Item) -> dict[str, list[tuple[str, str]]]   # signature unchanged; see FR-2
 def ck47(item: Item, rep: Report) -> None            # STATIC: order check; a missing section is a warning, an error under --require-sections
 def ck48(item: Item, rep: Report) -> None            # References section; STATIC
 def ck49(item: Item, rep: Report) -> None            # Operating envelope section; STATIC
 
 # scripts/spec_gate.py
-GATED = ("spec-locked", "building")             # read from spec_check's tier sets, not re-spelled
-def entering_gated(head_status: str | None, staged_status: str) -> bool   # staged in GATED and (head absent or head != staged)
-def gated_readmes(tree: IndexTree) -> list[Path]     # every staged docs/work/*/README.md for which entering_gated is true
+GATED = STATIC                                     # spec-locked, building, shipped: spec_check's STATIC tier, not re-spelled
+def staged_item(tree: IndexTree, path: Path) -> Item   # the yaml Item loader over the staged blob; raises on unreadable or out-of-enum status
+def historical_exception(head: Item | None, staged: Item) -> bool   # head exists, same status, and head has neither leading section
+def gated_readmes(tree: IndexTree) -> list[Path]     # every staged docs/work/*/README.md whose staged status is in GATED
 ```
 
 Config and data contracts (all generated; none hand-written):
@@ -79,7 +80,7 @@ Config and data contracts (all generated; none hand-written):
 
 The walk roots for the one-shot AC-9 gate: `D:/repo/*/*/docs/work` (this includes `D:/repo/Lib/*/docs/work`), `D:/repo/*/docs/work`, and `~/.claude/docs/work`, derived from `fleet_paths.REPO_ROOT`. A root that does not exist fails the gate, never skipped.
 
-Transition rule (the authoritative fact is the commit): `spec_gate.py` runs on every commit, not only source commits. For each staged `docs/work/*/README.md`, it reads the staged frontmatter status from the index and the HEAD status with `git show HEAD:<path>` (absent for a new file). When `entering_gated` is true, it runs `spec_check.py --require-sections` on the staged tree and rejects the commit on any CK-47, CK-48 or CK-49 finding. A draft, a shipped item, or a commit that leaves the status unchanged is not gated; the standalone checker reports a missing section there as a warning only. A git error or an unreadable status is a rejection (fail closed).
+Staged-state rule (the authoritative fact is what the commit contains): `spec_gate.py` runs this check FIRST, before its default-branch and merge/rebase early returns, on every commit, including docs-only ones. For each staged `docs/work/*/README.md` whose staged status (read with the yaml Item loader, so `"spec-locked"` and `spec-locked` are the same) is in GATED, it runs `spec_check.py --require-sections` on the staged tree and rejects on any CK-47, CK-48 or CK-49 finding, unless `historical_exception` holds, in which case it warns. HEAD is read with `git cat-file -e HEAD:<path>` (absent) versus `git show HEAD:<path>` (present); an unborn HEAD is absent. A status outside the enum, or an unreadable staged README, rejects (fail closed). An unreadable HEAD version is treated as absent, so a commit that repairs it is not blocked.
 
 Cell rules (each failing cell is one finding, rule `CK-48` or `CK-49`, line format `rule: README.md: message` as for CK-5):
 
@@ -119,26 +120,26 @@ Reviewer sentence to add to `agents/reviewer.md` (applied by the parent session,
 | FR-3 | `ck47` requires the leading headings present in a README to be the first level-2 headings after an optional `Overview`, in `leading` order; the finding names the offending heading |
 | FR-4 | `ck48` requires the `References` section to hold exactly two tables, Local then Web, each with the exact header (compared case- and whitespace-insensitively like every Row model), at least one row, and rows that pass LocalRefRow and WebRefRow |
 | FR-5 | `ck49` validates the `Operating envelope` section when present: exact header, at least one row, rows that pass EnvelopeRow including the typed observed pointer |
-| FR-6 | `spec_gate.py` requires the sections exactly when a staged work-item README enters spec-locked or building (`entering_gated`), on any commit including docs-only ones; it runs `spec_check.py --require-sections` and rejects on any CK-47, CK-48 or CK-49 finding; a git or status-read error rejects |
+| FR-6 | `spec_gate.py`, before its branch and in-progress early returns, requires valid sections in every staged work-item README whose staged status is spec-locked, building or shipped, on any branch and any commit including docs-only ones; the only exception (warning) is an untouched historical README (`historical_exception`); an out-of-enum status or an unreadable staged README rejects |
 | FR-7 | The standard, both README templates and the reviewer rating wording carry the sections, tables, vocabularies and rule; a test reads them and compares with the constants |
 | FR-8 | CK-47, CK-48 and CK-49 bind at STATIC; present sections are always fully checked (malformed is an error); a missing section is a warning unless `--require-sections`; a `killed` or `promoted` item gets no check |
 | FR-9 | `resolve_citation` resolves every LOCAL_CITE token as defined above; unresolved is an error at `spec-locked` and `building`, a warning at `shipped` |
 | FR-10 | The schema layer rejects a `created` that is not a real calendar date as a CK-1 finding, before any other rule; a CK-1 failure ends the run |
 
 ### Data
-Reads: the README body through `Doc` (level-2 headings, tables), frontmatter `type`, `status`, `parent`; `contracts/work-item.headings.v2.json`; the cited files; for the gate, the staged and HEAD versions of each work-item README. The authoritative sources: the heading table and the sentence naming the leading headings in the standard (for the heading config); the commit itself (staged index versus HEAD) for whether the sections are required, which no author-editable field or list can change; the cited file itself for citation resolution. Writes: nothing at check time. The heading generator writes its config; nothing else is generated.
+Reads: the README body through `Doc` (level-2 headings, tables), frontmatter `type`, `status`, `parent`; `contracts/work-item.headings.v2.json`; the cited files; for the gate, the staged version of each work-item README, and its HEAD version for the historical exception only. The authoritative sources: the heading table and the sentence naming the leading headings in the standard (for the heading config); the staged README itself for whether the sections are required (HEAD only to recognise an untouched historical spec), which no author-editable field or list can change; the cited file itself for citation resolution. Writes: nothing at check time. The heading generator writes its config; nothing else is generated.
 
 Standard text added (the Implementer writes the prose; this is its required content):
 1. L0 description: `## References` and `## Operating envelope` are items 1 and 2 of the section order, after the optional `## Overview` and before `## Purpose`; each table's exact header and cell rules (the tables above); the typed observed pointer; the `If violated` vocabulary with its four definitions and the statement that it is checked syntactically only.
 2. L0 full and lite heading lists begin with `References`, `Operating envelope`.
 3. Heading table rows: refactor gains both; bugfix, research and experiment gain `References` and the notation `(optional: `Operating envelope`)`; the sentence naming the leading headings.
 4. Per-type profile table: a References/envelope column (feature, integration, data-collection, refactor: required/required; experiment, research, bugfix: required/optional).
-5. Checker rules: rows CK-47, CK-48, CK-49 with pass and fail fixtures; line 23 becomes CK-1..CK-49; the ALWAYS and STATIC lists at line 326 gain CK-47 (ALWAYS) and CK-48, CK-49 (STATIC); the CK-1 row notes the real-date check; the spec gate row notes the transition trigger.
+5. Checker rules: rows CK-47, CK-48, CK-49 with pass and fail fixtures; line 23 becomes CK-1..CK-49; the STATIC list at line 326 gains CK-47, CK-48 and CK-49; the CK-1 row notes the real-date check; the spec gate row notes the staged-state rule.
 6. Migration section (below).
 7. A short section "Reviewer rating against the envelope": a finding that needs an envelope assumption broken is rated F, not R, unless the assumption can break silently; then a cheap detector (a check that ends in keep, refuse, flag or defer) is required and its absence is rated R. A spec that rebuilds something its References list as working, without a stated reason, is flagged. The reviewer opens each cited local line and spot-checks a web citation.
 8. `wrap` means extend in place; `extract` means lift the code into the new thing (so the Decision words cover all reuse).
 
-Migration (chosen: bind on the commit transition, owner-approved scope cut 2026-10-31; no exemption list, no date cutoff, no flag): nothing is grandfathered and nothing finished is rewritten. Existing items keep passing when checked standalone (a missing section is a warning). A commit that moves an item into spec-locked or building must add valid sections, so the Spindle drafts (branch-conventions, claim-registry, worktree-reaper) convert when they lock. Items already at building (spec-gate, spec-gate-checker, fleet-docs-home) are not gated until a later move into a gated status, and shipped is not gated. Rejected: a `created`-date cutoff and a `legacy-l0` flag (both author-editable) and a frozen generated list (regenerating it silently re-grandfathers new items; review round 2, NEW-2).
+Migration (chosen: an invariant on the staged state, owner-approved scope cut 2026-10-31; no exemption list, no date cutoff, no flag): existing items keep passing standalone (a missing section is a warning), and an untouched historical spec (same status at HEAD, neither section) only warns when edited. A README that is created at, or moved into, spec-locked, building or shipped must carry valid sections, so the Spindle drafts convert when they lock, and the building items (spec-gate, spec-gate-checker, fleet-docs-home) convert when they move to shipped. Once a README has the sections, every later commit must keep them valid (an amend or edit that removes them is rejected). Rejected first: a transition (delta) rule, which had four bypasses (entry at shipped, amend, branch early returns, quoted status). Rejected: a `created`-date cutoff and a `legacy-l0` flag (both author-editable) and a frozen generated list (regenerating it silently re-grandfathers new items; review round 2, NEW-2).
 
 ### Failure modes
 | Failure | Detection | Handling |
