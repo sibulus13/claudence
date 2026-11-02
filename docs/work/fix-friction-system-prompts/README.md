@@ -1,7 +1,7 @@
 ---
 id: fix-friction-system-prompts
 type: bugfix
-status: building
+status: shipped
 touches: [harness]
 layers:
   architecture: none
