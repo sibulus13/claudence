@@ -285,3 +285,117 @@ def test_ac7_v2_untrailered_docs_only_commit_lands(repo2: Path) -> None:
     write(repo2, "NOTES.md", "x\n")
     git(repo2, "add", "NOTES.md")
     assert commit(repo2, "-m", "docs: notes").returncode == 0
+
+
+# ---------------------------------------------------------------- fix-gate-trailer-hint (2026-11-02)
+
+HINT = "not read as a trailer"     # present only when the hint fires
+CAUSE = {
+    1: "the final paragraph has a non-trailer line",
+    2: "the key must be exactly `Spec`",
+    3: "text follows the path",
+    4: "the line is indented",
+    5: "outside the final trailer block",
+}
+COAUTHOR = "Co-Authored-By: t <t@t>"
+
+
+def commit_msg(repo: Path, message: str, *extra: str) -> subprocess.CompletedProcess:
+    """Stage a source edit and commit it with exactly `message` (written to a file, so nothing is reflowed)."""
+    write(repo, "src/app.py", f"x = {len(message)}\n")
+    msg = repo.parent / "msg.txt"
+    msg.write_text(message, encoding="utf-8", newline="\n")
+    return git(repo, *extra, "commit", "-q", "-a", "-F", str(msg), check=False)
+
+
+def commit_verbose(repo: Path, message: str, *config: str) -> subprocess.CompletedProcess:
+    """A real `git commit -v`: an editor stub prepends `message` to git's template (comments, scissors, diff)."""
+    stub = repo.parent / "editor.py"
+    stub.write_text("import sys\np = sys.argv[1]\nbody = open(p, encoding='utf-8').read()\n"
+                    f"open(p, 'w', encoding='utf-8', newline='\\n').write({message!r} + '\\n' + body)\n", encoding="utf-8")
+    editor = f'"{Path(sys.executable).as_posix()}" "{stub.as_posix()}"'
+    return git(repo, *config, "-c", f"core.editor={editor}", "commit", "-q", "-v", "-a", check=False)
+
+
+def test_a_divider_line_in_the_body_does_not_hide_the_trailers(repo2: Path) -> None:
+    # fix-gate-trailer-hint/AC-1
+    r = commit_msg(repo2, f"feat: x\n\nWhy, in two parts.\n---\nPart two.\n\n{TRAILER}\n{COAUTHOR}\n")
+    assert r.returncode == 0, r.stderr
+
+
+@pytest.mark.parametrize("config", [(), ("-c", "core.commentChar=;")])
+def test_commit_verbose_reads_the_trailers_like_git(repo2: Path, config: tuple) -> None:
+    # fix-gate-trailer-hint/AC-2
+    write(repo2, "src/app.py", "x = 99\n")
+    r = commit_verbose(repo2, f"feat: x\n\n{TRAILER}\n{COAUTHOR}", *config)
+    assert r.returncode == 0, r.stderr
+
+
+def test_no_hint_from_a_spec_line_below_the_scissors(repo2: Path) -> None:
+    # fix-gate-trailer-hint/AC-2: the context line " Spec: docs/work/..." sits in the diff, below the scissors
+    write(repo2, "src/app.py", "x = 1\nSpec = 'docs/work/demo/README.md'\n")
+    git(repo2, "commit", "-qam", "chore: seed", "--no-verify")
+    write(repo2, "src/notes.txt", "Spec: docs/work/x/README.md\nend\n")
+    git(repo2, "add", "-A")
+    git(repo2, "commit", "-qm", "chore: seed notes", "--no-verify")
+    write(repo2, "src/notes.txt", "Spec: docs/work/x/README.md\nchanged\n")
+    write(repo2, "src/app.py", "x = 2\nSpec = 'docs/work/demo/README.md'\n")
+    r = commit_verbose(repo2, "feat: no trailer at all")
+    assert r.returncode != 0 and HINT not in r.stderr, r.stderr
+
+
+@pytest.mark.parametrize("message", [
+    f"feat: x\n\n{TRAILER}\n\n{COAUTHOR}\n",
+    f"{TRAILER}\n",
+])
+def test_a_spec_line_outside_the_trailer_block_is_named(repo2: Path, message: str) -> None:
+    # fix-gate-trailer-hint/AC-3
+    r = commit_msg(repo2, message)
+    assert r.returncode != 0 and CAUSE[5] in r.stderr, r.stderr
+
+
+@pytest.mark.parametrize("message,cause", [
+    (f"feat: x\n\n{TRAILER}\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n", 1),
+    (f"feat: x\n\nspec: docs/work/demo/README.md\n{COAUTHOR}\n", 2),
+    (f"feat: x\n\nSpecs: docs/work/demo/README.md\n{COAUTHOR}\n", 2),
+    (f"feat: x\n\n{TRAILER} (building)\n{COAUTHOR}\n", 3),
+    (f"feat: x\n\nA body paragraph.\n\n  {TRAILER}\n", 4),
+    (f"feat: x\n\nSpec: docs/specs/demo.md\n\n{COAUTHOR}\n", 5),
+])
+def test_each_cause_is_named(repo2: Path, message: str, cause: int) -> None:
+    # fix-gate-trailer-hint/AC-4
+    r = commit_msg(repo2, message)
+    assert r.returncode != 0 and CAUSE[cause] in r.stderr, r.stderr
+    if cause == 4:
+        assert CAUSE[1] not in r.stderr, r.stderr
+
+
+@pytest.mark.parametrize("message", [
+    "feat: x\n\nNo spec line here.\n",
+    "feat: x\n\nSpec: see the README for why.\n",
+    "feat: x\n\n> Spec: x\n",
+])
+def test_lines_that_only_look_like_spec_get_no_hint(repo2: Path, message: str) -> None:
+    # fix-gate-trailer-hint/AC-5
+    r = commit_msg(repo2, message)
+    assert r.returncode != 0 and HINT not in r.stderr, r.stderr
+
+
+def test_repo_trailer_config_does_not_change_the_reading(repo2: Path) -> None:
+    # fix-gate-trailer-hint/AC-6
+    git(repo2, "config", "trailer.separators", "=")
+    r = commit_msg(repo2, f"feat: x\n\n{TRAILER}\n{COAUTHOR}\n")
+    assert r.returncode == 0, r.stderr
+
+
+def test_a_failed_trailer_parse_is_a_gate_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    # fix-gate-trailer-hint/AC-6: tests the return-code check, not git
+    sys.path.insert(0, str(CLAUDE / "scripts"))
+    import spec_gate
+
+    def failed(*a, **k):
+        return subprocess.CompletedProcess(a, 1, stdout="", stderr="boom")
+
+    monkeypatch.setattr(spec_gate.subprocess, "run", failed)
+    with pytest.raises(spec_gate.GateError):
+        spec_gate.git_trailers(Path("msg.txt"))
