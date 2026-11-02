@@ -23,5 +23,8 @@ flowchart TD
    - `MSYS_NO_PATHCONV=1 python ~/.claude/scripts/repoint_paths.py --map moves.json --exclude /test/ --exclude /tests/ --exclude .test. --exclude .spec. --exclude /.claude/telemetry/` (dry-run first with `--dry-run`)
    - `powershell -NoProfile -File ~/.claude/scripts/repoint_tasks.ps1 -Map moves.json` (a task stored with a password needs the owner)
    - `python ~/.claude/scripts/repair_worktrees.py --map moves.json` (git worktree links and pnpm junctions)
+   - A move across drives is never a rename: copy (`robocopy /E /COPY:DAT`), hash-verify every file, clear
+     read-only attributes (`attrib -R /S`, git objects are read-only), then delete the source. `Move-Item` across
+     drives half-fails on read-only git objects (2026-10-31).
 5. Verify: every scheduled task's script path exists; run each moved repo's test gate; start one moved task and require `LastTaskResult` 0; restart any daemon you stopped from its new path.
 6. Commit the rewritten files per repo (only files that were clean before), and update `D:/repo/_Archive/README.md` for archives.

@@ -36,7 +36,14 @@ bug is not testing that code).
   integration boundary (section 5). Nothing speculative.
 - **Test first** (adopted 2026-10-31). A test is written and seen red before the code that makes
   it green; a reviewer checks the commit order or the stated red run. Spikes and research are exempt
-  until their code is kept.
+  until their code is kept. The red run **finishes and is read before the first edit to the code under test**: run
+  it in the foreground, never overlapping an edit (a background red run raced the edits on 2026-10-31 and proved
+  nothing). If a red run was invalidated, a mutation check (disable the new code, see the tests fail) replaces it, and the
+  independent reviewer's own mutation check (`agents/reviewer.md`) is the verifier of either; the author's quoted red
+  run is never the only evidence.
+- **Look-alikes are acceptance tests.** Any pattern or parser over prose or untrusted text gets negative fixtures
+  for inputs that only look valid (`3.5:1` is not `file:line`); each closed-off row of a spec's Outcome inventory
+  gets a test asserting that named outcome. Neither counts as speculative.
 - **The change test:** a refactor that keeps the behaviour must keep the tests green. If a harmless
   rename, reorder or rewording breaks a test, the test pinned implementation: loosen it.
 

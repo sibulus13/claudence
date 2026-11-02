@@ -48,11 +48,11 @@ A review's outcome, one of `pass`, `fix-first` or `block`; `pass` means lock at 
 _Avoid_: SHIP, GO, CONFIRMED, approval
 
 **Rating**:
-The weight of one finding: R (real, must fix), F (fragile, should fix), H (hardening, optional).
+The weight of one finding: R (real now: blocks), F (future: real only if an Operating envelope assumption breaks), H (hardening: optional).
 _Avoid_: severity, critical/warn/info, blocker/concern/nit
 
 **Review budget**:
-One review, at most one fix round, then one verify review; a second fix-first verdict goes to the architect.
+Per work item and per review kind: one review, at most one fix round, then one verify review; a second fix-first verdict goes to the architect.
 _Avoid_: review rounds, fix budget
 
 ## Records

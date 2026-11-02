@@ -21,7 +21,7 @@ flowchart TD
 | Old phases | Now | Notes |
 |---|---|---|
 | -1, 0, 1 | intake, reuse check, kill gate | REFERENCE §-1/§0/§1. A NO still writes a record |
-| 2, 2.5 | **cycle `scope=spec`** | Design = requirements plus the assumptions ledger. Design review = the multi-domain adversarial review (REFERENCE §2.5 dimensions). Pre-traffic GO sets `status: spec-locked` automatically; live requires `approvedBy` |
+| 2, 2.5 | **cycle `scope=spec`** | Design = requirements, assumptions and the Outcome inventory; then the adversary pass (`agents/adversary.md`); Design review = the reviewer in design mode. A pre-traffic `pass` is the fresh review record the parent locks with (`playbooks/agent-dispatch.md` § Review records); live also requires `approvedBy` |
 | 3 | **cycle `scope=contract`** | One contract artifact, child items with pairwise-disjoint `owns`, and a coupling map (REFERENCE §3). A small slice skips this and runs one component cycle |
 | 4, 5, 6 | **cycle `scope=component`** per child | One worktree each, in parallel. Tests are written alongside (REFERENCE §5), and gates come from the project manifest (REFERENCE §6) |
 | 7, 7.5 | **cycle `scope=integration`** | Contract tests, e2e, the smoke test, TRACE.md, and demo or before/after evidence (REFERENCE §7/§7.5) |

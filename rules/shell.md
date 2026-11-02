@@ -25,7 +25,11 @@ paths:
   preserves line endings (CRLF incident 2026-10-25).
 - Never write source code through a Python string inside a heredoc: escapes like `\n` and `\s` are
   re-interpreted and land as real newlines (JS syntax errors, Foreman alerts.js 2026-10-25). Use the
-  Edit tool, or a literal `cat <<'EOF'` with the exact text.
+  Edit tool, or a literal `cat <<'EOF'` with the exact text. The same holds for inline `python - <<'EOF'` patch
+  scripts that carry backslashes in their search strings: write the script to a file, or use the Edit tool
+  (4 silent failures on 2026-10-31).
+- **Read back every scripted edit** before reporting it: an aborted script (an assertion, a non-matching search)
+  leaves the file unchanged while the turn moves on. Report an edit that did not land as NOT landed.
 - git: never `--autostash` or bare `git stash` (the stash stack is shared across worktrees and
   sessions; slip 2026-10-25 on a Foreman rebase). Commit WIP or rebase with a clean tree.
 

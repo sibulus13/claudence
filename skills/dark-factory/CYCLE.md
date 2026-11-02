@@ -2,6 +2,25 @@
 
 Adopted 2026-09-26 at the owner's request: "minimize the workflow into one atomic chunk we can replicate". It is implemented as `C:/Users/Michael/.claude/workflows/cycle.js`, verified against a stubbed run of all 6 control-flow paths.
 
+## Adopted 2026-11-02, these override the text below (owner decisions D23-D25; ADR `~/.claude/docs/adr/0001-review-records-gate-lock-and-ship.md`)
+
+**`cycle.js` is suspended until work item `stage-trace` updates it**: its Implement prompt still tells the
+implementer to set `building` and commit, which the implementer persona now forbids, and its reviewer prompt uses the
+retired severity words. Until then, run the stages by hand (designer, adversary, reviewer in design mode, implementer,
+reviewer in code mode) as `playbooks/agent-dispatch.md` describes. Lines below marked *(retired 2026-11-02)* no
+longer apply.
+- **Adversary pass** between Design and DesignReview (`agents/adversary.md`); the designer adds or rejects each row.
+- **Budget, every size**: one review, at most one fix round, then a **verify review** of only the fix diff. A second
+  `fix-first` goes to the architect. The S/M/L 1/2/3 budget (inputs table, caller rule 6) is retired.
+- **Verdicts** `pass` / `fix-first` / `block`; **ratings** R (real now) / F (future) / H (hardening); finding
+  **class** adds `approach` (routed to the architect).
+- **Review records**: every review leaves `docs/work/<id>/reviews/<date>-<kind>.md`; `steps.jsonl` keeps only a
+  pointer (path and hash). Lock and ship need a fresh `pass` record.
+- **Ship** becomes a traced stage; the trace moves to `docs/work/<id>/trace.jsonl` for every work item.
+- **Caller rule 10 is retired**: small mechanical work still gets a (short) design review; no exemption.
+- **Tests**: a negative fixture for each look-alike and a row per closed-off outcome count as acceptance-criterion
+  tests, not padding.
+
 ```mermaid
 stateDiagram-v2
   [*] --> Design
@@ -30,7 +49,7 @@ stateDiagram-v2
 | `testCommand` | the exact gate command. Required for every scope except spec |
 | `owns` | glob list this cycle may edit (component scope) |
 | `contract` | path of the contract artifact to import and never edit |
-| `size` / `budget` | optional. Size S/M/L gives a fix budget of 1/2/3. Absent, the designer's own size estimate decides. Max 3 |
+| `size` / `budget` | *(retired 2026-11-02)* optional. Size S/M/L gives a fix budget of 1/2/3. Absent, the designer's own size estimate decides. Max 3 |
 | `parentCycleId` | links a component or integration cycle to its parent work item |
 
 ## Personas per step (Fan-Out checklist items 1, 2 and 6)
@@ -92,8 +111,8 @@ The **Design** step writes `## Gate plan` into the work item README and returns 
 3. **Reviewers first check that the item actually changed** (`git status` / `diff`). An unchanged item gets exactly one finding ("no changes produced") instead of a re-review of stale content.
 4. After the cycle, **commit its `cycles/<cycleId>/` trace with the work**. The trace is part of the evidence.
 5. **Only R findings block** (from pilot 2: budget-exhausted on a 25-AC spec whose round-3 findings were precision polish). Each finding is rated R/F/H (Real-now / Future / Hardening, the rating from the old §2.5 review). The script passes a review with no R findings; F and H are recorded as `deferred` on the step. Reviewers get the earlier round's findings and must first mark each resolved or still open.
-6. **Budget = the larger of the caller's size and the designer's own estimate** (pilot 2 was capped at M while its designer sized it L).
+6. *(retired 2026-11-02)* **Budget = the larger of the caller's size and the designer's own estimate** (pilot 2 was capped at M while its designer sized it L).
 7. **`startAt: "review"` + `priorFindings`** re-verifies an existing design without redesigning it.
 8. **One cycle = one deliverable** (from the Foreman test-isolation run: sandboxing + minimization in one brief; every fix round went to the first half and the second never started). A large, mechanical sweep, such as minimizing 800+ tests, is not one implementer's job. Run it as its own fan-out: one agent per file classifies, then a per-file prune, then a coverage check across the whole suite. Then run a cycle over the result.
 9. **Preserve line endings** (from the nuwa run: agents on Windows rewrote 42 LF files as CRLF, inflating a +1,095-line change to +8,900). Before committing a cycle's output, normalize every touched file back to its `HEAD` line ending, and review the diff size after normalization.
-10. **Don't send small mechanical work through the full cycle** (from the nuwa architecture run: ~663k tokens across 3 design-review rounds of a design doc for a ~150-line generator with an existing reference; it never reached implementation). When the work has a reference implementation to mirror and an objective gate (e.g. "the generator runs and `likec4 validate` passes"), skip Design/Design-review: **implement directly, run the gate, then have ONE independent reviewer check it** (the `reviewer` agent). That still separates author from verifier. Reserve the full cycle for work with real design ambiguity.
+10. *(retired 2026-11-02: every design gets a short review)* **Don't send small mechanical work through the full cycle** (from the nuwa architecture run: ~663k tokens across 3 design-review rounds of a design doc for a ~150-line generator with an existing reference; it never reached implementation). When the work has a reference implementation to mirror and an objective gate (e.g. "the generator runs and `likec4 validate` passes"), skip Design/Design-review: **implement directly, run the gate, then have ONE independent reviewer check it** (the `reviewer` agent). That still separates author from verifier. Reserve the full cycle for work with real design ambiguity.

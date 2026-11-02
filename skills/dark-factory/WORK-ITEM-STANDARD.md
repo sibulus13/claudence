@@ -138,6 +138,26 @@ FR delta (v1), then `## Acceptance criteria` with exactly this header:
 - For bugfix and refactor the same table lives in README under `## Acceptance criteria`, and `Traces` may be `-`.
 - At most 15 AC rows per work item (CK-23).
 
+## Outcome inventory [adopted 2026-11-02; checker rule lands with work item `outcome-inventory`]
+
+The single definition used by `agents/designer.md`, `agents/adversary.md` and `agents/reviewer.md` (owner decisions
+D24, grilling round 1 Q8-Q10). Required in every feature and integration item and in any item with a state diagram,
+under `## Outcome inventory` in `functional.md` (README for bugfix and refactor). An item with no stages writes exactly
+`No states.` followed by one sentence saying why.
+
+One table per state machine or staged flow, header exactly:
+
+`| Stage | Outcome | Kind | Class | Handled by |`
+
+- `Kind` is one of the **outcome-kind checklist**: `success`, `invalid input`, `dependency fails`, `timeout`,
+  `crash mid-step`, `concurrent actor`, `duplicate or replay`, `arrival channel`. Every stage has at least one row of
+  each kind, or one row `n/a: <reason>` in `Outcome` for a kind that cannot occur there.
+- `arrival channel` rows list every way input reaches the stage (for a git gate: commit, amend, merge, squash,
+  rebase, cherry-pick, revert, rename, first commit, import).
+- `Class` is `nominal`, `closed: refused`, `closed: recovered` or `closed: escalated` (GLOSSARY.md: Closed off).
+- `Handled by` names an `AC-n` (or `FR-n`) of this item; every closed row's AC asserts that named outcome.
+- Rows the adversary pass proposed are added, or listed under `### Rejected outcomes` with the reason.
+
 ## README.md frontmatter (machine-read by Catwalk) [v2: extended]
 
 ```yaml

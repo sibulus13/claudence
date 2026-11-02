@@ -1,6 +1,8 @@
 # dark-factory — full reference (moved verbatim from SKILL.md, 2026-09-26)
 
 > The operating core is now `SKILL.md` (the cycle model). This file keeps every rule, rationale and incident that the core points into. Section headings are unchanged, so existing references still resolve.
+>
+> **Superseded in part, 2026-11-02:** verdicts (SHIP / GO / CONFIRMED…), review budgets, the Skeptic and "adversarial pass" roles and the design-review skip below are replaced, as are the `docs/review-records/<slug>-round-<N>.md` record path (now `docs/work/<id>/reviews/`), by `CYCLE.md` § "Adopted 2026-11-02", `agents/adversary.md` and ADR `~/.claude/docs/adr/0001-review-records-gate-lock-and-ship.md`. Where this file disagrees, those win.
 
 
 # dark-factory
