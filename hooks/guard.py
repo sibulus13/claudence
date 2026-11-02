@@ -11,7 +11,6 @@ from __future__ import annotations
 import json
 import os
 import re
-import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -112,22 +111,206 @@ def bad_repo_target(path: Path) -> bool:
     return len(parts) == 1 or parts[0] in LEGACY_CATEGORIES or (parts[0] == "web" and parts[1:2] != ["personal"])
 
 
-def clone_or_init_target(cmd: str, cwd: str) -> Path | None:
-    m = re.search(r"\bgit\s+(clone|init)\b(.*)", cmd)
-    if not m:
-        return None
-    try:
-        args = [a for a in shlex.split(m.group(2).split("&&")[0].split(";")[0], posix=False) if not a.startswith("-")]
-    except ValueError:
-        return None
-    if m.group(1) == "clone":
-        if not args:
+# --- Where a git init / clone will create a repo (docs/work/fix-guard-init-branch) ---------------------------------
+# Value options that take a separate argument, from git-scm.com/docs/git, git-init and git-clone (checked 2026-11-02).
+GIT_GLOBAL_VALUE = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--config-env", "--super-prefix"}
+INIT_VALUE = {"-b", "--initial-branch", "--template", "--separate-git-dir", "--object-format", "--ref-format"}
+CLONE_VALUE = {"-o", "--origin", "-b", "--branch", "-u", "--upload-pack", "-c", "--config", "-j", "--jobs",
+               "--reference", "--reference-if-able", "--separate-git-dir", "--depth", "--template", "--filter",
+               "--shallow-since", "--shallow-exclude", "--server-option", "--bundle-uri", "--revision", "--ref-format"}
+SEP = "\0sep"   # a command separator token, never a real argument
+CD_WORDS = {"cd", "pushd", "set-location", "sl", "chdir"}
+WRAPPERS = {"bash": ("-c", "bash"), "sh": ("-c", "bash"), "pwsh": ("-c", "powershell"),
+            "powershell": ("-c", "powershell"), "cmd": ("/c", "powershell")}
+GIT_INIT_OR_CLONE = re.compile(r"\bgit(\.exe)?\b.*\b(init|clone)\b", re.S)
+
+
+class Unresolvable(Exception):
+    """The guard cannot tell where a git init or clone would create a repo: the caller denies."""
+
+
+def shell_tokens(cmd: str, shell: str) -> list[str]:
+    """Split by the calling shell's rules: Bash escapes with a backslash, PowerShell (and cmd) with a backtick and keep
+    backslashes literal. Separators outside quotes become SEP. Raises ValueError on an unbalanced quote."""
+    esc = "\\" if shell == "bash" else "`"
+    tokens: list[str] = []
+    buf: list[str] = []
+    started = False
+    quote = None
+    i = 0
+
+    def flush() -> None:
+        nonlocal buf, started
+        if buf or started:
+            tokens.append("".join(buf))
+        buf, started = [], False
+
+    while i < len(cmd):
+        c = cmd[i]
+        if quote == "'":
+            if c == "'" and shell != "bash" and cmd[i + 1:i + 2] == "'":
+                buf.append("'")
+                i += 1
+            elif c == "'":
+                quote = None
+            else:
+                buf.append(c)
+        elif quote == '"':
+            if c == '"':
+                quote = None
+            elif c == esc and i + 1 < len(cmd):
+                nxt = cmd[i + 1]
+                if shell == "bash" and nxt not in '"\\$`\n':
+                    buf.append(c)              # bash keeps a backslash that escapes nothing inside double quotes
+                else:
+                    buf.append(nxt)
+                    i += 1
+            else:
+                buf.append(c)
+        elif c in "'\"":
+            quote, started = c, True
+        elif c == esc and i + 1 < len(cmd):
+            buf.append(cmd[i + 1])
+            started = True
+            i += 1
+        elif c in " \t\r":
+            flush()
+        elif c in "\n;&|()":
+            flush()
+            if not tokens or tokens[-1] != SEP:
+                tokens.append(SEP)
+        else:
+            buf.append(c)
+        i += 1
+    if quote:
+        raise ValueError("unbalanced quote")
+    flush()
+    return tokens
+
+
+def resolve_dir(cwd: Path | None, arg: str) -> Path | None:
+    """`arg` as a directory seen from `cwd`. None when it cannot be on this drive (not judged); raises Unresolvable when
+    it depends on something unknown (a variable, `-`, `~`, or a relative path from an unknown directory)."""
+    if not arg or arg in ("-", "~") or "$" in arg or "%" in arg:
+        raise Unresolvable(f"directory `{arg or '(home)'}` is not known statically")
+    m = re.match(r"^([A-Za-z]):(?![\\/])(.*)$", arg)   # drive-relative, e.g. D:repobad
+    if m:
+        if cwd is None:
+            raise Unresolvable(f"`{arg}` is relative to an unknown directory")
+        if cwd.drive.upper() != f"{m.group(1).upper()}:":
             return None
-        dest = args[1] if len(args) > 1 else re.sub(r"\.git$", "", args[0].rstrip("/").split("/")[-1])
-    else:
-        dest = args[0] if args else "."
-    dest = dest.strip("\"'")
-    return Path(dest) if Path(dest).is_absolute() else Path(cwd) / dest
+        arg = m.group(2)
+    p = Path(arg)
+    if not p.is_absolute():
+        if cwd is None:
+            raise Unresolvable(f"`{arg}` is relative to an unknown directory")
+        p = cwd / p
+    return Path(os.path.normpath(p))
+
+
+def take_options(args: list[str], value_opts: set[str]) -> list[str]:
+    """Drop options and their values (attached, separate, clustered short ones, unique long prefixes); return the
+    positionals. A long prefix of two or more value options is ambiguous: Unresolvable."""
+    positionals: list[str] = []
+    longs = sorted(o for o in value_opts if o.startswith("--"))
+    shorts = {o[1] for o in value_opts if len(o) == 2}
+    i = 0
+    while i < len(args):
+        a = args[i]
+        if a == "--":
+            positionals += args[i + 1:]
+            break
+        if a.startswith("--"):
+            name = a.split("=", 1)[0]
+            if "=" not in a:
+                hits = [name] if name in value_opts else [o for o in longs if o.startswith(name)]
+                if len(hits) > 1:
+                    raise Unresolvable(f"`{name}` is an ambiguous option")
+                if hits:
+                    i += 1             # its value is the next argument
+        elif a.startswith("-") and len(a) > 1:
+            for k, ch in enumerate(a[1:], start=1):
+                if ch in shorts:
+                    if k == len(a) - 1:
+                        i += 1         # `-qb main`: the value is the next argument; `-bmain`: it is attached
+                    break
+        else:
+            positionals.append(a)
+        i += 1
+    return positionals
+
+
+def clone_dir(url: str) -> str:
+    tail = re.split(r"[/\\:]", url.rstrip("/\\"))[-1]
+    return re.sub(r"\.git$", "", tail)
+
+
+def init_targets(cmd: str, cwd: str, shell: str = "bash", depth: int = 0) -> list[Path]:
+    """Every directory a git init or clone in `cmd` would create a repo in, in order. Raises Unresolvable when that
+    cannot be told; the guard denies then. Known limits: docs/work/fix-guard-init-branch/README.md § Known limits."""
+    text = HEREDOC.sub("<<HEREDOC", cmd)
+    try:
+        tokens = shell_tokens(text, shell)
+    except ValueError as e:
+        if GIT_INIT_OR_CLONE.search(text):
+            raise Unresolvable(str(e)) from e
+        return []
+    here: Path | None = Path(cwd)
+    found: list[Path] = []
+    segments: list[list[str]] = [[]]
+    for t in tokens:
+        if t == SEP:
+            segments.append([])
+        else:
+            segments[-1].append(t)
+    for seg in segments:
+        while seg and (re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", seg[0]) or seg[0] == "command"):
+            seg = seg[1:]
+        if not seg:
+            continue
+        word = re.split(r"[\\/]", seg[0])[-1].lower().removesuffix(".exe")
+        if word in CD_WORDS:
+            args = [a for a in seg[1:] if a.lower() not in ("-path", "-literalpath")]
+            try:
+                here = resolve_dir(here, args[0] if args else "")
+            except Unresolvable:
+                here = None          # judged only if a later init or clone depends on it
+            continue
+        if word in WRAPPERS and depth == 0:
+            flag, inner_shell = WRAPPERS[word]
+            lowered = [a.lower() for a in seg]
+            for f in (flag, "-command"):
+                if f in lowered and lowered.index(f) + 1 < len(seg):
+                    found += init_targets(seg[lowered.index(f) + 1], str(here) if here else cwd, inner_shell, 1)
+                    break
+            continue
+        if word != "git":
+            continue
+        rest, where = seg[1:], here
+        while rest and rest[0].startswith("-"):
+            opt = rest[0].split("=", 1)[0]
+            if opt in GIT_GLOBAL_VALUE and "=" not in rest[0] and len(rest) > 1:
+                if opt == "-C":
+                    where = resolve_dir(where, rest[1])
+                rest = rest[2:]
+            else:
+                rest = rest[1:]
+        if not rest or rest[0] not in ("init", "clone"):
+            continue
+        sub, args = rest[0], rest[1:]
+        pos = take_options(args, INIT_VALUE if sub == "init" else CLONE_VALUE)
+        if sub == "init":
+            target = pos[0] if pos else "."
+        elif pos:
+            target = pos[1] if len(pos) > 1 else clone_dir(pos[0])
+        else:
+            continue
+        if where is None and not re.match(r"^[A-Za-z]:[\\/]", target):
+            raise Unresolvable("the working directory is not known statically")
+        resolved = resolve_dir(where, target)
+        if resolved is not None:
+            found.append(resolved)
+    return found
 
 
 def check_shell(event: dict) -> dict | None:
@@ -161,10 +344,15 @@ def check_shell(event: dict) -> dict | None:
        not re.search(r"run[-_]hidden\.vbs|pythonw(\.exe)?", cmd, re.I):
         return decide("deny", "Scheduled tasks must run hidden: action = wscript.exe //B //Nologo <repo>\\scripts\\run-hidden.vbs "
                               "<program> (or pythonw.exe). Then smoke it: Start-ScheduledTask + LastTaskResult 0.")
-    target = clone_or_init_target(ti.get("command") or "", cwd)
-    if target is not None and bad_repo_target(target):
-        return decide("deny", f"New repos go in a theme folder (D:/repo/<Finance|Factory|SaaS|Assistant|Lib|Experiment>/...), "
-                              f"not {target}.")
+    try:
+        targets = init_targets(ti.get("command") or "", cwd, "powershell" if event.get("tool_name") == "PowerShell" else "bash")
+    except Unresolvable as e:
+        return decide("deny", f"Cannot tell where this git init/clone would create a repo ({e}). Use a literal absolute "
+                              "path in a theme folder (D:/repo/<Theme>/<repo>).")
+    for target in targets:
+        if target == Path(os.path.normpath(REPO_ROOT)) or bad_repo_target(target):
+            return decide("deny", f"New repos go in a theme folder (D:/repo/<Finance|Factory|SaaS|Assistant|Lib|Experiment>/...), "
+                                  f"not {target}.")
     if not unattended(event) and not ti.get("run_in_background") and LONG_RUNNERS.search(cmd):
         m = re.search(r"\bpytest\b(.*)", cmd)
         single = SINGLE_TEST.search(cmd) or (m and PYTEST_TARGET.search(m.group(1).split("|")[0]))
