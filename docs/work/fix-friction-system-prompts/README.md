@@ -1,7 +1,7 @@
 ---
 id: fix-friction-system-prompts
 type: bugfix
-status: draft
+status: spec-locked
 touches: [harness]
 layers:
   architecture: none
