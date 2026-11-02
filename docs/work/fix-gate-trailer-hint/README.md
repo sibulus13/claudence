@@ -1,7 +1,7 @@
 ---
 id: fix-gate-trailer-hint
 type: bugfix
-status: draft
+status: spec-locked
 touches: [harness]
 layers:
   architecture: none

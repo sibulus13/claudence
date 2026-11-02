@@ -1,7 +1,7 @@
 ---
 id: review-records
 type: feature
-status: draft
+status: spec-locked
 touches: [harness]
 layers:
   architecture: none

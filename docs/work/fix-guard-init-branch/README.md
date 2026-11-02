@@ -1,7 +1,7 @@
 ---
 id: fix-guard-init-branch
 type: bugfix
-status: draft
+status: spec-locked
 touches: [harness]
 layers:
   architecture: none
