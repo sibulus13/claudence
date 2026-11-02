@@ -338,3 +338,138 @@ Describe "Get-PromptClassification" {
         }
     }
 }
+
+# ---------------------------------------------------------------- fix-friction-system-prompts (2026-11-02)
+
+Describe "fix-friction-system-prompts" {
+    BeforeAll {
+        . "$PSScriptRoot\..\telemetry\lib\classification.ps1"
+        function New-Prompt([string]$Ts, [string]$Text, [string]$Cls) {
+            [PSCustomObject]@{ ts = $Ts; event = 'prompt'; classification = $Cls; prompt_text = $Text; prompt_chars = $Text.Length }
+        }
+        function New-Entry([string]$Ts, [string]$Text, [string]$Src, [string]$PromptId = 'p', [bool]$Side = $false) {
+            [PSCustomObject]@{ timestamp = $Ts; text = $Text; promptSource = $Src; promptId = $PromptId; isSidechain = $Side }
+        }
+    }
+
+    Context "fix-friction-system-prompts/AC-1: Stop-time score reads the transcript" {
+        It "scores only owner prompts and joins each event to its own entry" {
+            $events = @(
+                New-Prompt '2026-11-02T10:00:00.000-08:00' 'Fix the guard' 'first_prompt'
+                New-Prompt '2026-11-02T10:00:30.000-08:00' '<task-notification><task-id>b1</task-id>' 'addition'
+                New-Prompt '2026-11-02T10:01:00.000-08:00' 'Go ahead' 'addition'
+                New-Prompt '2026-11-02T10:01:02.000-08:00' 'Go ahead' 'override'
+                New-Prompt '2026-11-02T10:02:00.000-08:00' 'tick: check CI' 'addition'
+                New-Prompt '2026-11-02T10:03:00.000-08:00' 'Actually use the other one instead' 'override'
+                New-Prompt '2026-11-02T10:04:00.000-08:00' 'accepted suggestion text' 'addition'
+            )
+            $entries = @(
+                New-Entry '2026-11-02T18:00:00.500Z' 'Fix the guard' 'typed'
+                New-Entry '2026-11-02T18:00:30.200Z' '<task-notification><task-id>b1</task-id>' 'system'
+                New-Entry '2026-11-02T18:01:00.100Z' 'Go ahead' 'typed' 'dup'
+                New-Entry '2026-11-02T18:01:02.100Z' 'Go ahead' 'system' 'dup'
+                New-Entry '2026-11-02T18:01:01.000Z' 'Go ahead' 'typed' 'side' $true
+                New-Entry '2026-11-02T18:02:00.300Z' 'tick: check CI' 'sdk'
+                New-Entry '2026-11-02T18:03:00.100Z' 'Actually use the other one instead' 'typed'
+                New-Entry '2026-11-02T18:04:00.100Z' 'accepted suggestion text' 'suggestion_accepted'
+            )
+            $r = Get-FrictionScore $events $entries
+            $r.score | Should -Be 5            # override +3, two additions +1 each; a crossed join gives 7
+            $r.prompt_count | Should -Be 4     # typed x3 and suggestion_accepted
+            $r.marker_misses | Should -Be 3    # notification, the system 'Go ahead', the sdk tick
+        }
+    }
+
+    Context "fix-friction-system-prompts/AC-2: live markers label injected prompts" {
+        It "labels <Name> as system while Claude runs" -TestCases @(
+            @{ Name = 'task-notification'; Text = '<task-notification><task-id>x</task-id>' }
+            @{ Name = 'agent-message after whitespace'; Text = "  `n<agent-message from=`"a1`">done</agent-message>" }
+            @{ Name = 'cross-session-message'; Text = '<cross-session-message from="s1">hi</cross-session-message>' }
+        ) {
+            param($Name, $Text)
+            $prior = @([PSCustomObject]@{ ts = '2026-01-01T10:00:00Z'; event = 'prompt'; classification = 'first_prompt' })
+            Get-PromptClassification $Text $prior | Should -Be 'system'
+        }
+    }
+
+    Context "fix-friction-system-prompts/AC-3: owner look-alikes are not silenced" {
+        It "does not treat <Name> as system" -TestCases @(
+            @{ Name = 'a marker mid-text'; Text = 'why did <task-notification> fire?' }
+            @{ Name = 'a paste'; Text = "<pasted_content id=`"5cf8`">`n<task-notification>x</task-notification>`n</pasted_content id=`"5cf8`">" }
+            @{ Name = 'a typed slash command'; Text = '/retrospect' }
+            @{ Name = 'an empty prompt'; Text = '' }
+        ) {
+            param($Name, $Text)
+            Test-IsSystemPrompt $Text | Should -Be $false
+        }
+    }
+
+    Context "fix-friction-system-prompts/AC-4: owner reply racing a notification" {
+        It "classifies the reply against the owner's last prompt" {
+            $prior = @(
+                [PSCustomObject]@{ ts = '2026-01-01T10:00:00Z'; event = 'prompt'; classification = 'first_prompt' }
+                [PSCustomObject]@{ ts = '2026-01-01T10:05:00Z'; event = 'stop' }
+                [PSCustomObject]@{ ts = '2026-01-01T10:05:10Z'; event = 'prompt'; classification = 'system' }
+            )
+            Get-PromptClassification 'Sounds good, go on' $prior | Should -Be 'followup'
+        }
+    }
+
+    Context "fix-friction-system-prompts/AC-5: a notification first" {
+        It "labels a first-prompt notification system" {
+            Get-PromptClassification '<task-notification>x</task-notification>' @() | Should -Be 'system'
+        }
+        It "gives the owner's first prompt first_prompt after a notification" {
+            $prior = @([PSCustomObject]@{ ts = '2026-01-01T10:00:00Z'; event = 'prompt'; classification = 'system' })
+            Get-PromptClassification 'Start the build' $prior | Should -Be 'first_prompt'
+        }
+    }
+
+    Context "fix-friction-system-prompts/AC-6: system prompts touch no theme or rate" {
+        It "<Label> updates themes and rates: <Expected>" -TestCases @(
+            @{ Label = 'system'; Expected = $false }
+            @{ Label = 'first_prompt'; Expected = $true }
+            @{ Label = 'followup'; Expected = $true }
+            @{ Label = 'override'; Expected = $true }
+            @{ Label = 'addition'; Expected = $true }
+            @{ Label = 'denial_context'; Expected = $true }
+        ) {
+            param($Label, $Expected)
+            Test-UpdatesTheme $Label | Should -Be $Expected
+            Test-CountsAsPrompt $Label | Should -Be $Expected
+        }
+    }
+
+    Context "fix-friction-system-prompts/AC-7: end to end at Stop, sandboxed" {
+        It "links the real transcript, counts misses and plays no sound" {
+            $home2 = Join-Path $TestDrive 'home'
+            $tele = Join-Path $home2 '.claude\telemetry'
+            New-Item -ItemType Directory -Force -Path (Join-Path $tele 'sessions'), (Join-Path $home2 '.claude\workspaces') | Out-Null
+            $sid = 'abcdef12-0000-0000-0000-000000000000'
+            @(
+                '{"ts":"2026-11-02T10:00:00.000-08:00","event":"prompt","classification":"first_prompt","prompt_text":"Fix it","prompt_chars":6}'
+                '{"ts":"2026-11-02T10:00:30.000-08:00","event":"prompt","classification":"addition","prompt_text":"/loop tick","prompt_chars":10}'
+                '{"ts":"2026-11-02T10:01:00.000-08:00","event":"prompt","classification":"addition","prompt_text":"orphan","prompt_chars":6}'
+            ) | Set-Content (Join-Path $tele "sessions\$sid.jsonl")
+            $transcript = Join-Path $TestDrive 'transcript.jsonl'
+            @(
+                '{"type":"user","message":{"role":"user","content":"Fix it"},"promptSource":"typed","timestamp":"2026-11-02T18:00:00.200Z","isSidechain":false}'
+                '{"type":"assistant","message":{"content":[{"type":"text","text":"ok"}]}}'
+                '{"type":"user","message":{"role":"user","content":[{"type":"text","text":"/loop tick"}]},"promptSource":"system","timestamp":"2026-11-02T18:00:30.100Z","isSidechain":false}'
+            ) | Set-Content $transcript
+            $realCum = "$env:USERPROFILE\.claude\telemetry\cumulative.json"
+            $before = (Get-Item $realCum -ErrorAction SilentlyContinue).LastWriteTimeUtc
+            $saved = $env:USERPROFILE
+            try {
+                $env:USERPROFILE = $home2; $env:TELEMETRY_NO_SOUND = '1'
+                (@{ session_id = $sid; transcript_path = $transcript } | ConvertTo-Json -Compress) |
+                    powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$PSScriptRoot\..\telemetry\analyze-session.ps1" | Out-Null
+            } finally { $env:USERPROFILE = $saved; Remove-Item Env:TELEMETRY_NO_SOUND -ErrorAction SilentlyContinue }
+            $report = Get-Content (Join-Path $tele 'reports\abcdef12.json') -Raw | ConvertFrom-Json
+            $report.transcript_path | Should -Be $transcript
+            "$($report.marker_misses)/$($report.unlabelled)" | Should -Be '1/1'
+            (Test-Path (Join-Path $home2 '.claude\workspaces\.last-ding-stop')) -or
+                ((Get-Item $realCum -ErrorAction SilentlyContinue).LastWriteTimeUtc -ne $before) | Should -Be $false
+        }
+    }
+}
