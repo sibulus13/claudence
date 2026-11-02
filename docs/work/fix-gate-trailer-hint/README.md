@@ -51,9 +51,9 @@ line or `commit -v` appends a diff. On top of that, the message names a missing 
 - **Expected:**
   - **Trailers:** git reads them from the raw message file: `git -c trailer.separators=: interpret-trailers --parse --no-divider <file>`. Git handles comments, `core.commentChar` and the scissors line itself, and a non-zero exit is a gate error.
   - **Revert check:** the body used for it is the text above the scissors line with comment lines removed, as today.
-  - **Hint trigger:** a line above the scissors matching `^\s*spec\s*:\s*docs/work/` (any case), whose value git did not return as a `Spec` trailer.
-  - **Hint cause:** the first that applies, in this order:
-    1. the final paragraph has a non-trailer line, which the hint quotes;
+  - **Hint trigger:** a line above the scissors matching `^\s*specs?\s*:\s*docs/(work|specs)/` (any case), whose value git did not return as a `Spec` trailer (D34).
+  - **Hint causes:** every cause that applies is reported, in this order:
+    1. the final paragraph has a non-trailer line other than the Spec line itself, which the hint quotes;
     2. the key is not exactly `Spec`;
     3. text follows the path;
     4. the line is indented;
@@ -65,10 +65,10 @@ line or `commit -v` appends a diff. On top of that, the message names a missing 
 | AC | Traces | Given / when | Pass when | Fail when | Test |
 |---|---|---|---|---|---|
 | AC-1 | - | a source commit whose valid `Spec:` sits in the final trailer block, with a `---` line earlier in the body | it lands | it is rejected | tests/test_spec_gate.py |
-| AC-2 | - | the same commit made by a real `git commit -v` with an editor stub (scissors line and diff in the hook file, including `+Spec: docs/work/x/README.md` diff lines), and with `core.commentChar` set to `;` | both land, and no hint comes from the diff lines | either is rejected or hints | tests/test_spec_gate.py |
+| AC-2 | - | the same commit made by a real `git commit -v` with an editor stub, and with `core.commentChar` set to `;`; then a rejecting `git commit -v` (no trailer) whose diff below the scissors has the context line ` Spec: docs/work/x/README.md` | the first two land; the third is rejected with the plain message and no hint (the test is seen failing once with scissors handling removed) | a correct commit is rejected, or a hint comes from below the scissors | tests/test_spec_gate.py |
 | AC-3 | - | `Spec: docs/work/<id>/README.md` in its own paragraph above a `Co-Authored-By:` block; and as the subject line only | both rejected; stderr says the line is outside the final trailer block | either lands or the cause is missing | tests/test_spec_gate.py |
-| AC-4 | - | the final paragraph holds `Spec:` plus `🤖 Generated with …`; `spec:` lower case in a valid block; `Spec: <path> (building)`; `  Spec: <path>` indented | each is rejected with its own cause, by the stated order | a cause is wrong or missing | tests/test_spec_gate.py |
-| AC-5 | - | no `Spec` line at all; `Spec: see the README for why` at a line start; `> Spec: x` quoted; `Specs: docs/work/x/README.md` | each rejected with the plain existing message and no hint, except `Specs:`, which gets the key-case cause | a hint appears where none should | tests/test_spec_gate.py |
+| AC-4 | - | the final paragraph holds `Spec:` plus `🤖 Generated with …`; `spec:` lower case in a valid block; `Specs: docs/work/x/README.md`; `Spec: <path> (building)`; a final paragraph holding only `  Spec: <path>` (indented); a misplaced `Spec: docs/specs/x.md` | each is rejected and stderr contains each expected cause (the indented case gets "indented", not cause 1; `Specs:` gets the key cause; the legacy path gets the outside-block cause) | an expected cause is missing | tests/test_spec_gate.py |
+| AC-5 | - | no `Spec` line at all; `Spec: see the README for why` at a line start; `> Spec: x` quoted | each rejected with the plain existing message and no hint | a hint appears | tests/test_spec_gate.py |
 | AC-6 | - | the repo sets `trailer.separators` to `=`; and a unit test of `git_trailers` with `subprocess.run` patched to return exit 1 (this tests the return-code check, not git) | the first still reads `Spec: x` as a trailer; the second raises a gate error | either reads as "no trailer" | tests/test_spec_gate.py |
 
 ## Gate plan

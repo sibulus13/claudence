@@ -44,12 +44,12 @@ required_records(tree, item_dir, edges) -> None | reason   # FR-8: the gate's si
 | FR-1 | `content_hash` over a tree (the index for `hash`, `write` and the gate; HEAD for `verify --tree head`). **Inputs:** every entry under the item folder except a path whose first segment is exactly `reviews`, `evidence` or `cycles`, and except the generated files `trace.jsonl` and `drift.md` at the item root. **Bytes:** `\r\n` to `\n`, then lone `\r` to `\n`; then strict UTF-8 decode. **README:** after normalising, line 1 must be exactly `---` and the frontmatter ends at the next line exactly `---`; within it exactly one line matches `^status:` (column 0, the key followed by a colon), and that whole line including its `\n` is removed; nothing else in any file is changed. **Serialise:** files sorted by the UTF-8 bytes of their path relative to the item folder (POSIX separators); each contributes `<byte length of path>:<path>\n<byte length of text>:<text>\n`. **Digest:** `sha256:` plus lowercase hex of the sha256 of the concatenation. A golden vector (a fixed fixture folder and its digest) pins it. |
 | FR-2 | `content_hash` refuses (HashError, named): an entry of mode `120000` (symlink) or `160000` (gitlink); a subfolder holding a `README.md` (nested item); a first segment equal to `reviews`, `evidence` or `cycles` in another letter case; a file that is not strict UTF-8 or starts with a BOM; a README whose frontmatter delimiters are not exact or that has zero or several `^status:` lines. |
 | FR-3 | `hash` and `write` refuse when the item folder has unstaged or untracked changes ("stage the item first"), so the hash in the reviewer's brief is the hash the gate will see. `--item` is resolved through `git ls-files` to the exact indexed path `docs/work/<id>/` (backslashes, a trailing slash and Windows letter case normalised); anything else is refused. |
-| FR-4 | `write` reads the report file (at most 1 MB) as strict UTF-8 and refuses unless: its last non-blank line, stripped of trailing spaces, is exactly `VERDICT: pass`, `VERDICT: fix-first` or `VERDICT: block`; it has exactly one line matching `^REVIEWED: sha256:[0-9a-f]{64}$` (outside code fences) equal to the current `content_hash`; a `code` report has exactly one `^REVIEWED-COMMIT: <sha>$` line naming an existing commit, stored as its full sha, and a `design` or `verify` report has none. The verdict comes from the report only. |
+| FR-4 | `write` reads the report file (at most 1 MB) as strict UTF-8 and refuses unless: its last non-blank line, stripped of trailing spaces, is exactly `VERDICT: pass`, `VERDICT: fix-first` or `VERDICT: block`; it has exactly one line matching `^REVIEWED: sha256:[0-9a-f]{64}$` (outside code fences) equal to the current `content_hash`; a `code` report, and a `verify` report whose `--verifies` names a code-class record, has exactly one `^REVIEWED-COMMIT: <sha>$` line naming an existing commit, stored as its full sha; a `design` report and a verify of a design record have none. The verdict comes from the report only. |
 | FR-5 | The reviewer rule (shared by `write` and record validity): case-folded and stripped, the reviewer must not be empty, `self`, `me`, `-`, `n/a`, `none`, in angle brackets, or equal to the item's `owner`. `write` also refuses a kind outside the schema and a `verify` record whose `--verifies` does not name an existing `fix-first` record of the same item and class. |
-| FR-6 | `write` builds the record in a temp file named `.<name>.<pid>.tmp` (never `.md`), then links it to the final name exclusively (fails if the name exists); on a clash it retries with `-2`, `-3`, so two concurrent writers both land. If a record of the same kind, content and report body already exists under any date, the write is a no-op that prints its path. Frontmatter written: `kind`, `reviewer`, `verdict`, `content`, `commit` (code), `verifies` (verify), `recorded` (UTC, ISO 8601 to the second, by the script's clock). |
+| FR-6 | `write` builds the record in a temp file named `.<name>.<pid>.tmp` (never `.md`), then links it to the final name exclusively (fails if the name exists); on a clash it retries with `-2`, `-3`, so two concurrent writers both land. A writer removes only its own temp file (try/finally); a leftover temp file is never read as a record and never deleted by another writer. If a record of the same kind, content and report body already exists under any date, the write is a no-op that prints its path. Frontmatter written: `kind`, `reviewer`, `verdict`, `content`, `commit` (code, and verify of code), `verifies` (verify), `recorded` (UTC, ISO 8601 to the second, by the script's clock). |
 | FR-7 | A record is valid when: the file is under 1 MB; `yaml.safe_load` of its frontmatter block validates against the schema; the reviewer passes FR-5; and `verdict` equals the body's last non-blank `VERDICT:` line. |
-| FR-8 | `required_records(tree, item, edges)`: each edge into `spec-locked` needs the **design class** (kind `design`, or `verify` of a `design` record); each edge into `shipped` needs the **code class** (kind `code`, or `verify` of a `code` record), except `research` and `experiment` items, which need the design class (a results re-review). In each class the newest valid record decides, ordered by (`recorded`, file name): it must have verdict `pass` and `content` equal to `content_hash(tree, item)`. For the code class, additionally, no source file (the gate's `SOURCE` and not `NOT_SOURCE` patterns) may differ between the record's `commit` and the tree, restricted to the item's owned-file globs (components.md `Owned files`, or the Work breakdown `Owns`) when it declares any, else the whole repo. Ancestry is not required, so a squash-merged review stays valid. Returns None or the reason. |
-| FR-9 | `verify` reports each record as fresh, stale or invalid against `--tree head` (default) or `--tree index`, and exits 1 when any is invalid; stale is information. An unborn HEAD is an empty tree (every record stale). |
+| FR-8 | `required_records(tree, item, edges)`: each edge into `spec-locked` needs the **design class** (kind `design`, or `verify` of a `design` record); each edge into `shipped` needs the **code class** (kind `code`, or `verify` of a `code` record), except `research` and `experiment` items, which need the design class (a results re-review). In each class the newest valid record decides, ordered by `recorded`, then by the integer suffix of the file name (no suffix = 1, `-<n>` = n), never by the bytes of the name: it must have verdict `pass` and `content` equal to `content_hash(tree, item)`. A code-class record stores the reviewed `commit` as evidence; the local gate does not judge code freshness (architect decision D32: "no code of this item changed after its code record" is a question about history, enforced over pushed commits by work item `gate-ci`). Returns None or the reason. |
+| FR-9 | `verify` reports each record as fresh, stale or invalid against `--tree head` (default) or `--tree index`, lists leftover temp files as information, and exits 1 when any record is invalid or git cannot read the chosen tree; stale is information. An unborn HEAD is an empty tree (every record stale). |
 
 ### Data
 
@@ -61,7 +61,7 @@ the script's clock for `recorded`.
 ### Failure modes
 
 - Every refusal: exit 1 with the reason; nothing written.
-- A crash before the link leaves only `.<name>.<pid>.tmp`, which is never a record and is removed by the next write.
+- A crash before the link leaves only `.<name>.<pid>.tmp`, which is never a record; `verify` lists it as information.
 - An invalid record counts as absent for the gate and as invalid for `verify`.
 
 ### Budget
@@ -74,8 +74,7 @@ the script's clock for `recorded`.
 ### Interface
 
 No new CLI. New rejection reasons, each naming the item and cause: `needs a fresh design review`, `needs a fresh code
-review`, `record is stale (reviewed <hash8>, committing <hash8>)`, `newest <class> record is <verdict>`, `source
-changed after the code review: <files>`, `record invalid: <reason>`, `cannot hash item: <reason>`, `deleting or moving
+review`, `record is stale (reviewed <hash8>, committing <hash8>)`, `newest <class> record is <verdict>`, `record invalid: <reason>`, `cannot hash item: <reason>`, `deleting or moving
 a <status> work item: set status: killed instead (it stays as history)`, `review records cannot be deleted: <file>`.
 
 ### Functional requirements
@@ -84,13 +83,13 @@ a <status> work item: set status: killed instead (it stays as history)`, `review
 |---|---|
 | FR-10 | For every staged README, the gate derives the edges its move traverses: the single edge for a plain commit; for a merge, squash, import (no HEAD version) or repair (HEAD status unreadable), the shortest chain of lifecycle edges from the HEAD status (or `draft` when absent or unreadable) to the staged status. It calls `required_records(IndexTree, item, edges)` and refuses with its reason. A move into `promoted` or `killed` needs no record. An amend of a lock or ship commit cannot be seen by the hook (HEAD already holds the new status): it is escalated to work item `gate-ci`, which re-checks each pushed commit against its parent. |
 | FR-11 | `review_record` and the contract are imported only when an edge into `spec-locked` or `shipped` is present, so a broken contract or record never blocks any other commit. |
-| FR-12 | Refused: a staged README of an item past `draft` (the later of the HEAD and MERGE_HEAD statuses) that is deleted, renamed to a path outside `docs/work/<id>/README.md`, or changed in type (symlink), with the `T` filter added to `staged_readmes`; and the deletion of any `reviews/*.md` file present at HEAD. A deletion that git paired as delete plus add because of heavy edits gets the hint "rename in its own commit with the README unchanged". |
+| FR-12 | Refused: a staged README of an item past `draft` (the later of the HEAD and MERGE_HEAD statuses) that is deleted, renamed to a path outside `docs/work/<id>/README.md`, or changed in type (symlink), with the `T` filter added to `staged_readmes`; and the deletion of any `reviews/*.md` file present at HEAD, unless the same commit deletes the item's README and the item is at `draft` by both HEAD and MERGE_HEAD. A deletion that git paired as delete plus add because of heavy edits gets the hint "rename in its own commit with the README unchanged". |
 | FR-13 | No other commit checks freshness: edits while an item stays at a status never need a record (owner decision Q2; the ship check judges the final spec and code). |
 
 ### Data
 
-Reads the staged index, the HEAD and MERGE_HEAD versions, the staged diff with renames and type changes, and the
-source diff between a reviewed commit and the index. Writes nothing.
+Reads the staged index, the HEAD and MERGE_HEAD versions, and the staged diff with renames and type changes.
+Writes nothing.
 
 ### Failure modes
 
@@ -99,7 +98,7 @@ source diff between a reviewed commit and the index. Writes nothing.
 
 ### Budget
 
-- Hashing and the source diff run only on commits with an edge into `spec-locked` or `shipped`.
+- Hashing runs only on commits with an edge into `spec-locked` or `shipped`.
 
 ## trees
 

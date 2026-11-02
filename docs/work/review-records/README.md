@@ -16,7 +16,7 @@ lifecycle: false
 
 ```mermaid
 flowchart TD
-  R[reviewer report] -->|piped unchanged| S[review_record.py]
+  R[reviewer report file] -->|--report, unchanged| S[review_record.py]
   S -->|hash + verdict| F[reviews/date-kind.md]
   F --> G{spec_gate: lock or ship move?}
   G -->|fresh pass| OK[commit lands]
@@ -42,7 +42,7 @@ reviewed, and makes the commit gate demand a fresh `pass` at the two moves that 
 | C:/Users/Michael/.claude/scripts/spec_check.py:87-100 | partial | `DiskTree` reads the working tree with universal newlines, so its text differs from the index for lone CR bytes | ignore: hashing uses byte trees only (FR-14); a new `HeadTree` joins `IndexTree` |
 | C:/Users/Michael/.claude/contracts/work-item.lifecycle.v1.json:1 | working | the lifecycle is data the gate reads | extract: the record schema follows the same pattern, `contracts/review-record.v1.json` |
 | C:/Users/Michael/.claude/playbooks/agent-dispatch.md:21-30 | working | the interim record format and hash rule the parent writes by hand until this ships | replace: the script becomes the only writer; the playbook points to it |
-| C:/Users/Michael/.claude/scripts/spec_gate.py:116-129 | partial | `staged_readmes` lists added, copied, modified and renamed READMEs only (`--diff-filter=ACMR`): a deleted README reaches no check | wrap: add staged deletions for FR-7 |
+| C:/Users/Michael/.claude/scripts/spec_gate.py:116-129 | partial | `staged_readmes` lists added, copied, modified and renamed READMEs only (`--diff-filter=ACMR`): a deleted README reaches no check | wrap: add staged deletions, renames out and type changes for FR-12 |
 | C:/Users/Michael/.claude/workflows/cycle.js:34-47 | working | the FINDING schema: class (design / implementation / test / spec / approach) and rating R/F/H | extract: the kind of record body a code review produces; the enums stay in the glossary vocabulary |
 | C:/Users/Michael/.claude/workflows/cycle.js:160 | partial | the workflow forces the verdict to `pass` when no R finding remains, whatever the reviewer wrote | ignore: cycle.js is suspended; the record copies the reviewer's own `VERDICT:` line (assumed, DECISIONS D26) and work item `stage-trace` aligns the workflow |
 | D:/repo/Factory/foreman/core/spec-verdict.js:43 | working | Foreman picks `docs/review-records/<slug>-round-N.md` by branch slug | replace: the record path becomes `docs/work/<id>/reviews/`; Foreman follows on the roadmap |
@@ -65,9 +65,9 @@ reviewed, and makes the commit gate demand a fresh `pass` at the two moves that 
 | Assumption | How it is observed (not hoped) | If violated |
 |---|---|---|
 | Local hooks run on the commits that make the lock and ship moves | the commit-msg gate, `spec_gate.py`, AC-5 and AC-7 | defer: commits the hook cannot judge (an amend of the lock or ship commit, `--no-verify`, server squash, cherry-pick, rebase, revert) are re-checked per commit against its parent by work item `gate-ci` after the push |
-| The reviewer named in a record is independent of the author | the record's `reviewer` field, refused when empty or `self` (AC-1) | flag: independence is trusted by process until Weaver run traces exist (D23 revisit trigger) |
+| The reviewer named in a record is independent of the author | the record's `reviewer` field, refused when empty, `self` or a look-alike (AC-2, AC-6) | flag: independence is trusted by process until Weaver run traces exist (D23 revisit trigger) |
 | A record's body is the reviewer's report, unchanged, and the reviewer saw the hash it echoes | the frontmatter verdict must equal the body's last `VERDICT:` line and the report's `REVIEWED:` hash must equal the content at write time (AC-2, AC-6) | refuse: a mismatch is never a fresh pass |
-| An item's content is every file in its folder outside `reviews/`, `evidence/` and `cycles/`; its code is bound by the reviewed commit and the Spec trailer of later commits | `content_hash` (AC-3) and the code-class rule (AC-7) | refuse: a change after the review makes the record stale |
+| An item's content is every file in its folder outside `reviews/`, `evidence/`, `cycles/`, `trace.jsonl` and `drift.md`; its code is bound by the record's reviewed `commit` | `content_hash` (AC-3); the commit is stored by `write` (AC-2) | defer: code changed after its code review is caught by work item `gate-ci` over pushed history (D32); AC-7 pins that the local gate does not judge it |
 
 ## Purpose
 
