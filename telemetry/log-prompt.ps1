@@ -72,7 +72,7 @@ if (-not $state -or $state.session_id -ne $session_id) {
     }
 }
 
-$state.prompts += 1
+if (Test-CountsAsPrompt $classification) { $state.prompts += 1 }   # injected prompts are not the owner's
 switch ($classification) {
     'override'        { $state.overrides        += 1 }
     'addition'        { $state.additions        += 1 }
@@ -109,7 +109,9 @@ if (-not $is_new -and $classification -ne 'addition' -and $themes.Count -gt 0 -a
         if ($jac -lt 0.2) { $is_new = $true }
     }
 }
-if ($is_new -and $theme_label -ne '') {
+if (-not (Test-UpdatesTheme $classification)) {
+    # an injected prompt neither opens nor bumps a theme
+} elseif ($is_new -and $theme_label -ne '') {
     $themes.Insert(0, [PSCustomObject]@{ label = $theme_label; ts = (Get-Date -Format 'o'); turns = 1 })
     while ($themes.Count -gt 3) { $themes.RemoveAt(3) }
 } elseif ($themes.Count -gt 0) {

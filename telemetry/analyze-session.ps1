@@ -85,23 +85,15 @@ foreach ($req in (@($perm_reqs) + @($perm_repeats))) {
     if ($was_approved) { $approved_req_ts.Add($req.ts) | Out-Null }
 }
 
-foreach ($p in $prompts) {
-    switch ($p.classification) {
-        'override' {
-            $score += 3
-            $friction_notes.Add("Override (+3): user redirected post-stop - $($p.prompt_text.Substring(0, [Math]::Min(80, $p.prompt_text.Length)))")
-        }
-        'addition' {
-            $score += 1
-            $friction_notes.Add("Add/Alt (+1): queued while running - $($p.prompt_text.Substring(0, [Math]::Min(80, $p.prompt_text.Length)))")
-        }
-        'denial_context' {
-            $score += 1
-            $friction_notes.Add("Denied+ctx (+1): tool denied with reason - $($p.prompt_text.Substring(0, [Math]::Min(80, $p.prompt_text.Length)))")
-        }
-        # first_prompt and followup score 0
-    }
-}
+# --- Prompt friction: only the owner's prompts count (docs/work/fix-friction-system-prompts) ---
+# The transcript's promptSource is the authoritative origin; injected prompts (task notifications, subagent
+# hand-backs, cross-session messages, scheduled ticks) score 0 and drop out of every count and turn below.
+. "$PSScriptRoot\lib\classification.ps1"
+$transcript_path = if ($data -and $data.transcript_path) { [string]$data.transcript_path } else { $null }
+$friction = Get-FrictionScore $prompts (Read-TranscriptPrompts $transcript_path)
+$score += $friction.score
+foreach ($n in $friction.notes) { $friction_notes.Add($n) }
+$prompts = @($friction.owner_prompts)
 
 foreach ($req in $perm_reqs) {
     $approved = $approved_req_ts.Contains($req.ts)
@@ -210,7 +202,9 @@ $report = [PSCustomObject]@{
     perm_req_count    = $perm_reqs.Count
     perm_repeat_count = $perm_repeats.Count
     compact_count     = $compacts.Count
-    transcript_path   = "$HOME\.claude\history.jsonl"
+    transcript_path   = $transcript_path
+    marker_misses     = $friction.marker_misses
+    unlabelled        = $friction.unlabelled
     session_jsonl     = $session_file
     friction_notes    = $friction_notes.ToArray()
     allow_suggestions = $allow_suggestions.ToArray()
@@ -342,7 +336,8 @@ $ding_now    = [int][DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
 $ding_last   = 0
 try { $ding_last = [int]((Get-Content $ding_stamp -Raw).Trim()) } catch { $ding_last = 0 }
 
-if (($ding_now - $ding_last) -ge $ding_window) {
+$silent = ($env:TELEMETRY_NO_SOUND -eq '1')   # test seam: tests never play sounds
+if (-not $silent -and ($ding_now - $ding_last) -ge $ding_window) {
     [System.IO.File]::WriteAllText($ding_stamp, "$ding_now")
     Start-Sleep -Milliseconds 400
     $snd_dir = "$HOME/.claude/sounds/"
