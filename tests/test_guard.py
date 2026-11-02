@@ -132,3 +132,108 @@ def test_other_bare_root_names_stay_denied(name):
     """fleet-docs-home/AC-9: only the single name docs is exempt; the root itself is still not a target."""
     assert _bad_repo_target(f"D:/repo/{name}")
     assert not _bad_repo_target("D:/repo")
+
+
+# ---------------------------------------------------------------- fix-guard-init-branch (2026-11-02)
+
+def _targets(cmd: str, cwd: str, shell: str = "bash") -> list[str] | str:
+    """init_targets as POSIX strings, or 'UNRESOLVABLE' when the guard cannot resolve the command."""
+    code = ("import sys, json; sys.path.insert(0, sys.argv[1]); import guard\n"
+            "try:\n"
+            "    print(json.dumps([p.as_posix() for p in guard.init_targets(sys.argv[2], sys.argv[3], sys.argv[4])]))\n"
+            "except guard.Unresolvable:\n"
+            "    print(json.dumps('UNRESOLVABLE'))\n")
+    out = subprocess.run([sys.executable, "-c", code, str(HOOK.parent), cmd, cwd, shell], capture_output=True,
+                         text=True, timeout=30, env={"PATH": "", "SYSTEMROOT": "C:/Windows"})
+    assert out.returncode == 0, out.stderr
+    return json.loads(out.stdout)
+
+
+def _decision(cmd: str, cwd: str, tool: str = "Bash") -> str | None:
+    return run(tool, {"command": cmd}, cwd=cwd)
+
+
+@pytest.mark.parametrize("cmd", [
+    "git init -b main D:/repo/Lib/x", "git init --initial-branch main D:/repo/Lib/x", "git init -qb main D:/repo/Lib/x",
+    "git init -bmain D:/repo/Lib/x", "git init --template D:/t D:/repo/Lib/x", "git init --shared D:/repo/Lib/x",
+    "git init -- D:/repo/Lib/x"])
+def test_init_option_values_are_not_targets(cmd):
+    """fix-guard-init-branch/AC-1"""
+    assert _targets(cmd, "D:/repo") == ["D:/repo/Lib/x"]
+    assert _decision(cmd, "D:/repo") != "deny"
+
+
+@pytest.mark.parametrize("cmd", [
+    "git clone --branch dev https://h/r.git", "git clone --bra dev https://h/r.git", "git clone -c a=b https://h/r.git",
+    "git clone https://h/r.git --depth 1"])
+def test_clone_values_are_skipped_and_the_root_denied(cmd):
+    """fix-guard-init-branch/AC-2"""
+    assert _targets(cmd, "D:/repo") == ["D:/repo/r"]
+    assert _decision(cmd, "D:/repo") == "deny"
+
+
+@pytest.mark.parametrize("cmd", [
+    "git -C D:/repo init junk", "git -c k=v --git-dir D:/g init D:/repo/junk", "cd D:/repo && git init junk",
+    "cd D:/repo; git init junk", "cd D:/repo\ngit init junk", "git -C .. init junk"])
+def test_working_directory_changes_are_followed(cmd):
+    """fix-guard-init-branch/AC-3"""
+    assert _targets(cmd, "D:/repo/Lib") == ["D:/repo/junk"]
+    assert _decision(cmd, "D:/repo/Lib") == "deny"
+
+
+def test_chained_dash_c_applies_left_to_right():
+    """fix-guard-init-branch/AC-3"""
+    assert _targets("git -C D:/repo -C Lib init x", "D:/repo/Lib") == ["D:/repo/Lib/x"]
+
+
+def test_every_segment_is_judged():
+    """fix-guard-init-branch/AC-4"""
+    assert _targets("cd D:/repo/Lib && git init x", "D:/repo") == ["D:/repo/Lib/x"]
+    assert _decision("git init D:/repo/Lib/x && git init D:/repo/bad", "D:/repo") == "deny"
+    assert _decision("cd $X && git init y", "D:/repo") == "deny"
+
+
+@pytest.mark.parametrize("cmd", ["git init -b main", "git init"])
+def test_an_init_at_the_fleet_root_is_denied(cmd):
+    """fix-guard-init-branch/AC-5 (bad_repo_target('D:/repo') stays False: test_other_bare_root_names_stay_denied)"""
+    assert _targets(cmd, "D:/repo") == ["D:/repo"]
+    assert _decision(cmd, "D:/repo") == "deny"
+
+
+@pytest.mark.parametrize("cmd", [
+    'git commit -m "git init D:/repo/x"', "cat > notes.txt <<'EOF'\ngit init D:/repo/x\nEOF",
+    "echo git init D:/repo/x"])
+def test_prose_is_not_an_init(cmd):
+    """fix-guard-init-branch/AC-6"""
+    assert _targets(cmd, "D:/repo/Lib") == []
+
+
+@pytest.mark.parametrize("cmd,tool,target,denied", [
+    ('git init "D:/repo/bad"', "Bash", "D:/repo/bad", True),
+    ('git init "D:/repo/Lib/my proj"', "Bash", "D:/repo/Lib/my proj", False),
+    ('bash -c "git init D:/repo/bad"', "Bash", "D:/repo/bad", True),
+    ('pwsh -Command "git init D:/repo/bad"', "PowerShell", "D:/repo/bad", True)])
+def test_quoted_and_wrapped_targets_are_read(cmd, tool, target, denied):
+    """fix-guard-init-branch/AC-6"""
+    assert _targets(cmd, "D:/repo/Lib", tool.lower()) == [target]
+    assert (_decision(cmd, "D:/repo/Lib", tool) == "deny") is denied
+
+
+def test_unparseable_inits_are_denied_and_other_commands_untouched():
+    """fix-guard-init-branch/AC-7"""
+    assert _targets('git init "D:/repo/bad', "D:/repo/Lib") == "UNRESOLVABLE"
+    assert _targets("git clone --b dev https://h/r.git", "D:/repo/Lib") == "UNRESOLVABLE"
+    assert _decision('git init "D:/repo/bad', "D:/repo/Lib") == "deny"
+    assert _targets('echo "it\'s fine', "D:/repo/Lib") == []
+
+
+@pytest.mark.parametrize("cmd,cwd,tool,target,denied", [
+    (r"git init D:\repo\bad", "D:/repo", "Bash", "D:/repo/repobad", True),
+    (r"git init D:\repo\bad", "D:/repo/Lib", "Bash", "D:/repo/Lib/repobad", False),
+    (r"git init D:\repo\bad", "D:/repo/Lib", "PowerShell", "D:/repo/bad", True),
+    (r'git init "D:\repo\bad"', "D:/repo/Lib", "Bash", "D:/repo/bad", True),
+    (r'git init "D:\repo\Lib\x y"', "D:/repo/Lib", "PowerShell", "D:/repo/Lib/x y", False)])
+def test_backslash_paths_follow_the_calling_shell(cmd, cwd, tool, target, denied):
+    """fix-guard-init-branch/AC-8"""
+    assert _targets(cmd, cwd, tool.lower()) == [target]
+    assert (_decision(cmd, cwd, tool) == "deny") is denied
