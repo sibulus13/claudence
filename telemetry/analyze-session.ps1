@@ -93,6 +93,7 @@ $transcript_path = if ($data -and $data.transcript_path) { [string]$data.transcr
 $friction = Get-FrictionScore $prompts (Read-TranscriptPrompts $transcript_path)
 $score += $friction.score
 foreach ($n in $friction.notes) { $friction_notes.Add($n) }
+$all_prompts = $prompts   # the cwd comes from the first prompt of any origin (an all-injected session keeps it)
 $prompts = @($friction.owner_prompts)
 
 foreach ($req in $perm_reqs) {
@@ -179,7 +180,7 @@ for ($ti = 0; $ti -lt $prompts.Count; $ti++) {
 $report_dir = "$HOME\.claude\telemetry\reports"
 if (-not (Test-Path $report_dir)) { New-Item $report_dir -ItemType Directory -Force | Out-Null }
 
-$cwd         = if ($prompts.Count -gt 0 -and $prompts[0].cwd) { $prompts[0].cwd } else { '' }
+$cwd         = if ($all_prompts.Count -gt 0 -and $all_prompts[0].cwd) { $all_prompts[0].cwd } else { '' }
 $short_id    = $session_id.Substring(0, [Math]::Min(8, $session_id.Length))
 $overrides     = @($prompts | Where-Object { $_.classification -eq 'override'       }).Count
 $additions     = @($prompts | Where-Object { $_.classification -eq 'addition'       }).Count

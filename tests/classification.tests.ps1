@@ -473,3 +473,98 @@ Describe "fix-friction-system-prompts" {
         }
     }
 }
+
+# ------------------------------------- fix-friction-system-prompts, code review round 1 regressions (2026-11-02)
+
+Describe "fix-friction-system-prompts: join rules and side effects (code review round 1)" {
+    BeforeAll {
+        . "$PSScriptRoot\..\telemetry\lib\classification.ps1"
+        function New-Prompt([string]$Ts, [string]$Text, [string]$Cls = 'addition') {
+            [PSCustomObject]@{ ts = $Ts; event = 'prompt'; classification = $Cls; prompt_text = $Text; prompt_chars = $Text.Length }
+        }
+        function New-Entry([string]$Ts, [string]$Text, [string]$Src, [bool]$Side = $false) {
+            [PSCustomObject]@{ timestamp = $Ts; text = $Text; promptSource = $Src; isSidechain = $Side }
+        }
+        $script:t0 = '2026-11-02T10:00:00.000-08:00'
+        function At([double]$Seconds) { '2026-11-02T18:00:{0:00.000}Z' -f $Seconds }
+    }
+
+    Context "fix-friction-system-prompts/AC-1: each join rule is pinned" {
+        It "skips a sidechain entry even when it is the nearest" {
+            $r = Get-FrictionScore @(New-Prompt $t0 'X') @((New-Entry (At 0.1) 'X' 'typed' $true), (New-Entry (At 1) 'X' 'system'))
+            $r.score | Should -Be 0
+        }
+        It "leaves an event unlabelled when the only entry is 6 s away" {
+            $r = Get-FrictionScore @(New-Prompt $t0 'Y') @(New-Entry (At 6) 'Y' 'typed')
+            $r.unlabelled | Should -Be 1
+        }
+        It "takes the nearest entry, not the earliest in the window" {
+            $r = Get-FrictionScore @(New-Prompt $t0 'Z') @((New-Entry '2026-11-02T17:59:58.000Z' 'Z' 'system'), (New-Entry (At 0.5) 'Z' 'typed'))
+            $r.score | Should -Be 1
+        }
+        It "uses each entry at most once" {
+            $events = @((New-Prompt $t0 'W'), (New-Prompt '2026-11-02T10:00:00.200-08:00' 'W'))
+            $r = Get-FrictionScore $events @(New-Entry (At 0.1) 'W' 'typed')
+            $r.unlabelled | Should -Be 1
+        }
+        It "does not join a same-time entry with different text" {
+            $r = Get-FrictionScore @(New-Prompt $t0 'A') @(New-Entry (At 0) 'B' 'system')
+            $r.unlabelled | Should -Be 1
+        }
+        It "counts a queued prompt as the owner's" {
+            $r = Get-FrictionScore @(New-Prompt $t0 'Q') @(New-Entry (At 0.2) 'Q' 'queued')
+            $r.score | Should -Be 1
+        }
+        It "never joins an empty text to a non-empty one" {
+            $r = Get-FrictionScore @(New-Prompt $t0 '') @(New-Entry (At 1) '<task-notification>x' 'system')
+            $r.unlabelled | Should -Be 1
+        }
+        It "joins 600 events to 600 entries well inside the Stop hook's 30 s bound" {
+            $events = 0..599 | ForEach-Object { New-Prompt ([DateTimeOffset]::Parse($t0).AddSeconds($_ * 10).ToString('o')) "prompt number $_" }
+            $entries = 0..599 | ForEach-Object { New-Entry ([DateTimeOffset]::Parse($t0).AddSeconds($_ * 10 + 0.2).UtcDateTime.ToString('o')) "prompt number $_" 'typed' }
+            $sw = [Diagnostics.Stopwatch]::StartNew()
+            $r = Get-FrictionScore @($events) @($entries)
+            $sw.Elapsed.TotalSeconds | Should -BeLessThan 3
+            $r.unlabelled | Should -Be 0
+        }
+    }
+
+    Context "fix-friction-system-prompts/AC-6: log-prompt end to end, sandboxed" {
+        It "keeps an injected prompt out of the prompt count and the themes" {
+            $home2 = Join-Path $TestDrive 'lp'
+            New-Item -ItemType Directory -Force -Path (Join-Path $home2 '.claude\telemetry\sessions') | Out-Null
+            $sid = 'lp-' + [guid]::NewGuid().ToString('N').Substring(0, 8)
+            $saved = $env:USERPROFILE
+            try {
+                $env:USERPROFILE = $home2
+                foreach ($p in @('Fix the build', '<task-notification><task-id>b1</task-id> done')) {
+                    (@{ session_id = $sid; prompt = $p; cwd = 'D:/repo' } | ConvertTo-Json -Compress) |
+                        powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$PSScriptRoot\..\telemetry\log-prompt.ps1" | Out-Null
+                }
+            } finally { $env:USERPROFILE = $saved }
+            $s = Get-Content (Join-Path $home2 ".claude\telemetry\state-$sid.json") -Raw | ConvertFrom-Json
+            "$($s.prompts)/$(@($s.themes).Count)/$(@($s.themes)[0].turns)" | Should -Be '1/1/1'
+        }
+    }
+
+    Context "fix-friction-system-prompts/AC-7: a session of only injected prompts keeps its cwd" {
+        It "reports the cwd of the first prompt event" {
+            $home2 = Join-Path $TestDrive 'cwd'
+            $tele = Join-Path $home2 '.claude\telemetry'
+            New-Item -ItemType Directory -Force -Path (Join-Path $tele 'sessions') | Out-Null
+            $sid = 'cafe0123-0000-0000-0000-000000000000'
+            '{"ts":"2026-11-02T10:00:00.000-08:00","event":"prompt","classification":"system","prompt_text":"<task-notification>x","prompt_chars":20,"cwd":"D:/repo/Lib/x"}' |
+                Set-Content (Join-Path $tele "sessions\$sid.jsonl")
+            $transcript = Join-Path $TestDrive 'only-system.jsonl'
+            '{"type":"user","message":{"role":"user","content":"<task-notification>x"},"promptSource":"system","timestamp":"2026-11-02T18:00:00.100Z","isSidechain":false}' |
+                Set-Content $transcript
+            $saved = $env:USERPROFILE
+            try {
+                $env:USERPROFILE = $home2; $env:TELEMETRY_NO_SOUND = '1'
+                (@{ session_id = $sid; transcript_path = $transcript } | ConvertTo-Json -Compress) |
+                    powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$PSScriptRoot\..\telemetry\analyze-session.ps1" | Out-Null
+            } finally { $env:USERPROFILE = $saved; Remove-Item Env:TELEMETRY_NO_SOUND -ErrorAction SilentlyContinue }
+            (Get-Content (Join-Path $tele 'reports\cafe0123.json') -Raw | ConvertFrom-Json).cwd | Should -Be 'D:/repo/Lib/x'
+        }
+    }
+}

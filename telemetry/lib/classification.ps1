@@ -8,6 +8,8 @@
 #   override        — Claude had stopped; user explicitly redirects the current direction
 #   addition        — Claude is running; user queues additional context or a parallel task
 #   denial_context  — Claude is running; user denied a tool call and is providing context/reason
+#   system          — injected by Claude Code (task notification, subagent hand-back, cross-session message);
+#                     scores 0, counts in no rate, opens no theme (docs/work/fix-friction-system-prompts)
 #
 # Friction scores (applied in analyze-session.ps1):
 #   override +3    addition +1    denial_context +1    followup/first_prompt 0
@@ -122,25 +124,38 @@ function Get-JoinKey {
     return $t.Substring(0, [Math]::Min($JoinPrefixChars, $t.Length))
 }
 
+function Test-KeysMatch {
+    # One key must be a prefix of the other; an empty key matches only another empty key (an image-only prompt).
+    param([string]$A, [string]$B)
+    if ($A.Length -eq 0 -or $B.Length -eq 0) { return $A.Length -eq $B.Length }
+    return $A.StartsWith($B, [System.StringComparison]::Ordinal) -or $B.StartsWith($A, [System.StringComparison]::Ordinal)
+}
+
 function Join-TranscriptSource {
     # Returns one promptSource (or $null when unmatched) per prompt event, in order. An event joins the unused,
-    # non-sidechain entry with the same text prefix whose UTC time is nearest and within the window.
+    # non-sidechain entry with a matching text key whose UTC time is nearest and within the window. Entries are
+    # sorted by time once and each event scans only its window, so a long session stays well inside the Stop
+    # hook's time bound.
     param([array]$PromptEvents, [array]$Entries)
-    $pool = @($Entries | Where-Object { -not $_.isSidechain -and $_.promptSource })
+    $pool = @($Entries | Where-Object { -not $_.isSidechain -and $_.promptSource } | ForEach-Object {
+        [PSCustomObject]@{ ticks = [DateTimeOffset]::Parse($_.timestamp).UtcTicks; key = (Get-JoinKey $_.text); source = $_.promptSource }
+    } | Sort-Object ticks)
+    $ticks = [long[]]@($pool | ForEach-Object { $_.ticks })
+    $window = [long]($JoinWindowSeconds * [TimeSpan]::TicksPerSecond)
     $used = [System.Collections.Generic.HashSet[int]]::new()
     $out = [System.Collections.Generic.List[object]]::new()
     foreach ($e in $PromptEvents) {
         $key = Get-JoinKey $e.prompt_text
-        $t = [DateTimeOffset]::Parse($e.ts).UtcDateTime
-        $best = -1; $bestGap = [double]::MaxValue
-        for ($i = 0; $i -lt $pool.Count; $i++) {
-            if ($used.Contains($i)) { continue }
-            $entryKey = Get-JoinKey $pool[$i].text
-            if (-not ($entryKey.StartsWith($key) -or $key.StartsWith($entryKey))) { continue }
-            $gap = [Math]::Abs(([DateTimeOffset]::Parse($pool[$i].timestamp).UtcDateTime - $t).TotalSeconds)
-            if ($gap -le $JoinWindowSeconds -and $gap -lt $bestGap) { $best = $i; $bestGap = $gap }
+        $t = [DateTimeOffset]::Parse($e.ts).UtcTicks
+        $i = [Array]::BinarySearch($ticks, $t - $window)
+        if ($i -lt 0) { $i = -bnot $i }
+        $best = -1; $bestGap = [long]::MaxValue
+        for (; $i -lt $ticks.Length -and $ticks[$i] -le $t + $window; $i++) {
+            if ($used.Contains($i) -or -not (Test-KeysMatch $key $pool[$i].key)) { continue }
+            $gap = [Math]::Abs($ticks[$i] - $t)
+            if ($gap -lt $bestGap) { $best = $i; $bestGap = $gap }
         }
-        if ($best -ge 0) { [void]$used.Add($best); $out.Add($pool[$best].promptSource) } else { $out.Add($null) }
+        if ($best -ge 0) { [void]$used.Add($best); $out.Add($pool[$best].source) } else { $out.Add($null) }
     }
     return , $out.ToArray()
 }
@@ -188,14 +203,20 @@ function Read-TranscriptPrompts {
     param([string]$Path)
     if (-not $Path -or -not (Test-Path -LiteralPath $Path)) { return @() }
     $out = [System.Collections.Generic.List[object]]::new()
-    foreach ($line in [System.IO.File]::ReadLines($Path)) {
-        if ($line.IndexOf('"promptSource"', [System.StringComparison]::Ordinal) -lt 0) { continue }
-        $d = try { $line | ConvertFrom-Json -ErrorAction Stop } catch { $null }
-        if (-not $d -or $d.type -ne 'user' -or -not $d.promptSource) { continue }
-        $c = $d.message.content
-        $text = if ($c -is [string]) { $c } else { (@($c | Where-Object { $_.type -eq 'text' } | ForEach-Object { $_.text }) -join "`n") }
-        $out.Add([PSCustomObject]@{ timestamp = $d.timestamp; text = $text; promptSource = $d.promptSource; isSidechain = [bool]$d.isSidechain })
-    }
+    # Claude Code may still hold the transcript open for writing at Stop: share read, write and delete.
+    $share = [System.IO.FileShare]::ReadWrite -bor [System.IO.FileShare]::Delete
+    $stream = [System.IO.File]::Open($Path, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, $share)
+    $reader = [System.IO.StreamReader]::new($stream, [System.Text.Encoding]::UTF8)
+    try {
+        while ($null -ne ($line = $reader.ReadLine())) {
+            if ($line.IndexOf('"promptSource"', [System.StringComparison]::Ordinal) -lt 0) { continue }
+            $d = try { $line | ConvertFrom-Json -ErrorAction Stop } catch { $null }
+            if (-not $d -or $d.type -ne 'user' -or -not $d.promptSource) { continue }
+            $c = $d.message.content
+            $text = if ($c -is [string]) { $c } else { (@($c | Where-Object { $_.type -eq 'text' } | ForEach-Object { $_.text }) -join "`n") }
+            $out.Add([PSCustomObject]@{ timestamp = $d.timestamp; text = $text; promptSource = $d.promptSource; isSidechain = [bool]$d.isSidechain })
+        }
+    } finally { $reader.Dispose() }
     return , $out.ToArray()
 }
 
