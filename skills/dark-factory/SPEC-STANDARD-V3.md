@@ -134,8 +134,12 @@ most 15. Tests cite `<id>/AC-n` and `<id>/MNC-n` verbatim (checked from `buildin
 
 ## Reviews
 
-- **Probe** (T2, flagged bugfix): before the draft. The adversary's outcome-kind questions on the problem, the real
-  tool run on real inputs, environment facts; saved to `evidence/probe.md` and cited by the Probe section. Two
+- **Probe** (T2, flagged bugfix): before the draft, saved to `evidence/probe.md` and cited by the Probe section. It
+  builds the full picture from three sources, each cited (owner rule 2026-11-03): (1) the existing specs for the
+  area (every work item and design doc whose scope or tested paths overlap, shipped ones included), (2) the code
+  itself (entry points, call sites, tests, and a real run of the tool on real inputs), and (3) a web survey of
+  current industry practice for similar implementations (dated URLs; heuristics worth reusing, known failure
+  modes). Then the adversary's outcome-kind questions on the problem. Two
   required reads (both v3 stage misses on 2026-11-02): every state machine the change touches (for a gate, the
   lifecycle contract's edges), and every new parser run on the real corpus it will read (look-alike negatives come
   from that run, not from the design).

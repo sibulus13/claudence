@@ -12,8 +12,9 @@
 ## Design closes before lock (owner, 2026-11-02; ADR `~/.claude/docs/adr/0001-review-records-gate-lock-and-ship.md`)
 - **v3 items (`standard: 3`) scale by tier** (`~/.claude/skills/dark-factory/SPEC-STANDARD-V3.md` § Tiers, D38-D40):
   - T1 feature or unflagged bugfix: draft -> red tests -> build -> code review. No adversary, no design review.
-  - T2 feature or flagged bugfix: probe first (the adversary on the problem plus a real-input run, saved to
-    `evidence/probe.md`; it reads every state machine the change touches and runs each new parser on its real
+    The drafter still reads the existing specs and the code for the area first and cites them in the draft.
+  - T2 feature or flagged bugfix: probe first (existing specs, the code and a dated web survey of industry practice,
+    then the adversary on the problem and a real-input run, saved to `evidence/probe.md`; it reads every state machine the change touches and runs each new parser on its real
     corpus), then draft -> one design review -> red tests -> build -> code review. With 2+ flags, add
     the security reviewer in design mode.
   - Each tier has an agent-stage cap (T1 and bugfix 4, flagged bugfix 5, T2 9). Hitting it stops the item as
