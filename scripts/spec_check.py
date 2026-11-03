@@ -72,7 +72,8 @@ class ToolError(RuntimeError):
 # ---------------------------------------------------------------- trees: where files are read from
 
 class Tree:
-    """Repo-relative file access. `DiskTree` is the working tree; `IndexTree` is what git is about to commit."""
+    """Repo-relative file access. `DiskTree` is the working tree; `IndexTree` is what git is about to commit and
+    `HeadTree` is the last commit. Only the two git trees give bytes and modes (`entries`, `read_many`)."""
 
     def read(self, rel: str) -> str | None:
         raise NotImplementedError
@@ -81,6 +82,12 @@ class Tree:
         raise NotImplementedError
 
     def exists(self, rel: str) -> bool:
+        raise NotImplementedError
+
+    def entries(self, prefix: str) -> list[tuple[str, str]]:
+        raise NotImplementedError
+
+    def read_many(self, paths: list[str]) -> dict[str, bytes]:
         raise NotImplementedError
 
 
@@ -99,33 +106,109 @@ class DiskTree(Tree):
         return (self.root / rel).exists()
 
 
-class IndexTree(Tree):
-    """The staged content: the commit gate must judge what will be committed, never the working tree."""
+def require_index_file() -> None:
+    """`GIT_INDEX_FILE` names the index git is committing; git reads a missing one as empty, which would hide the
+    staged work from every check, so a missing file is a named failure."""
+    named = os.environ.get("GIT_INDEX_FILE")
+    if named and not os.path.exists(named):
+        raise OSError(f"GIT_INDEX_FILE points at a file that does not exist: {named}")
+
+
+class GitTree(Tree):
+    """A tree read from git objects: bytes and modes from one listing (`ls-files -s` / `ls-tree -r`) and one
+    `cat-file --batch`. The listing is read once per instance; a tree object is short-lived (one commit, one command)."""
 
     def __init__(self, root: Path) -> None:
         self.root = root
 
-    def _git(self, *args: str) -> bytes:
+    def _git(self, *args: str, stdin: bytes | None = None) -> bytes:
+        require_index_file()
         try:
-            r = subprocess.run(["git", "-C", str(self.root), *args], capture_output=True, timeout=GIT_TIMEOUT_S)
+            r = subprocess.run(["git", "-C", str(self.root), *args], capture_output=True, timeout=GIT_TIMEOUT_S,
+                               input=stdin)
         except subprocess.TimeoutExpired as e:
             raise OSError(f"git {args[0]} timed out") from e
         if r.returncode:
             raise OSError(f"git {' '.join(args[:2])} exited {r.returncode}: {r.stderr.decode(errors='replace')[:200]}")
         return r.stdout
 
+    def _listing(self) -> list[tuple[str, str, str]]:
+        """(mode, object id, path) for every file of the tree."""
+        raise NotImplementedError
+
+    @cached_property
+    def listing(self) -> list[tuple[str, str, str]]:
+        return self._listing()
+
     @cached_property
     def files(self) -> set[str]:
-        return {f for f in self._git("ls-files", "-z").decode("utf-8", "replace").split("\0") if f}
+        return {path for _, _, path in self.listing}
+
+    def entries(self, prefix: str) -> list[tuple[str, str]]:
+        return [(mode, path) for mode, _, path in self.listing if path.startswith(prefix)]
+
+    def read_many(self, paths: list[str]) -> dict[str, bytes]:
+        if not paths:
+            return {}
+        ids = {path: oid for _, oid, path in self.listing}
+        unknown = [p for p in paths if p not in ids]
+        if unknown:
+            raise OSError(f"not in the tree: {unknown[0]}")
+        out = self._git("cat-file", "--batch", stdin="".join(f"{ids[p]}\n" for p in paths).encode())
+        result, at = {}, 0
+        for path in paths:
+            end = out.index(b"\n", at)
+            header = out[at:end].decode().split(" ")
+            if len(header) != 3 or header[1] != "blob":
+                raise OSError(f"{path} is not a readable file object ({' '.join(header[1:])})")
+            size = header[2]
+            result[path] = out[end + 1:end + 1 + int(size)]
+            at = end + 1 + int(size) + 1
+        return result
 
     def read(self, rel: str) -> str | None:
-        return self._git("show", f":{rel}").decode("utf-8", "replace") if rel in self.files else None
+        return self.read_many([rel])[rel].decode("utf-8", "replace") if rel in self.files else None
 
     def is_file(self, rel: str) -> bool:
         return rel in self.files
 
     def exists(self, rel: str) -> bool:
         return rel in self.files or any(f.startswith(rel.rstrip("/") + "/") for f in self.files)
+
+
+class IndexTree(GitTree):
+    """The staged content: the commit gate must judge what will be committed, never the working tree."""
+
+    def _listing(self) -> list[tuple[str, str, str]]:
+        rows = []
+        for row in self._git("ls-files", "-s", "-z").decode("utf-8", "surrogateescape").split("\0"):
+            if not row:
+                continue
+            meta, path = row.split("\t", 1)
+            mode, oid, stage = meta.split(" ")
+            if stage != "0":
+                raise OSError(f"the index has an unmerged path: {path}")
+            rows.append((mode, oid, path))
+        return rows
+
+
+class HeadTree(GitTree):
+    """The last commit; an unborn branch is an empty tree."""
+
+    def _listing(self) -> list[tuple[str, str, str]]:
+        try:
+            self._git("rev-parse", "--verify", "-q", "HEAD^{commit}")
+        except OSError as e:
+            if "exited 1" in str(e):
+                return []  # no commit yet
+            raise
+        rows = []
+        for row in self._git("ls-tree", "-r", "-z", "HEAD").decode("utf-8", "surrogateescape").split("\0"):
+            if row:
+                meta, path = row.split("\t", 1)
+                mode, _, oid = meta.split(" ")
+                rows.append((mode, oid, path))
+        return rows
 
 
 def inside(base: str, rel: str) -> str | None:

@@ -28,7 +28,10 @@ SOURCE = re.compile(r"(\.(py|[cm]?[jt]sx?|ps1|psm1|lua|go|rs|sh|bat|cmd|rb|java|
 # Tests (one definition, shared with the checker's CK-20), build output at the repo root only, vendored and generated files.
 NOT_SOURCE = re.compile(spec_check.TEST_PATH.pattern + r"|^(dist|build|out|coverage)/|(^|/)node_modules/|\.d\.ts$|"
                         r"\.min\.(js|css)$", re.I)
+ITEM_FILE = re.compile(r"^docs/work/(?!\.\.?/)([\w.-]+)/")
 WORK_ITEM = re.compile(r"^docs/work/(?!\.\.?/)[\w.-]+/README\.md$")
+REVIEW_RECORD = re.compile(r"^docs/work/(?!\.\.?/)[\w.-]+/reviews/[^/]+\.md$")
+RECORDED_STATES = ("spec-locked", "shipped")  # moves into these need a fresh passing review record (FR-8)
 REVERTS = re.compile(r"^This reverts commit ([0-9a-f]{7,40})\b", re.M)
 IN_PROGRESS = ("MERGE_HEAD", "REBASE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD")
 GIT_TIMEOUT_S = 10
@@ -40,6 +43,7 @@ class GateError(Exception):
 
 
 def git(*args: str, ok_codes: tuple[int, ...] = (0,)) -> str:
+    spec_check.require_index_file()
     try:
         r = subprocess.run(["git", *args], capture_output=True, text=True, encoding="utf-8", errors="replace",
                            timeout=GIT_TIMEOUT_S)
@@ -82,14 +86,20 @@ def status_of(text: str | None) -> str | None:
     return str(fm["status"]) if fm and fm.get("status") is not None else None
 
 
-def head_text(path: str) -> str | None:
-    """The HEAD version of a file; None when it is absent, HEAD is unborn, or the object cannot be read."""
-    if subprocess.run(["git", "cat-file", "-e", f"HEAD:{path}"], capture_output=True, timeout=GIT_TIMEOUT_S).returncode:
+def ref_text(ref: str, path: str) -> str | None:
+    """A file as `ref` (a commit, `HEAD` or `MERGE_HEAD`) holds it; None when the ref or the file is absent, or the
+    object cannot be read."""
+    if subprocess.run(["git", "cat-file", "-e", f"{ref}:{path}"], capture_output=True, timeout=GIT_TIMEOUT_S).returncode:
         return None
     try:
-        return git("show", f"HEAD:{path}")
+        return git("show", f"{ref}:{path}")
     except GateError:
-        return None  # an unreadable HEAD version counts as absent, so a commit that repairs it is not blocked
+        return None  # an unreadable version counts as absent, so a commit that repairs it is not blocked
+
+
+def head_text(path: str) -> str | None:
+    """The HEAD version of a file; None when it is absent, HEAD is unborn, or the object cannot be read."""
+    return ref_text("HEAD", path)
 
 
 def reachable(frm: str, item_type: str) -> set[str]:
@@ -115,24 +125,101 @@ def move_allowed(frm: str | None, to: str, item_type: str, *, merging: bool) -> 
     return frm == to or [frm, to] in edges
 
 
-def staged_readmes() -> list[tuple[str, str]]:
-    """(staged path, HEAD path) per added, changed or renamed work-item README; a rename is a move, never a creation."""
-    out = git("diff", "--cached", "--name-status", "-M", "-z", "--diff-filter=ACMR").split("\0")
-    pairs, i = [], 0
+def staged_changes() -> list[tuple[str, str, str]]:
+    """(kind, old path, new path) per staged change: A, C, M, R, T (type change) or D; for the others old == new."""
+    out = git("diff", "--cached", "--name-status", "-M", "-z", "--diff-filter=ACMRTD").split("\0")
+    changes, i = [], 0
     while i < len(out) - 1:
-        kind = out[i]
-        if kind.startswith(("R", "C")):
+        kind = out[i][0]
+        if kind in "RC":
             old, new, i = out[i + 1], out[i + 2], i + 3
         else:
             old = new = out[i + 1]
             i += 2
-        if WORK_ITEM.match(new):
-            pairs.append((new, old if kind.startswith("R") else new))
-    return pairs
+        changes.append((kind, old, new))
+    return changes
+
+
+def staged_readmes(changes: list[tuple[str, str, str]]) -> list[tuple[str, str]]:
+    """(staged path, HEAD path) per added, changed or renamed work-item README; a rename is a move, never a creation."""
+    return [(new, old if kind == "R" else new) for kind, old, new in changes if kind in "ACMR" and WORK_ITEM.match(new)]
+
+
+def later_status(path: str) -> str | None:
+    """The later of the HEAD and MERGE_HEAD statuses of a README (lifecycle order); `(unreadable)` when either is not
+    a lifecycle state, so a damaged item is never treated as a draft; None when neither side holds the file."""
+    found = [t for t in (head_text(path), ref_text("MERGE_HEAD", path)) if t is not None]
+    statuses = [status_of(t) for t in found]
+    if any(s not in LIFECYCLE["states"] for s in statuses):
+        return "(unreadable)"
+    return max(statuses, key=LIFECYCLE["states"].index) if statuses else None
+
+
+def removal_problem(changes: list[tuple[str, str, str]]) -> str | None:
+    """FR-12: no README of an item past draft is deleted, moved out of `docs/work/<id>/README.md` or retyped, and no
+    committed review record is deleted, unless the whole item is a draft going away."""
+    gone: set[str] = set()   # item folders whose README is deleted or moved out in this commit
+    added = [new for kind, _, new in changes if kind in "ACR" and WORK_ITEM.match(new)]
+    for kind, old, new in changes:
+        if not WORK_ITEM.match(old) or kind not in "DRT" or (kind == "R" and WORK_ITEM.match(new)):
+            continue
+        status = later_status(old)
+        if status != LIFECYCLE["initial"]:
+            hint = "; to rename the folder, rename in its own commit with the README unchanged" if kind == "D" and added else ""
+            return (f"{old}: deleting or moving a {status} work item: set status: killed instead "
+                    f"(it stays as history){hint}")
+        if kind != "T":
+            gone.add(old.rsplit("/", 1)[0])
+    for kind, old, new in changes:
+        if kind in "DR" and REVIEW_RECORD.match(old) and not (kind == "R" and REVIEW_RECORD.match(new)) \
+                and old.rsplit("/", 2)[0] not in gone:
+            return f"review records cannot be deleted: {old}"
+    return None
+
+
+def chain(frm: str, to: str, item_type: str) -> list[list[str]]:
+    """The shortest run of lifecycle edges from `frm` to `to` ([] when equal or unreachable)."""
+    edges = LIFECYCLE["edges"] + LIFECYCLE["typeEdges"].get(item_type, [])
+    paths: dict[str, list[list[str]]] = {frm: []}
+    todo = [frm]
+    while todo:
+        here = todo.pop(0)
+        for a, b in edges:
+            if a == here and b not in paths:
+                paths[b] = [*paths[here], [a, b]]
+                todo.append(b)
+    return paths.get(to, [])
+
+
+def merge_base_text(path: str) -> str | None:
+    """The README as the merge base of HEAD and MERGE_HEAD holds it; None when there is no such base or file."""
+    base = git("merge-base", "HEAD", "MERGE_HEAD", ok_codes=(0, 1)).split()
+    return ref_text(base[0], path) if base else None
+
+
+def edges_of_move(head_path: str, head: str | None, before: str | None, status: str, item_type: str,
+                  *, merging: bool) -> list[list[str]]:
+    """FR-10: the lifecycle edges this commit's move traverses. A plain commit makes its single edge; a merge, squash,
+    import (no HEAD version) or repair (unreadable HEAD status) is the shortest chain from the HEAD status (draft when
+    absent or unreadable). A merge in which BOTH sides moved the status away from the merge base is the chain from
+    that base: neither side's record judged the merged content."""
+    start = before if head is not None and before in LIFECYCLE["states"] else LIFECYCLE["initial"]
+    if merging or head is None or start != before:
+        edges = chain(start, status, item_type)
+    else:
+        edges = [[before, status]] if before != status else []
+    other = ref_text("MERGE_HEAD", head_path)
+    if other is not None:
+        base = status_of(merge_base_text(head_path))
+        base = base if base in LIFECYCLE["states"] else LIFECYCLE["initial"]
+        if before != base and status_of(other) != base:
+            edges += [e for e in chain(base, status, item_type) if e not in edges]
+    return edges
 
 
 def lifecycle_problem(tree: spec_check.Tree, readmes: list[tuple[str, str]], merging: bool) -> str | None:
-    """Every staged work-item README makes an allowed move and passes its tier (contracts/work-item.lifecycle.v1.json)."""
+    """Every staged work-item README makes an allowed move, passes its tier and, on a lock or ship move, carries a
+    fresh passing review record (contracts/work-item.lifecycle.v1.json, work item review-records)."""
     for path, head_path in readmes:
         status = status_of(tree.read(path))
         head = head_text(head_path)
@@ -155,13 +242,49 @@ def lifecycle_problem(tree: spec_check.Tree, readmes: list[tuple[str, str]], mer
         if errors and not historical:
             return f"{path} is not committable: {'; '.join(errors[:4])}"
         WARNINGS.extend(f"warn: {e}" for e in errors)
+        if why := record_problem(tree, path, head_path, head, before, status, item_type, merging=merging):
+            return why
+    return None
+
+
+def record_problem(tree: spec_check.Tree, path: str, head_path: str, head: str | None, before: str | None, status: str,
+                   item_type: str, *, merging: bool) -> str | None:
+    """FR-8, FR-10: on an edge into spec-locked or shipped the item needs a fresh passing record."""
+    edges = edges_of_move(head_path, head, before, status, item_type, merging=merging)
+    if not any(to in RECORDED_STATES for _, to in edges):
+        return None
+    import review_record  # lazy (FR-11): a broken record or contract blocks only the moves that need it
+    why = review_record.required_records(tree, path.rsplit("/", 1)[0], edges, item_type=item_type)
+    return f"{path}: {why}" if why else None
+
+
+def merged_items_problem(tree: spec_check.Tree, changes: list[tuple[str, str, str]],
+                         readmes: list[tuple[str, str]]) -> str | None:
+    """A merge can move an item without touching its README (both sides locked it, the files were merged by hand):
+    every item with a staged change whose README is not staged is judged by its edges alone."""
+    if not Path(git("rev-parse", "--git-path", "MERGE_HEAD").strip()).exists():
+        return None
+    seen = {path for path, _ in readmes}
+    items = sorted({f"docs/work/{m.group(1)}/README.md" for _, _, new in changes if (m := ITEM_FILE.match(new))} - seen)
+    for path in items:
+        status = status_of(tree.read(path)) if tree.is_file(path) else None
+        head = head_text(path)
+        if status in LIFECYCLE["states"] and head is not None:
+            item_type = str((frontmatter_of(head) or {}).get("type"))
+            if why := record_problem(tree, path, path, head, status_of(head), status, item_type, merging=True):
+                return why
     return None
 
 
 def reason_to_reject(message: str, message_file: Path) -> str | None:
     root = Path(git("rev-parse", "--show-toplevel").strip())
     merging = any(Path(git("rev-parse", "--git-path", name).strip()).exists() for name in MERGING)
-    lifecycle = lifecycle_problem(spec_check.IndexTree(root), staged_readmes(), merging)  # first, on every branch
+    changes = staged_changes()
+    removal = removal_problem(changes)  # first, on every branch
+    if removal:
+        return removal
+    tree, readmes = spec_check.IndexTree(root), staged_readmes(changes)
+    lifecycle = lifecycle_problem(tree, readmes, merging) or merged_items_problem(tree, changes, readmes)  # every branch
     if lifecycle:
         return lifecycle
     if any(Path(git("rev-parse", "--git-path", name).strip()).exists() for name in IN_PROGRESS):

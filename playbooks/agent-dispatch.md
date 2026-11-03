@@ -22,14 +22,13 @@
 - The format, the hash and the freshness rule have ONE definition: `~/.claude/docs/work/review-records/components.md`
   (FR-1 hash, FR-4 report, FR-6 file name `reviews/<YYYY-MM-DD>-<kind>-<hash8>.md` and keys, FR-8 freshness). Never
   restate them here.
-- **Every review brief carries the item's hash and names the scheme (review-records FR-1)**: once
-  `review_record.py` ships, from `python ~/.claude/scripts/review_record.py hash --item docs/work/<id>` after staging
-  the item; until then from the parent's interim implementation (below). A code review also gets the commit under
-  review. Write the review record the moment a report lands, before any fix. The reviewer's report must
-  echo it as a line `REVIEWED: sha256:<hex>` (and `REVIEWED-COMMIT: <sha>`); the record is refused otherwise.
-- **Until `scripts/review_record.py` ships**, the parent computes the hash with a throwaway implementation of FR-1 and
-  writes records by hand in the FR-6 format; the script re-verifies every hand-written record when it lands. Until the
-  gate enforces it, the parent checks freshness by hand before the lock commit.
+- **Every review brief carries the item's hash**, from `python ~/.claude/scripts/review_record.py hash --item
+  docs/work/<id>` after staging the item, and for a code review the commit under review. `review_record.py hash` and
+  review-records FR-1 are the only hash rule; never compute or restate it elsewhere. The reviewer's report must echo
+  it as a line `REVIEWED: sha256:<hex>` (and `REVIEWED-COMMIT: <sha>`); the record is refused otherwise.
+- **Write the review record the moment a report lands, before any fix**: save the report as a UTF-8 file and run
+  `python ~/.claude/scripts/review_record.py write --item docs/work/<id> --kind <design|code|verify> --reviewer
+  "<agent run>" --report <file> [--verifies <record>]`. The commit gate then enforces freshness at lock and ship.
 
 ## Lock before build; scope changes are new work items (owner, 2026-10-31)
 - Dispatch an implementer only against a work item at `spec-locked` or `building` (the implementer persona refuses

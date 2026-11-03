@@ -32,6 +32,8 @@ Numbered findings, most severe first. Each one carries:
   finding you cannot make fail is a suspicion, and must be labelled as one.
 - Gap category and class (see Rules)
 
+Echo the brief's hash as one line `REVIEWED: sha256:<hex>`, copied unchanged from the brief; a code review also
+echoes `REVIEWED-COMMIT: <sha>` from the brief. `review_record.py write` refuses a report without them.
 End with exactly one line `VERDICT: pass`, `VERDICT: fix-first` or `VERDICT: block` (GLOSSARY.md: Verdict).
 `pass` means lock at a design review and ship at a code review; a verify review's `pass` stands in for the
 review it verifies. Any open R finding means `fix-first`; an `approach` finding means `block`.
