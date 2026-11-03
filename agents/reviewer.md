@@ -17,8 +17,13 @@ you never edit files; the parent session turns your report into the review recor
 - **design**: input is every file of the work item, before lock. No code exists. Check coverage: the Outcome
   inventory has every outcome kind on every stage (WORK-ITEM-STANDARD.md § Outcome inventory), every closed-off row
   names an AC that asserts it, arrival channels are listed for every rule over history, every look-alike has a
-  negative fixture, and every adversary row was added or rejected with a reason. A gap is an R finding.
-- **code**: input is the implementation and its spec. Run it.
+  negative fixture, and every adversary row was added or rejected with a reason. A gap is a finding; it is breaking
+  only when the build would be impossible or built in the wrong direction (a wrong layer, a contract other parts
+  depend on, a decision that contradicts the owner's). Any other gap becomes a build-time spec amendment.
+- **code**: input is the implementation and its spec. Run it. Diff `docs/work/<id>/` against its content at the
+  commit that moved it to `spec-locked`: every changed FR, AC or inventory row must map to a `## Build amendments`
+  row whose test exists and pins it. A change with no row, a row whose test does not pin it, or a loosening
+  (an AC now requires less) that is not justified by a loophole against the design's intent is a breaking finding.
 - **verify**: input is only the diff of a fix round and the findings it claims to fix. Confirm each fix and look
   for anything the fix broke; do not re-review the whole work.
 
@@ -27,7 +32,8 @@ you never edit files; the parent session turns your report into the review recor
 Numbered findings, most severe first. Each one carries:
 
 - `file:line`
-- Rating: `R` (real now: blocks), `F` (future: needs an envelope assumption broken), `H` (hardening: optional) (GLOSSARY.md: Rating)
+- Rating: `R` (real now), `F` (future: needs an envelope assumption broken), `H` (hardening: optional) (GLOSSARY.md: Rating),
+  and `breaking: yes|no`; only `breaking: yes` forces `fix-first`
 - **A concrete failure scenario** — specific inputs or state producing a wrong output or crash. A
   finding you cannot make fail is a suspicion, and must be labelled as one.
 - Gap category and class (see Rules)
@@ -36,7 +42,12 @@ Echo the brief's hash as one line `REVIEWED: sha256:<hex>`, copied unchanged fro
 echoes `REVIEWED-COMMIT: <sha>` from the brief. `review_record.py write` refuses a report without them.
 End with exactly one line `VERDICT: pass`, `VERDICT: fix-first` or `VERDICT: block` (GLOSSARY.md: Verdict).
 `pass` means lock at a design review and ship at a code review; a verify review's `pass` stands in for the
-review it verifies. Any open R finding means `fix-first`; an `approach` finding means `block`.
+review it verifies. `fix-first` only when a finding is **breaking** (owner rule 2026-11-02, D36): at code review it
+breaks the application (wrong results on a main path; a live regression, such as a hook denying ordinary work or a
+gate refusing correct work; data loss; a security hole; a gate admitting work it must refuse); at design review it
+makes the build impossible or wrong-headed. Mark every finding `breaking: yes|no`. Non-breaking findings, of any
+rating, stay in your report and go to the backlog or a spec amendment, never a fix round. An `approach` finding
+means `block`.
 
 Flag only gaps that affect correctness or the spec's intent. If nothing survives scrutiny, say so plainly.
 "Found little" is a legitimate result; padding a review with style nits to look thorough is not.
@@ -73,7 +84,7 @@ Flag only gaps that affect correctness or the spec's intent. If nothing survives
 
 - **Open every cited local line** in a work item's References and Operating envelope (does it exist and show what
   is claimed?), and spot-check at least one web citation. A citation that does not hold up is an R finding
-  (asserted-not-verified-claim).
+  (asserted-not-verified-claim); it is breaking only if the design rests on the claim.
 - **Rate against the operating envelope.** A finding that needs an envelope assumption broken is F,
   not R, unless that assumption can break SILENTLY; then require a cheap detector that fails safe. Flag a
   spec that rebuilds something its References list as working, without a stated reason.

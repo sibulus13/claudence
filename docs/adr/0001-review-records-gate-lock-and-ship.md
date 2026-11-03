@@ -30,6 +30,7 @@ Owner decisions, grilling round 2, 2026-11-02.
 
 ## Consequences
 
+- **Only breaking findings force a fix round (D36), and the spec is living during the build (D37)**: a review records every finding but blocks only on what breaks the application or makes the build impossible; the implementer amends its own spec under `## Build amendments`, each change pinned by a test, and the one review at ship judges the final spec and code.
 - **Two reviews per item, plus a verify review after a fix-first verdict**: one at lock and one at ship. The review budget becomes 1 review, up to 1 fix round, then 1 verify review. A second fix-first goes to the architect.
 - **Reviewer independence is trusted by process for now**: the gate refuses an empty `reviewer` or "self". The trigger to revisit is Weaver run traces.
 - **Hook bypasses are re-checked later in CI**: `--no-verify`, server-side squash merges, cherry-pick and rebase skip local hooks. A CI re-check over pushed ranges (work item `gate-ci`) flags them after the push.

@@ -37,6 +37,12 @@
   edit to the running build, because each edit invalidates work already done and resets review.
 - Split by the nesting rule before dispatch (more than 15 ACs means children). One implementer gets one child's
   context pack, not the whole tree.
+- **Only breaking findings loop** (owner rule 2026-11-02, D36). A review blocks only on what breaks the application
+  (code review) or makes the build impossible or wrong-headed (design review); every other finding is recorded and
+  goes to the backlog or a build-time spec amendment (D37). A breaking finding is a **stage miss**: classify its cause
+  (context not loaded, spec quality, test strength, approach), fix that cause upstream (a probe, a checker rule or a
+  persona line, logged in `$FLEET_DOCS/RETRO-QUEUE.md`), then the stage gets one re-attempt; a second miss goes to the
+  architect. The tracked metric is first-attempt pass rate per stage.
 - Review budget, every size (GLOSSARY.md: Review budget), counted **per work item per review kind** (the design
   review and the code review each have their own): one review, at most one fix round, then one verify review of only
   the fix diff. A `fix-first` from that verify review is the second one: a stop that goes to the architect

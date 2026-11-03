@@ -158,6 +158,22 @@ One table per state machine or staged flow, header exactly:
 - `Handled by` names an `AC-n` (or `FR-n`) of this item; every closed row's AC asserts that named outcome.
 - Rows the adversary pass proposed are added, or listed under `### Rejected outcomes` with the reason.
 
+## Build amendments [adopted 2026-11-02, owner rule D37]
+
+Optional README section, written during the build by the implementer (or the parent) when a test exposes a gap in
+the spec or a loophole in specified behaviour that does not match the design's intent. Header exactly:
+
+`| Change | Why (what the test exposed) | Test |`
+
+- One row per amendment; `Test` names the test that pins the amended behaviour (a row without one is not allowed).
+- The section goes last in the README, after every required heading (CK-47 orders the leading ones).
+- Amendments add or tighten FR text, ACs, Outcome inventory rows and examples; a loosening is allowed only to close a
+  loophole against the design's intent and its row starts `loosens:`. They never delete an AC, change `status:`,
+  touch `reviews/`, or change the approach (another layer or contract): that goes back to design.
+- Every change to the spec after its lock has a row: the code review diffs the item against its content at the lock
+  commit, and an unlisted change is a breaking finding.
+- The code review at ship judges every row; the ship needs a fresh review of the amended content (ADR 0001).
+
 ## README.md frontmatter (machine-read by Catwalk) [v2: extended]
 
 ```yaml

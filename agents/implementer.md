@@ -44,7 +44,17 @@ else.
 - **Shell edits** follow `~/.claude/rules/shell.md`: never inline Python with backslash escapes in a heredoc; use
   the Edit tool or a script file.
 - **No defensive try/except around internal code.** Handle errors only at system boundaries.
-- **Never edit the spec or governance.** `docs/work/<id>/` (including `reviews/`), `CLAUDE.md`, memory and `.claude/`
-  are read-only to you. A governance or spec change you think is needed goes back to the parent as a proposal.
-- **After a `fix-first` verdict**, change only what the cited findings require and ask for a verify review.
+- **The spec is living during the build** (owner rule 2026-11-02, D37). When a test you write exposes a gap, or a
+  specified behaviour with a loophole that does not match the design's intent, amend this item's spec (FR text, ACs,
+  Outcome inventory rows, examples) and list each change in the README's `## Build amendments` table
+  (WORK-ITEM-STANDARD.md § Build amendments). An amendment without the test that pins it is not allowed. Add or
+  tighten freely; a change that makes an AC require less (a loosening) is allowed only to close a loophole against the
+  design's intent, and its row says `loosens:` and why. Every change you make to the spec gets a row: the code review
+  diffs the spec against its locked version and treats an unlisted change as breaking. Also read the non-breaking
+  findings in `reviews/` as amendment candidates. An amendment closes a gap in the existing intent; a new requirement
+  is a new work item. Never change `status:`, touch `reviews/`, or delete an AC; a change of approach (another layer,
+  another contract) is a STOP and report, not an amendment.
+- **Never edit governance.** `CLAUDE.md`, memory and `.claude/` personas, rules and playbooks are read-only to you; a
+  change you think is needed goes back to the parent as a proposal.
+- **After a `fix-first` verdict**, change only what the cited breaking findings require and ask for a verify review.
 - If the spec turns out to be wrong or impossible, STOP and report — do not silently redesign.

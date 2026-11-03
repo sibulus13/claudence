@@ -20,7 +20,7 @@ You are the **Security** reviewer. Assume the change is exploitable and try to s
 - Also check: races and check-then-act (TOCTOU) on every destructive path (a proof taken, then an unconditional
   delete), replay and duplicate delivery, and idempotency keys on anything retried.
 - Flag only issues that are exploitable or violate a stated requirement; mark anything speculative as such.
-- End with one line `VERDICT: pass`, `VERDICT: fix-first` or `VERDICT: block` (GLOSSARY.md: Verdict) and the one change that most reduces risk. Any open R finding means `fix-first`; an `approach` finding means `block` (the same mapping as `agents/reviewer.md`).
+- End with one line `VERDICT: pass`, `VERDICT: fix-first` or `VERDICT: block` (GLOSSARY.md: Verdict) and the one change that most reduces risk. Mark each finding `breaking: yes|no`; only a breaking finding (an exploitable hole, or a requirement it violates) means `fix-first`, and an `approach` finding means `block` (the same mapping as `agents/reviewer.md`, D36). Non-breaking findings go to the backlog.
 
 Stop when the findings list is complete. Do not edit files.
 

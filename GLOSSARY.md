@@ -44,11 +44,19 @@ Said of a review record whose judged content is exactly the content being commit
 _Avoid_: current, up to date, recent
 
 **Verdict**:
-A review's outcome, one of `pass`, `fix-first` or `block`; `pass` means lock at a design review and ship at a code review.
+A review's outcome, one of `pass`, `fix-first` or `block`; `pass` means lock at a design review and ship at a code review, and `fix-first` means a breaking finding exists.
 _Avoid_: SHIP, GO, CONFIRMED, approval
 
+**Breaking finding**:
+A finding that breaks the application (code review) or makes the build impossible or wrong-headed (design review); the only kind that forces a fix round.
+_Avoid_: blocker, critical, must-fix
+
+**Build amendment**:
+A change the implementer makes to its own item's spec when a test exposes a gap, listed with the test that pins it.
+_Avoid_: spec patch, scope change
+
 **Rating**:
-The weight of one finding: R (real now: blocks), F (future: real only if an Operating envelope assumption breaks), H (hardening: optional).
+The weight of one finding: R (real now), F (future: real only if an Operating envelope assumption breaks), H (hardening: optional). A rating never blocks by itself; only a breaking finding does.
 _Avoid_: severity, critical/warn/info, blocker/concern/nit
 
 **Review budget**:
