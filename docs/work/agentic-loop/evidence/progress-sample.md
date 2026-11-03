@@ -1,4 +1,4 @@
-# Progress view sample: agentic-loop mid-build (illustrative state)
+# Progress view sample: what the generated `evidence/progress.md` shows mid-build (illustrative state)
 
 ```mermaid
 flowchart TD
@@ -15,7 +15,9 @@ flowchart TD
   class M4 owner
 ```
 
-The state above is invented to show the colors; today every milestone is `planned`.
+The state above is invented to show the colors; today every milestone is `planned`. The README's Milestones table
+holds the plan only: `scripts/progress.py` generates this view (and `evidence/progress.json`) from the review records,
+the `Milestone:` trailers and the last test run per AC. No gate reads it, and `evidence/` is outside the content hash.
 
 ## Terminal view (`spec_status`), one line per item, then one per milestone
 
@@ -33,7 +35,7 @@ feedback-loop  T2  ready 83%  (2 of 12 ready checks open: Outcomes depth, open d
 | Measure | What it counts | Source |
 |---|---|---|
 | Spec readiness | ready checks passed over applicable checks: required sections, open decisions resolved, Outcomes breadth and depth, every AC with a named test, no open-question markers | the checker's ready checks, run on demand |
-| Implementation progress | per AC: `·` no test yet, `✕` test red, `✓` green, `✓✓` reviewed; per milestone: green ACs over its ACs | the last recorded test run per AC (until `gate-ci`, the implementer's quoted run) and the review records |
+| Implementation progress | per AC: `·` no test yet, `✕` test red, `✓` green, `✓✓` reviewed; per milestone: green ACs over its ACs | the last recorded test run per AC (until `gate-ci`, the implementer's quoted run), the review records and the `Milestone:` trailers |
 
 ## Status enum (one source: `contracts/progress-status.v1.json`)
 
@@ -43,8 +45,8 @@ feedback-loop  T2  ready 83%  (2 of 12 ready checks open: Outcomes depth, open d
 | blocked | ⊘ | red outline | a dependency or a breaking finding stops it |
 | building | ◐ | blue | red tests committed, code in progress |
 | review | ◔ | amber | built, its review is running |
-| owner | ⏸ | purple | waiting on the owner's milestone check |
-| done | ● | green | outer test green, review passed, owner check passed or not required |
+| owner | ⏸ | purple | done (a `milestone` record names it) and waiting for the owner's `milestone-approval` |
+| done | ● | green | outer test green, review passed, owner `milestone-approval` recorded |
 | failed | ✕ | red | a breaking finding or a red outer test after "done" |
 | killed | ⨯ | black | dropped, kept as history |
 
