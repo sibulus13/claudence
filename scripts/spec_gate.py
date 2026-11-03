@@ -28,6 +28,7 @@ SOURCE = re.compile(r"(\.(py|[cm]?[jt]sx?|ps1|psm1|lua|go|rs|sh|bat|cmd|rb|java|
 # Tests (one definition, shared with the checker's CK-20), build output at the repo root only, vendored and generated files.
 NOT_SOURCE = re.compile(spec_check.TEST_PATH.pattern + r"|^(dist|build|out|coverage)/|(^|/)node_modules/|\.d\.ts$|"
                         r"\.min\.(js|css)$", re.I)
+FRONTMATTER_BLOCK = re.compile(r"^---\r?\n(.*?)\r?\n---", re.S)
 ITEM_FILE = re.compile(r"^docs/work/(?!\.\.?/)([\w.-]+)/")
 WORK_ITEM = re.compile(r"^docs/work/(?!\.\.?/)[\w.-]+/README\.md$")
 REVIEW_RECORD = re.compile(r"^docs/work/(?!\.\.?/)[\w.-]+/reviews/[^/]+\.md$")
@@ -146,10 +147,14 @@ def staged_readmes(changes: list[tuple[str, str, str]]) -> list[tuple[str, str]]
 
 
 def later_status(path: str) -> str | None:
-    """The later of the HEAD and MERGE_HEAD statuses of a README (lifecycle order); `(unreadable)` when either is not
-    a lifecycle state, so a damaged item is never treated as a draft; None when neither side holds the file."""
+    """The later of the HEAD and MERGE_HEAD statuses of a README (lifecycle order). A README with no frontmatter block
+    is a legacy file, not a v2 work item, and counts as a draft; `(unreadable)` when a frontmatter block holds no
+    lifecycle status, so a damaged item is never treated as a draft; None when neither side holds the file."""
     found = [t for t in (head_text(path), ref_text("MERGE_HEAD", path)) if t is not None]
-    statuses = [status_of(t) for t in found]
+    blocks = [t for t in found if FRONTMATTER_BLOCK.match(t)]
+    if found and not blocks:
+        return LIFECYCLE["initial"]
+    statuses = [status_of(t) for t in blocks]
     if any(s not in LIFECYCLE["states"] for s in statuses):
         return "(unreadable)"
     return max(statuses, key=LIFECYCLE["states"].index) if statuses else None
@@ -254,8 +259,31 @@ def record_problem(tree: spec_check.Tree, path: str, head_path: str, head: str |
     if not any(to in RECORDED_STATES for _, to in edges):
         return None
     import review_record  # lazy (FR-11): a broken record or contract blocks only the moves that need it
+    if merged_item_equals_a_side(tree, path, head_path, status, review_record):
+        return None  # that side's history already passed the gate for exactly this content
     why = review_record.required_records(tree, path.rsplit("/", 1)[0], edges, item_type=item_type)
     return f"{path}: {why}" if why else None
+
+
+def merged_item_equals_a_side(tree: spec_check.Tree, path: str, head_path: str, status: str, review_record) -> bool:
+    """FR-10: in a merge (MERGE_HEAD exists), an item whose hashed files equal HEAD's or MERGE_HEAD's version, at the same
+    status, derives no edges: that side's commits were gated one by one. A conflict resolved to new content, or a
+    squash (no MERGE_HEAD), is not exempt."""
+    if ref_text("MERGE_HEAD", head_path) is None and head_text(head_path) is None:
+        return False
+    if not Path(git("rev-parse", "--git-path", "MERGE_HEAD").strip()).exists():
+        return False
+    merged = review_record.content_hash(tree, path.rsplit("/", 1)[0])
+    for rev in ("MERGE_HEAD", "HEAD"):
+        text = ref_text(rev, head_path)
+        if text is not None and status_of(text) == status:
+            side = spec_check.HeadTree(tree.root, rev)
+            try:
+                if review_record.content_hash(side, head_path.rsplit("/", 1)[0]) == merged:
+                    return True
+            except review_record.HashError:
+                continue
+    return False
 
 
 def merged_items_problem(tree: spec_check.Tree, changes: list[tuple[str, str, str]],

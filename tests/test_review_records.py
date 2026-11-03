@@ -895,9 +895,9 @@ def test_ac8_a_squash_of_lock_and_build_needs_a_design_record(repo2: Path, tmp_p
     assert land(repo2, "docs: squash feat").returncode == 0
 
 
-@pytest.mark.parametrize("with_code", [True, False])
-def test_ac8_an_item_imported_at_shipped_by_a_merge_needs_both_records(repo2: Path, tmp_path: Path, capsys, clock,
-                                                                       with_code: bool) -> None:
+@pytest.mark.parametrize("edited", [False, True])
+def test_ac8_an_item_imported_at_shipped_by_a_merge_lands_unless_the_merge_changed_it(repo2: Path, tmp_path: Path, capsys,
+                                                                                    clock, edited: bool) -> None:
     # review-records/AC-8
     base = head_sha(repo2)
     git(repo2, "rm", "-rq", ITEM)
@@ -906,7 +906,7 @@ def test_ac8_an_item_imported_at_shipped_by_a_merge_needs_both_records(repo2: Pa
     write(repo2, f"{ITEM}/evidence/demo.webm", "x")
     set_status(repo2, "shipped")
     stage_all(repo2)
-    for kind in ("design", *(["code"] if with_code else [])):
+    for kind in ("design", "code"):
         code, out, err = do_write(capsys, repo2, tmp_path, kind=kind, commit_sha=base if kind == "code" else None,
                                   name=f"{kind}.md")
         assert code == 0, err
@@ -915,12 +915,14 @@ def test_ac8_an_item_imported_at_shipped_by_a_merge_needs_both_records(repo2: Pa
     git(repo2, "checkout", "-q", "main")
     git(repo2, "merge", "--no-commit", "--no-ff", "feat", check=False)
     git(repo2, "checkout", "feat", "--", ITEM)
+    if edited:  # the merge resolution writes content neither side reviewed
+        edit_item(repo2, "components.md", "\nEdited while merging.\n")
     stage_all(repo2)
     r = commit(repo2, "-m", "Merge branch 'feat'")
-    if with_code:
-        assert r.returncode == 0, r.stderr
+    if edited:
+        assert r.returncode != 0 and "record is stale" in r.stderr, r.stderr
     else:
-        assert r.returncode != 0 and "needs a fresh code review" in r.stderr, r.stderr
+        assert r.returncode == 0, r.stderr
 
 
 @pytest.mark.parametrize("target", ["spec-locked", "building"])
@@ -1387,3 +1389,91 @@ def test_ac15_the_reviewer_and_the_playbook_require_the_echo_and_name_one_hash_r
     assert "review_record.py hash" in playbook and "FR-1" in playbook
     assert re.search(r"only hash rule", playbook)
     assert "sha256sum" not in playbook and "hashlib" not in playbook  # the playbook restates no rule of its own
+
+
+# ---------------------------------------------------------------- fix round 1 (code review R1, R2)
+
+def lock_build_refine_on_main(repo: Path, tmp_path: Path, capsys) -> None:
+    """On main (hooks bypassed, as each commit passed the gate on its own branch): lock with a fresh record, build,
+    then refine functional.md, so the final content is newer than the record."""
+    set_status(repo, "spec-locked")
+    stage_all(repo)
+    code, _, err = do_write(capsys, repo, tmp_path)
+    assert code == 0, err
+    for status in (None, "building"):
+        if status:
+            set_status(repo, status)
+        stage_all(repo)
+        git(repo, "commit", "-qm", f"chore: {status or 'lock'}", "--no-verify")
+    edit_item(repo)
+    git(repo, "commit", "-qm", "docs: refine", "--no-verify")
+
+
+def test_ac8_merging_main_into_a_branch_after_main_locked_built_and_refined_lands(repo2: Path, tmp_path: Path, capsys, clock) -> None:
+    # review-records/AC-8 (code review R1): the merged item equals MERGE_HEAD's, whose history already passed the gate
+    seed_status(repo2, "draft")
+    git(repo2, "branch", "feat")
+    lock_build_refine_on_main(repo2, tmp_path, capsys)
+    git(repo2, "checkout", "-q", "feat")
+    write(repo2, "NOTES.md", "branch work\n")
+    git(repo2, "add", "-A")
+    git(repo2, "commit", "-qm", "docs: notes", "--no-verify")
+    r = git(repo2, "merge", "--no-ff", "-q", "-m", "Merge main", "main", check=False)
+    assert r.returncode == 0, r.stderr
+
+
+def test_ac8_merging_main_into_a_branch_that_lacks_the_item_lands(repo2: Path, tmp_path: Path, capsys, clock) -> None:
+    # review-records/AC-8 (code review R1): the item is absent from the branch HEAD (an import)
+    git(repo2, "rm", "-rq", ITEM)
+    git(repo2, "commit", "-qm", "chore: no item yet", "--no-verify")
+    git(repo2, "branch", "feat")
+    git(repo2, "checkout", "-q", "main~1", "--", ITEM)
+    set_status(repo2, "draft")
+    stage_all(repo2)
+    git(repo2, "commit", "-qm", "chore: draft", "--no-verify")
+    lock_build_refine_on_main(repo2, tmp_path, capsys)
+    git(repo2, "checkout", "-q", "feat")
+    write(repo2, "NOTES.md", "branch work\n")
+    git(repo2, "add", "-A")
+    git(repo2, "commit", "-qm", "docs: notes", "--no-verify")
+    r = git(repo2, "merge", "--no-ff", "-q", "-m", "Merge main", "main", check=False)
+    assert r.returncode == 0, r.stderr
+
+
+def test_ac8_a_merge_whose_item_equals_neither_side_is_still_checked(repo2: Path, tmp_path: Path, capsys, clock) -> None:
+    # review-records/AC-8: the equal-to-a-side exemption does not cover a merge that produces new content
+    seed_status(repo2, "draft")
+    git(repo2, "branch", "feat")
+    lock_build_refine_on_main(repo2, tmp_path, capsys)
+    git(repo2, "checkout", "-q", "feat")
+    edit_item(repo2, "components.md", "\nBranch-only change.\n")
+    git(repo2, "commit", "-qm", "docs: branch edit", "--no-verify")
+    git(repo2, "merge", "--no-ff", "--no-commit", "main")
+    r = commit(repo2, "-m", "Merge main")
+    assert r.returncode != 0 and "record is stale" in r.stderr, r.stderr
+
+
+def commit_legacy_readme(repo: Path, text: str) -> str:
+    rel = "docs/work/legacy/README.md"
+    write(repo, rel, text)
+    git(repo, "add", "-A")
+    git(repo, "commit", "-qm", "chore: legacy", "--no-verify")
+    return rel
+
+
+@pytest.mark.parametrize("text", ["# Legacy plan\n", "", "Just prose.\n\n---\nnot frontmatter\n"])
+def test_ac10_deleting_a_legacy_readme_without_frontmatter_lands(repo2: Path, text: str) -> None:
+    # review-records/AC-10 (code review R2): no frontmatter block, so not a v2 work item
+    rel = commit_legacy_readme(repo2, text)
+    git(repo2, "rm", "-q", rel)
+    r = commit(repo2, "-m", "docs: drop the legacy plan")
+    assert r.returncode == 0, r.stderr
+
+
+@pytest.mark.parametrize("front", ["id: x\nowner: me", "id: x\nstatus: weird", "id: x\nstatus: building"])
+def test_ac10_deleting_a_readme_with_frontmatter_but_no_draft_status_is_refused(repo2: Path, front: str) -> None:
+    # review-records/AC-10 (code review R2): readable frontmatter, status missing, unknown or past draft
+    rel = commit_legacy_readme(repo2, f"---\n{front}\n---\n# Plan\n")
+    git(repo2, "rm", "-q", rel)
+    r = commit(repo2, "-m", "docs: drop the plan")
+    assert r.returncode != 0 and "deleting or moving a" in r.stderr, r.stderr

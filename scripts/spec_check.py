@@ -193,17 +193,21 @@ class IndexTree(GitTree):
 
 
 class HeadTree(GitTree):
-    """The last commit; an unborn branch is an empty tree."""
+    """The last commit (or another `rev`: MERGE_HEAD for a merge); an unborn branch is an empty tree."""
+
+    def __init__(self, root: Path, rev: str = "HEAD") -> None:
+        super().__init__(root)
+        self.rev = rev
 
     def _listing(self) -> list[tuple[str, str, str]]:
         try:
-            self._git("rev-parse", "--verify", "-q", "HEAD^{commit}")
+            self._git("rev-parse", "--verify", "-q", f"{self.rev}^{{commit}}")
         except OSError as e:
             if "exited 1" in str(e):
                 return []  # no commit yet
             raise
         rows = []
-        for row in self._git("ls-tree", "-r", "-z", "HEAD").decode("utf-8", "surrogateescape").split("\0"):
+        for row in self._git("ls-tree", "-r", "-z", self.rev).decode("utf-8", "surrogateescape").split("\0"):
             if row:
                 meta, path = row.split("\t", 1)
                 mode, _, oid = meta.split(" ")
