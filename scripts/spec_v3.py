@@ -55,20 +55,18 @@ AC_ID = re.compile(r"^AC-\d+$")
 
 # ---------------------------------------------------------------- the repo's tier: `live`
 
-FENCE_LINE = re.compile(r"^\s*(`{3,}|~{3,})")
 DECLARED_AT_LINE_START = re.compile(r"^[ \t]*(?:[-*+][ \t]+)?\**deploymentTier\**:\**[ \t]*`?([a-z-]+)(?!\w)")
 DECLARED_IN_CODE_SPAN = re.compile(r"`deploymentTier:[ \t]*([a-z-]+)(?!\w)")
 
 
 def live_of(claude_md: str | None) -> bool:
     """Whether the first `deploymentTier:` declaration in a CLAUDE.md is exactly `live`. A declaration is a line that
-    starts with the key, or a backticked `deploymentTier: word` span; prose, code fences, comments and look-alikes
-    (`live-later`, `live_x`) are not. A missing file or no declaration is not live (the global default: pre-traffic)."""
-    in_fence = False
+    starts with the key, inside a code fence or not (the fleet writes it fenced: D:/repo/SaaS/cashcow/CLAUDE.md:11),
+    or a backticked `deploymentTier: word` span; prose, comments and look-alikes (`live-later`, `live_x`) are not.
+    Reading a fenced example as live only makes an item stricter. A missing file or no declaration is not live (the
+    global default: pre-traffic)."""
     for line in (claude_md or "").splitlines():
-        if FENCE_LINE.match(line):
-            in_fence = not in_fence
-        elif not in_fence and (m := DECLARED_AT_LINE_START.match(line) or DECLARED_IN_CODE_SPAN.search(line)):
+        if m := DECLARED_AT_LINE_START.match(line) or DECLARED_IN_CODE_SPAN.search(line):
             return m.group(1) == LIVE
     return False
 

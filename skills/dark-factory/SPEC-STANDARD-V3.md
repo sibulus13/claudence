@@ -108,7 +108,8 @@ most 15. Tests cite `<id>/AC-n` and `<id>/MNC-n` verbatim (checked from `buildin
 | removal | data and compatibility |
 | live | operability, dependency fails |
 
-- **Executable share**: the L3 rows whose AC has a citing test, over all L3 rows. Done means 100%.
+- **Executable share**: the L3 rows whose AC has a citing test, over all L3 rows. From `building` every AC needs a
+  citing test (CK-20), so done means 100%; the share itself is not yet reported.
 - A spec with a state machine may add per-stage outcome rows under Approach; they are not counted.
 
 ## Definition of ready (the lock, `draft` to `spec-locked`)
@@ -117,7 +118,7 @@ most 15. Tests cite `<id>/AC-n` and `<id>/MNC-n` verbatim (checked from `buildin
 2. Every required section is present; the AC table has 1-15 rows (bugfix 1-3), each with every cell filled.
 3. No open-question marker (`[NEEDS CLARIFICATION`, `TBD` outside inline code) remains.
 4. Outcomes meet the tier's thresholds.
-5. Every cited local `path:line` resolves.
+5. Every `path:line` in the Assumptions table's Observed column resolves.
 6. T2 and flagged bugfix: the probe is saved under `evidence/`, and a fresh `pass` design or verify record matches
    the item's hash (`scripts/review_record.py`). T1 and unflagged bugfix lock on the mechanical check alone.
 7. Bugfix: the reproducer test is written and seen red for the stated reason (quoted in the red-test commit).

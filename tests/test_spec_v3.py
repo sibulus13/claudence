@@ -288,8 +288,11 @@ def test_ac3_live_comes_from_claude_md_whatever_risk_says(tmp_path: Path) -> Non
     ("deploymentTier: live   (owner-promoted 2026-10-31)\n", True),
     ("- deploymentTier: live\n", True),
     ("Never set deploymentTier: live without approval.\n", False),
-    ("```\ndeploymentTier: live\n```\n", False),
-    ("~~~md\ndeploymentTier: live\n~~~\n", False),
+    # A fenced line-start declaration counts: the fleet writes it that way (D:/repo/SaaS/cashcow/CLAUDE.md:11, code
+    # review finding 1), and reading a fenced example as live only makes an item stricter (fails safe).
+    ("```\ndeploymentTier: live\n```\n", True),
+    ("~~~md\ndeploymentTier: live\n~~~\n", True),
+    ("## Deployment tier\n\n```\ndeploymentTier: live   (owner-promoted 2026-10-31; real Stripe payments)\n```\n", True),
     ("deploymentTier: live-later\n", False),
     ("deploymentTier: live_x\n", False),
     ("deploymentTier: pre-traffic  # was live\n", False),
@@ -302,6 +305,27 @@ def test_ac3_live_comes_from_claude_md_whatever_risk_says(tmp_path: Path) -> Non
 def test_ac3_live_reader_refuses_lookalikes(text: str | None, live: bool) -> None:
     # spec-standard-v3/AC-3
     assert sv3().live_of(text) is live
+
+
+FLEET_TIER_AT_LINE_START = re.compile(r"^[ \t]*deploymentTier:[ \t]*`?([a-z-]+)", re.M)
+
+
+def test_ac3_live_reader_finds_every_live_repo_in_the_fleet() -> None:
+    # spec-standard-v3/AC-3 (code review finding 1): fixtures from the design missed a real fenced declaration, so the
+    # reader is checked against every repo CLAUDE.md the fleet actually has. No live repo may read as not live.
+    root = Path("D:/repo")
+    if not root.is_dir():
+        pytest.skip("D:/repo is absent: no fleet CLAUDE.md files to compare against")
+    live_files = []
+    for path in sorted({*root.glob("*/CLAUDE.md"), *root.glob("*/*/CLAUDE.md"), *root.glob("*/*/*/CLAUDE.md")}):
+        text = path.read_text(encoding="utf-8", errors="replace")
+        m = FLEET_TIER_AT_LINE_START.search(text)
+        if m and m.group(1) == "live":
+            live_files.append((path, text))
+    if not live_files:
+        pytest.skip("no fleet repo declares deploymentTier: live today")
+    missed = [str(p) for p, text in live_files if sv3().live_of(text) is not True]
+    assert missed == [], f"live repos read as not live: {missed}"
 
 
 # ---------------------------------------------------------------- AC-4: sections
