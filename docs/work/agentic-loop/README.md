@@ -164,14 +164,26 @@ flowchart TD
   M1["M1 walking skeleton: plan sections checked"] --> M2["M2 manifest, profiles, milestone gate, brief"]
   M2 --> M3["M3 final gate: goal check, manual or auto"]
   M1 --> M4["M4 levels and limits: product brief, split"]
+  classDef planned fill:#eeeeee,color:#333,stroke:#9e9e9e
+  class M1,M2,M3,M4 planned
 ```
 
-| Milestone | Slice (what works after it) | Depends on | Owns | Outer test (red first) | Unblocks |
-|---|---|---|---|---|---|
-| M1 | a T2 spec with Decisions, Milestones and Contracts passes the checker; this spec checks itself | - | `scripts/spec_v3.py`, `contracts/work-item.v3.json` | AC-1 | every T2 spec can carry a checked plan |
-| M2 | the manifest and profile are read; a milestone waits for the owner as the profile says; the brief reaches Catwalk and TeleFi | M1 | `scripts/manifest.py`, `scripts/milestone_brief.py`, `scripts/spec_gate.py` | AC-4 | the owner checks each milestone |
-| M3 | ship needs a goal-check record, then an owner record (manual) or a green health check (auto) | M2 | `scripts/review_record.py`, `agents/goal-checker.md` | AC-9 | unattended ship on `yolo` repos, safely |
-| M4 | the checker reads the product brief and domains, refuses a spec or index past its limits or depth | M1, capability layer | `scripts/spec_levels.py` | AC-11 | large projects decompose by rule |
+| Milestone | Status | Slice (what works after it) | Depends on | Owns | Outer test (red first) | Unblocks |
+|---|---|---|---|---|---|---|
+| M1 | planned | a T2 spec with Decisions, Milestones and Contracts passes the checker; this spec checks itself | - | `scripts/spec_v3.py`, `contracts/work-item.v3.json` | AC-1 | every T2 spec can carry a checked plan |
+| M2 | planned | the manifest and profile are read; a milestone waits for the owner as the profile says; the brief reaches Catwalk and TeleFi | M1 | `scripts/manifest.py`, `scripts/milestone_brief.py`, `scripts/spec_gate.py` | AC-4 | the owner checks each milestone |
+| M3 | planned | ship needs a goal-check record, then an owner record (manual) or a green health check (auto) | M2 | `scripts/review_record.py`, `agents/goal-checker.md` | AC-9 | unattended ship on `yolo` repos, safely |
+| M4 | planned | the checker reads the product brief and domains, refuses a spec or index past its limits or depth | M1, capability layer | `scripts/spec_levels.py` | AC-11 | large projects decompose by rule |
+
+### Progress and status
+
+Two measures: **spec readiness** (ready checks passed over applicable ones) and **implementation progress** (per AC:
+no test, red, green, reviewed; per milestone: green ACs over its ACs). The Status column is the one source; the
+chart's colors are generated from it. Statuses, symbols and colors have one source,
+`contracts/progress-status.v1.json`: planned ○ grey, blocked ⊘ red outline, building ◐ blue, review ◔ amber,
+owner ⏸ purple, done ● green, failed ✕ red, killed ⨯ black; every status shows its symbol and word, so it reads
+without color. Shown in the spec, in the `spec_status` terminal view and at the top of each milestone brief; a
+sample on this spec: [progress-sample.md](evidence/progress-sample.md).
 
 M4 runs in parallel with M2 and M3 (no shared paths). It needs the capability layer (`docs/capabilities/`) from the
 spec-structure proposal. The chart is revised after M1.
@@ -184,18 +196,19 @@ spec-structure proposal. The chart is revised after M1.
 | per-project manifest and profiles | v1 | `contracts/project-manifest.v1.json` | `contracts/fixtures/manifest-*.yaml` |
 | milestone brief | v1 | `contracts/milestone-brief.v1.json` | `contracts/fixtures/brief-*.json` |
 | review record kinds `milestone`, `goal`, `owner-decision` | review-record v2 | `contracts/review-record.v2.json` | `contracts/fixtures/record-*.md` |
+| progress statuses: enum, symbol, color, meaning | v1 | `contracts/progress-status.v1.json` | `contracts/fixtures/progress-*.json` |
 | product brief and domain index | v1 | `contracts/product-brief.v1.json` | `contracts/fixtures/brief-index-*.md` |
 
 ## Behaviour
 
 | AC | Traces | Given / when | Pass when | Fail when | Test |
 |---|---|---|---|---|---|
-| AC-1 | M1 | this README and a fixture T2 spec with Decisions, Milestones and Contracts in the exact shapes | both pass the checker | either is refused, or a malformed one passes | tests/test_agentic_loop.py |
+| AC-1 | M1 | this README and a fixture T2 spec with Decisions, Milestones (with a Status column) and Contracts in the exact shapes; a status outside `contracts/progress-status.v1.json` | both pass the checker and the chart colors are regenerated from the Status column; the unknown status is refused | either is refused, a malformed one passes, or the chart and the column disagree | tests/test_agentic_loop.py |
 | AC-2 | M1 | fixtures: a milestone without an outer test; a Depends-on cycle or unknown id; two milestones without a dependency owning one path; a contract whose schema or fixture is missing | each refused, the rule named | any lands | tests/test_agentic_loop.py |
 | AC-3 | M2, D-C | manifests: each profile; missing (pre-traffic and live repos); an unknown value; a `live` repo set to `yolo` | each profile's defaults apply; missing gives `yolo` or `revenue` by tier; unknown refused by name; the `live` repo stays `revenue` | a default is unsafe, or a bad value is silently used | tests/test_agentic_loop.py |
 | AC-4 | M2 | a milestone moving to `building` while unreviewed done milestones are at the profile's cap (blocking = cap 0); then after an owner `milestone` record | refused naming the waiting milestone; lands after the record | it lands at the cap, or is refused under it | tests/test_agentic_loop.py |
 | AC-5 | M2, security | an owner `milestone` record written by the builder's identity, or for other content | refused | it counts | tests/test_agentic_loop.py |
-| AC-6 | M2 | a milestone moves to done | a brief validating against its contract exists with six parts (now, evidence, what broke, cost vs cap, assumed decisions, next) and is queued for Catwalk and TeleFi | missing, invalid, or a part absent | tests/test_agentic_loop.py |
+| AC-6 | M2 | a milestone moves to done; `spec_status` run on a repo with specs mid-build | a brief validating against its contract exists with six parts (now, evidence, what broke, cost vs cap, assumed decisions, next), opens with the progress line, and is queued for Catwalk and TeleFi; `spec_status` prints readiness, AC and milestone progress per item with symbols | missing, invalid, a part absent, or a count disagrees with the records | tests/test_agentic_loop.py |
 | AC-7 | M2, D-C | a `public` repo: a T2 spec with `security` below L3, or without a security review record at lock | each refused by name | either lands | tests/test_agentic_loop.py |
 | AC-8 | M2, D-C | a `revenue` repo: a T2 spec without a rollback plan; a flagged bugfix without a security review record | each refused by name | either lands | tests/test_agentic_loop.py |
 | AC-9 | M3 | a ship without a `goal` record; with one written by the builder; with a fresh independent one | refused, refused, lands | otherwise | tests/test_agentic_loop.py |
