@@ -38,8 +38,8 @@ were split by this spec's own limit (5 milestones).
 |---|---|---|---|---|---|
 | D-A | How a spec changes after lock | **confirmed** (owner 2026-11-03, D43) | frozen original + append-only Amendments log + folded current view; built by `feedback-loop` | D37 in-place edits | every spec, gate rule and reviewer reads this format |
 | D-B | Where per-project switches live | open, recommended | one owner-only manifest per repo, `catalog-info.yaml` (approved, unbuilt) | `.claude/gates.json`; CLAUDE.md keys | Foreman, Catwalk, the gate and the brief all read it |
-| D-C | What sets the loop's caution | open, recommended | a project **profile** in the manifest: `velocity`, `public` or `revenue` (table below); defaults follow the profile | one default for all; `deploymentTier` alone | every gate default in every repo |
-| D-D | Final gate per profile | open, recommended | `velocity`: auto (goal check + health check); `public` and `revenue`: manual | manual everywhere | what ships without a human |
+| D-C | What sets the loop's caution | **confirmed** (owner 2026-11-03, D44): cashcow `revenue`, every other repo `yolo` | a project **profile** in the manifest: `yolo`, `public` or `revenue` (table below); defaults follow the profile | one default for all; `deploymentTier` alone | every gate default in every repo |
+| D-D | Final gate per profile | **confirmed** (owner 2026-11-03, D44) | `yolo`: auto (goal check + health check); `public` and `revenue`: manual | manual everywhere | what ships without a human |
 | D-E | Background sections | open, recommended | a visible one-line summary per pattern, detail collapsed; owner preference `background: expanded` | expanded by default | every spec's layout |
 | D-F | Size limits and depth | open, recommended | the limits and levels table below | per-project only, no defaults | every spec's size and the number of agents per build |
 
@@ -47,11 +47,11 @@ were split by this spec's own limit (5 milestones).
 
 | Profile | Who is exposed | Values | Milestone review | Final gate | Also |
 |---|---|---|---|---|---|
-| `velocity` | the owner only (pre-revenue, internal) | speed | async, at most 2 unreviewed | auto: goal check + health check | design review only where the tier requires it |
+| `yolo` | the owner only (pre-revenue, internal) | speed | async, at most 2 unreviewed | auto: goal check + health check | design review only where the tier requires it |
 | `public` | public users, no money | security, stability | async at most 1; blocking for a milestone with a security or data flag | manual | `security` forced to L3 in every T2; security reviewer on every T2; full end-to-end suite and a canary before release |
 | `revenue` | paying users, payments or PII (today's `live`) | security, stability, data | blocking | manual, recorded approval | flag `live` derived; security reviewer on every T2 and flagged bugfix; a rollback plan in the spec |
 
-A repo with no manifest is `velocity` when its `deploymentTier` is `pre-traffic` and `revenue` when it is `live`.
+A repo with no manifest is `yolo` when its `deploymentTier` is `pre-traffic` and `revenue` when it is `live`.
 A manifest can raise a repo's caution but never set a `live` repo below `revenue`.
 
 ### Levels and limits for large projects (D-F)
@@ -164,7 +164,7 @@ flowchart TD
 |---|---|---|---|---|---|
 | M1 | a T2 spec with Decisions, Milestones and Contracts passes the checker; this spec checks itself | - | `scripts/spec_v3.py`, `contracts/work-item.v3.json` | AC-1 | every T2 spec can carry a checked plan |
 | M2 | the manifest and profile are read; a milestone waits for the owner as the profile says; the brief reaches Catwalk and TeleFi | M1 | `scripts/manifest.py`, `scripts/milestone_brief.py`, `scripts/spec_gate.py` | AC-4 | the owner checks each milestone |
-| M3 | ship needs a goal-check record, then an owner record (manual) or a green health check (auto) | M2 | `scripts/review_record.py`, `agents/goal-checker.md` | AC-9 | unattended ship on `velocity` repos, safely |
+| M3 | ship needs a goal-check record, then an owner record (manual) or a green health check (auto) | M2 | `scripts/review_record.py`, `agents/goal-checker.md` | AC-9 | unattended ship on `yolo` repos, safely |
 | M4 | the checker reads the product brief and domains, refuses a spec or index past its limits or depth | M1, capability layer | `scripts/spec_levels.py` | AC-11 | large projects decompose by rule |
 
 M4 runs in parallel with M2 and M3 (no shared paths). It needs the capability layer (`docs/capabilities/`) from the
@@ -186,14 +186,14 @@ spec-structure proposal. The chart is revised after M1.
 |---|---|---|---|---|---|
 | AC-1 | M1 | this README and a fixture T2 spec with Decisions, Milestones and Contracts in the exact shapes | both pass the checker | either is refused, or a malformed one passes | tests/test_agentic_loop.py |
 | AC-2 | M1 | fixtures: a milestone without an outer test; a Depends-on cycle or unknown id; two milestones without a dependency owning one path; a contract whose schema or fixture is missing | each refused, the rule named | any lands | tests/test_agentic_loop.py |
-| AC-3 | M2, D-C | manifests: each profile; missing (pre-traffic and live repos); an unknown value; a `live` repo set to `velocity` | each profile's defaults apply; missing gives `velocity` or `revenue` by tier; unknown refused by name; the `live` repo stays `revenue` | a default is unsafe, or a bad value is silently used | tests/test_agentic_loop.py |
+| AC-3 | M2, D-C | manifests: each profile; missing (pre-traffic and live repos); an unknown value; a `live` repo set to `yolo` | each profile's defaults apply; missing gives `yolo` or `revenue` by tier; unknown refused by name; the `live` repo stays `revenue` | a default is unsafe, or a bad value is silently used | tests/test_agentic_loop.py |
 | AC-4 | M2 | a milestone moving to `building` while unreviewed done milestones are at the profile's cap (blocking = cap 0); then after an owner `milestone` record | refused naming the waiting milestone; lands after the record | it lands at the cap, or is refused under it | tests/test_agentic_loop.py |
 | AC-5 | M2, security | an owner `milestone` record written by the builder's identity, or for other content | refused | it counts | tests/test_agentic_loop.py |
 | AC-6 | M2 | a milestone moves to done | a brief validating against its contract exists with six parts (now, evidence, what broke, cost vs cap, assumed decisions, next) and is queued for Catwalk and TeleFi | missing, invalid, or a part absent | tests/test_agentic_loop.py |
 | AC-7 | M2, D-C | a `public` repo: a T2 spec with `security` below L3, or without a security review record at lock | each refused by name | either lands | tests/test_agentic_loop.py |
 | AC-8 | M2, D-C | a `revenue` repo: a T2 spec without a rollback plan; a flagged bugfix without a security review record | each refused by name | either lands | tests/test_agentic_loop.py |
 | AC-9 | M3 | a ship without a `goal` record; with one written by the builder; with a fresh independent one | refused, refused, lands | otherwise | tests/test_agentic_loop.py |
-| AC-10 | M3, D-D | the profile's final gate: `velocity` with the health check red, then green; `public` or `revenue` without, then with, an owner record | refused then lands, in both | otherwise | tests/test_agentic_loop.py |
+| AC-10 | M3, D-D | the profile's final gate: `yolo` with the health check red, then green; `public` or `revenue` without, then with, an owner record | refused then lands, in both | otherwise | tests/test_agentic_loop.py |
 | AC-11 | M4, D-F | a change with 16 ACs or 6 milestones; a child of a child; a product brief with 10 capabilities and no domains; a capability SPEC.md over 200 lines; a manifest raising a limit | each refused naming the limit and the split to make; the raised limit applies | a limit is ignored | tests/test_agentic_loop.py |
 | AC-12 | D-B | a T2 lock whose Decisions table has open rows, without and with an owner `owner-decision` record; a T2 without open rows | refused, lands, lands on the design record | otherwise | tests/test_agentic_loop.py |
 | AC-13 | compatibility | every v2 item and every shipped v3 item in the fleet | judged exactly as before | any result changes | tests/test_agentic_loop.py |
