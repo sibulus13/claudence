@@ -1,7 +1,7 @@
 ---
 id: spec-standard-v3
 type: feature
-status: building
+status: shipped
 touches: [harness]
 layers:
   architecture: none

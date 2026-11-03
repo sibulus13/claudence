@@ -13,7 +13,8 @@
 - **v3 items (`standard: 3`) scale by tier** (`~/.claude/skills/dark-factory/SPEC-STANDARD-V3.md` § Tiers, D38-D40):
   - T1 feature or unflagged bugfix: draft -> red tests -> build -> code review. No adversary, no design review.
   - T2 feature or flagged bugfix: probe first (the adversary on the problem plus a real-input run, saved to
-    `evidence/probe.md`), then draft -> one design review -> red tests -> build -> code review. With 2+ flags, add
+    `evidence/probe.md`; it reads every state machine the change touches and runs each new parser on its real
+    corpus), then draft -> one design review -> red tests -> build -> code review. With 2+ flags, add
     the security reviewer in design mode.
   - Each tier has an agent-stage cap (T1 and bugfix 4, flagged bugfix 5, T2 9). Hitting it stops the item as
     `repair-budget-exhausted`; it is never extended.

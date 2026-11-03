@@ -135,7 +135,10 @@ most 15. Tests cite `<id>/AC-n` and `<id>/MNC-n` verbatim (checked from `buildin
 ## Reviews
 
 - **Probe** (T2, flagged bugfix): before the draft. The adversary's outcome-kind questions on the problem, the real
-  tool run on real inputs, environment facts; saved to `evidence/probe.md` and cited by the Probe section.
+  tool run on real inputs, environment facts; saved to `evidence/probe.md` and cited by the Probe section. Two
+  required reads (both v3 stage misses on 2026-11-02): every state machine the change touches (for a gate, the
+  lifecycle contract's edges), and every new parser run on the real corpus it will read (look-alike negatives come
+  from that run, not from the design).
 - **Design review** (T2, flagged bugfix): one attempt; only breaking findings loop (D36); fix, verify the fix diff,
   then the architect on a second `fix-first`.
 - **Code review** (every tier): runs the tests, a mutation check and, for parsers, guards and gates, a corpus diff. A
