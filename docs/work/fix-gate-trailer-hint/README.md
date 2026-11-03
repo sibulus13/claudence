@@ -1,7 +1,7 @@
 ---
 id: fix-gate-trailer-hint
 type: bugfix
-status: building
+status: shipped
 touches: [harness]
 layers:
   architecture: none
