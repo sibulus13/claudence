@@ -237,3 +237,60 @@ def test_backslash_paths_follow_the_calling_shell(cmd, cwd, tool, target, denied
     """fix-guard-init-branch/AC-8"""
     assert _targets(cmd, cwd, tool.lower()) == [target]
     assert (_decision(cmd, cwd, tool) == "deny") is denied
+
+
+# ---------------------------------------- fix-guard-init-branch, code review round 1 regressions (2026-11-02)
+
+@pytest.mark.parametrize("cmd,tool", [
+    ('for d in */; do git -C "$d" pull; done', "Bash"), ('git -C "$(pwd)" status', "Bash"),
+    ("git -C $DIR log --oneline", "Bash"), ("git status; git -C $x log", "Bash"), ("git -C ~ status", "Bash"),
+    ("git -C $env:USERPROFILE status", "PowerShell"), ("cd $X && git -C sub status", "Bash")])
+def test_dash_c_with_an_unknown_directory_is_fine_for_other_subcommands(cmd, tool):
+    """fix-guard-init-branch/AC-3 (code review R1: only an init or clone needs the directory)"""
+    assert _decision(cmd, "D:/repo/Lib/telefi", tool) != "deny"
+
+
+@pytest.mark.parametrize("cmd", [
+    "git commit -m @'\nfix: git init handling doesn't break\n'@",
+    "$msg = @'\nthe guard's git init rule\n'@\ngit commit -m $msg",
+    'Set-Content f.md @"\nnote: "don\'t" git init here\n"@'])
+def test_powershell_here_strings_are_prose(cmd):
+    """fix-guard-init-branch/AC-6 (code review R2)"""
+    assert _targets(cmd, "D:/repo/Lib", "powershell") == []
+    assert _decision(cmd, "D:/repo/Lib", "PowerShell") != "deny"
+
+
+@pytest.mark.parametrize("cmd,tool", [
+    ("if true; then git init D:/repo/bad; fi", "Bash"), ("for d in a b; do git init D:/repo/bad; done", "Bash"),
+    ("{ git init D:/repo/bad; }", "Bash"), ("env git init D:/repo/bad", "Bash"), ("time git init D:/repo/bad", "Bash"),
+    ("if ($true) { git init D:/repo/bad }", "PowerShell")])
+def test_keywords_before_git_still_count_as_command_position(cmd, tool):
+    """fix-guard-init-branch/AC-6 (code review F1)"""
+    assert _targets(cmd, "D:/repo/Lib", tool.lower()) == ["D:/repo/bad"]
+
+
+def test_msys_drive_paths_are_judged():
+    """fix-guard-init-branch/AC-8 (code review F2)"""
+    assert _targets("git init /d/repo/bad", "D:/repo/Lib") == ["D:/repo/bad"]
+
+
+@pytest.mark.parametrize("cmd", ["git init D:/repo/Lib/$NAME", "git clone https://x/$R.git"])
+def test_variable_targets_are_not_judged(cmd):
+    """fix-guard-init-branch/AC-4 (code review F3: Known limits lists shell variables in a target)"""
+    assert _targets(cmd, "D:/repo/Lib") == []
+
+
+@pytest.mark.parametrize("cmd", ["git init --help", "git init -h"])
+def test_help_creates_no_repo(cmd):
+    """fix-guard-init-branch/AC-5 (code review H1)"""
+    assert _targets(cmd, "D:/repo") == []
+
+
+def test_a_subshell_cd_does_not_leak():
+    """fix-guard-init-branch/AC-4 (code review H2)"""
+    assert _targets("(cd D:/repo && git status); git init newrepo", "D:/repo/Lib") == ["D:/repo/Lib/newrepo"]
+
+
+def test_another_drive_is_not_judged():
+    """fix-guard-init-branch/AC-8 (code review T1)"""
+    assert _targets("git init C:x", "D:/repo/Lib") == []

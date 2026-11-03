@@ -113,7 +113,13 @@ def bad_repo_target(path: Path) -> bool:
 
 # --- Where a git init / clone will create a repo (docs/work/fix-guard-init-branch) ---------------------------------
 # Value options that take a separate argument, from git-scm.com/docs/git, git-init and git-clone (checked 2026-11-02).
-GIT_GLOBAL_VALUE = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--config-env", "--super-prefix"}
+GIT_GLOBAL_VALUE = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--config-env", "--super-prefix",
+                    "--attr-source"}
+# Words that put the next word in command position (shell keywords and pass-through launchers).
+LEADING_WORDS = {"then", "do", "else", "elif", "if", "while", "until", "{", "}", "!", "time", "env", "exec", "nohup",
+                 "sudo", "command"}
+PS_HERE_STRING = re.compile(r"@(['\"])\r?\n.*?\r?\n\1@", re.S)
+OPEN, CLOSE = "\0open", "\0close"   # subshell / block boundaries: a cd inside does not leak out
 INIT_VALUE = {"-b", "--initial-branch", "--template", "--separate-git-dir", "--object-format", "--ref-format"}
 CLONE_VALUE = {"-o", "--origin", "-b", "--branch", "-u", "--upload-pack", "-c", "--config", "-j", "--jobs",
                "--reference", "--reference-if-able", "--separate-git-dir", "--depth", "--template", "--filter",
@@ -175,7 +181,10 @@ def shell_tokens(cmd: str, shell: str) -> list[str]:
             i += 1
         elif c in " \t\r":
             flush()
-        elif c in "\n;&|()":
+        elif c in "()":
+            flush()
+            tokens.append(OPEN if c == "(" else CLOSE)
+        elif c in "\n;&|":
             flush()
             if not tokens or tokens[-1] != SEP:
                 tokens.append(SEP)
@@ -188,11 +197,13 @@ def shell_tokens(cmd: str, shell: str) -> list[str]:
     return tokens
 
 
-def resolve_dir(cwd: Path | None, arg: str) -> Path | None:
+def resolve_dir(cwd: Path | None, arg: str, shell: str = "bash") -> Path | None:
     """`arg` as a directory seen from `cwd`. None when it cannot be on this drive (not judged); raises Unresolvable when
     it depends on something unknown (a variable, `-`, `~`, or a relative path from an unknown directory)."""
-    if not arg or arg in ("-", "~") or "$" in arg or "%" in arg:
+    if not arg or arg in ("-", "~") or arg.startswith("~/") or "$" in arg or "%" in arg:
         raise Unresolvable(f"directory `{arg or '(home)'}` is not known statically")
+    if shell == "bash" and (msys := re.match(r"^(?:/mnt)?/([A-Za-z])(/.*|$)", arg)):
+        arg = f"{msys.group(1).upper()}:{msys.group(2) or '/'}"   # Git Bash / WSL drive form: /d/repo is D:/repo
     m = re.match(r"^([A-Za-z]):(?![\\/])(.*)$", arg)   # drive-relative, e.g. D:repobad
     if m:
         if cwd is None:
@@ -248,7 +259,7 @@ def clone_dir(url: str) -> str:
 def init_targets(cmd: str, cwd: str, shell: str = "bash", depth: int = 0) -> list[Path]:
     """Every directory a git init or clone in `cmd` would create a repo in, in order. Raises Unresolvable when that
     cannot be told; the guard denies then. Known limits: docs/work/fix-guard-init-branch/README.md § Known limits."""
-    text = HEREDOC.sub("<<HEREDOC", cmd)
+    text = PS_HERE_STRING.sub("''", HEREDOC.sub("<<HEREDOC", cmd))   # here-doc and here-string bodies are data
     try:
         tokens = shell_tokens(text, shell)
     except ValueError as e:
@@ -256,25 +267,39 @@ def init_targets(cmd: str, cwd: str, shell: str = "bash", depth: int = 0) -> lis
             raise Unresolvable(str(e)) from e
         return []
     here: Path | None = Path(cwd)
+    stack: list[Path | None] = []    # directories saved by `(`, `{`-blocks are not scopes; pushd saves too
     found: list[Path] = []
     segments: list[list[str]] = [[]]
     for t in tokens:
-        if t == SEP:
-            segments.append([])
+        if t in (SEP, OPEN, CLOSE):
+            segments.append([t] if t != SEP else [])
         else:
             segments[-1].append(t)
     for seg in segments:
-        while seg and (re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", seg[0]) or seg[0] == "command"):
+        if seg and seg[0] == OPEN:
+            stack.append(here)
+            seg = seg[1:]
+        elif seg and seg[0] == CLOSE:
+            here = stack.pop() if stack else here
+            seg = seg[1:]
+        seg = [a for i, a in enumerate(seg) if not re.match(r"^\d?[<>]", a)          # redirections and their file
+               and not (i > 0 and re.fullmatch(r"\d?[<>]+&?", seg[i - 1]))]
+        while seg and (re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", seg[0]) or seg[0].lower() in LEADING_WORDS):
             seg = seg[1:]
         if not seg:
             continue
         word = re.split(r"[\\/]", seg[0])[-1].lower().removesuffix(".exe")
         if word in CD_WORDS:
-            args = [a for a in seg[1:] if a.lower() not in ("-path", "-literalpath")]
+            args = [a for a in seg[1:] if a.lower() not in ("-path", "-literalpath", "/d")]
+            if word == "pushd":
+                stack.append(here)
             try:
-                here = resolve_dir(here, args[0] if args else "")
+                here = resolve_dir(here, args[0] if args else "", shell)
             except Unresolvable:
                 here = None          # judged only if a later init or clone depends on it
+            continue
+        if word == "popd":
+            here = stack.pop() if stack else None
             continue
         if word in WRAPPERS and depth == 0:
             flag, inner_shell = WRAPPERS[word]
@@ -291,13 +316,18 @@ def init_targets(cmd: str, cwd: str, shell: str = "bash", depth: int = 0) -> lis
             opt = rest[0].split("=", 1)[0]
             if opt in GIT_GLOBAL_VALUE and "=" not in rest[0] and len(rest) > 1:
                 if opt == "-C":
-                    where = resolve_dir(where, rest[1])
+                    try:
+                        where = resolve_dir(where, rest[1], shell)
+                    except Unresolvable:
+                        where = None     # only an init or clone needs it (checked below)
                 rest = rest[2:]
             else:
                 rest = rest[1:]
         if not rest or rest[0] not in ("init", "clone"):
             continue
         sub, args = rest[0], rest[1:]
+        if "-h" in args or "--help" in args:
+            continue                     # prints usage, creates nothing
         pos = take_options(args, INIT_VALUE if sub == "init" else CLONE_VALUE)
         if sub == "init":
             target = pos[0] if pos else "."
@@ -305,9 +335,11 @@ def init_targets(cmd: str, cwd: str, shell: str = "bash", depth: int = 0) -> lis
             target = pos[1] if len(pos) > 1 else clone_dir(pos[0])
         else:
             continue
-        if where is None and not re.match(r"^[A-Za-z]:[\\/]", target):
+        if "$" in target or "%" in target:
+            continue                     # Known limits: a shell variable in a target is not judged
+        if where is None and not re.match(r"^(?:[A-Za-z]:[\\/]|/)", target):
             raise Unresolvable("the working directory is not known statically")
-        resolved = resolve_dir(where, target)
+        resolved = resolve_dir(where, target, shell)
         if resolved is not None:
             found.append(resolved)
     return found
