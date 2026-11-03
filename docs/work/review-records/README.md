@@ -1,7 +1,7 @@
 ---
 id: review-records
 type: feature
-status: building
+status: shipped
 touches: [harness]
 layers:
   architecture: none
