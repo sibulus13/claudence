@@ -407,3 +407,34 @@ def test_every_applicable_cause_is_reported(repo2: Path) -> None:
     # fix-gate-trailer-hint/AC-4 (D34: all causes, not the first)
     r = commit_msg(repo2, f"feat: x\n\nspec: docs/work/demo/README.md (building)\n\n{COAUTHOR}\n")
     assert r.returncode != 0 and all(CAUSE[c] in r.stderr for c in (2, 3, 5)), r.stderr
+
+
+# ---------------------------------------- fix-gate-trailer-hint, code review round 1 regressions (2026-11-02)
+
+def test_comment_char_auto_reads_the_trailers(repo2: Path) -> None:
+    # fix-gate-trailer-hint/AC-2 (code review R1: git picks `;` when the body has a `#` line)
+    write(repo2, "src/app.py", "x = 7\n")
+    r = subprocess.run(["git", "-C", str(repo2), "-c", "core.commentChar=auto", "commit", "-q", "-a", "-e", "-m",
+                        f"feat: x\n\n#1 fix\n\n{TRAILER}\n{COAUTHOR}"], capture_output=True, text=True,
+                       env={**ENV, "GIT_EDITOR": "true"}, timeout=60)
+    assert r.returncode == 0, r.stderr
+
+
+def test_a_continuation_line_is_not_a_non_trailer_line(repo2: Path) -> None:
+    # fix-gate-trailer-hint/AC-4 (code review H2)
+    r = commit_msg(repo2, f"feat: x\n\n{TRAILER} (b)\nCo-Authored-By: a\n  <a@b>\n")
+    assert r.returncode != 0 and CAUSE[3] in r.stderr and CAUSE[1] not in r.stderr, r.stderr
+
+
+def test_an_unexplained_miss_never_prints_an_empty_cause_list(repo2: Path) -> None:
+    # fix-gate-trailer-hint/AC-4 (code review H3)
+    git(repo2, "config", "trailer.spec.key", "Spec-X")   # repo trailer config must not change the gate's reading
+    r = commit_msg(repo2, f"feat: x\n\n{TRAILER}\n{COAUTHOR}\n")
+    assert r.returncode == 0, r.stderr
+
+
+@pytest.mark.parametrize("cleanup", ["scissors", "verbatim", "strip"])
+def test_cleanup_modes_and_crlf_land(repo2: Path, cleanup: str) -> None:
+    # fix-gate-trailer-hint/AC-1 (code review H5)
+    r = commit_msg(repo2, f"feat: x\r\n\r\n{TRAILER}\r\n{COAUTHOR}\r\n", f"-c", f"commit.cleanup={cleanup}")
+    assert r.returncode == 0, r.stderr

@@ -12,8 +12,10 @@ accepted until migration ends.
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
+import tempfile
 import sys
 from pathlib import Path
 
@@ -217,13 +219,29 @@ def item_problem(cited: str, tree: spec_check.Tree, *, for_source_commit: bool) 
     return f"{cited} is not committable: {'; '.join(errors[:4])}" if errors else None
 
 
+def comment_char(message: str) -> str:
+    """The comment character git used for THIS message file, read from git's own template lines (with
+    core.commentChar=auto git picks a character per message, which a separate git process cannot know)."""
+    for line in message.splitlines():
+        if m := re.match(r"^(\S) -+ >8 -+$", line) or re.match(r"^(\S) Please enter the commit message", line):
+            return m.group(1)
+    configured = git("config", "core.commentChar", ok_codes=(0, 1)).strip()
+    return configured if configured and configured != "auto" else "#"
+
+
 def git_trailers(message_file: Path) -> str:
-    """The trailers exactly as git reads them: the raw message file (git handles comments, core.commentChar and the
-    `commit -v` scissors itself), no `---` divider, separators pinned so repo config cannot change the reading."""
+    """The trailers exactly as git reads them: the raw message file, its own comment character, the scissors handled
+    by git, no `---` divider. The parse runs outside the repo with no global or system config and only pinned
+    settings, so repo or user `trailer.*` config cannot change what counts as the Spec trailer."""
+    message_file = Path(message_file).resolve()
+    char = comment_char(message_file.read_text(encoding="utf-8", errors="replace")) if message_file.is_file() else "#"
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_CONFIG")}
+    env.update(GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL=os.devnull)
     try:
-        r = subprocess.run(["git", "-c", "trailer.separators=:", "interpret-trailers", "--parse", "--no-divider",
-                            str(message_file)], capture_output=True, text=True, encoding="utf-8", errors="replace",
-                           timeout=GIT_TIMEOUT_S)
+        r = subprocess.run(["git", "-c", "trailer.separators=:", "-c", f"core.commentChar={char}", "interpret-trailers",
+                            "--parse", "--no-divider", str(message_file)], capture_output=True, text=True,
+                           encoding="utf-8", errors="replace", timeout=GIT_TIMEOUT_S, env=env,
+                           cwd=tempfile.gettempdir())
     except (OSError, subprocess.TimeoutExpired) as e:
         raise GateError(f"git interpret-trailers failed: {e}") from e
     if r.returncode != 0:
@@ -239,8 +257,7 @@ HINT = "not read as a trailer"
 
 def message_body(message: str) -> str:
     """The message as a reader sees it: the text above the `commit -v` scissors, comment lines removed."""
-    char = git("config", "core.commentChar", ok_codes=(0, 1)).strip() or "#"
-    char = "#" if char == "auto" else char
+    char = comment_char(message)
     lines: list[str] = []
     for line in message.splitlines():
         if line.startswith(char) and re.match(rf"^{re.escape(char)} -+ >8 -+$", line):
@@ -258,7 +275,8 @@ def trailer_hint(body: str) -> str:
     final = paragraphs[-1]
     for line in (l for p in paragraphs for l in p if SPEC_SHAPED.match(l)):
         causes: list[str] = []
-        others = [l for l in final if l != line and not TRAILER_LINE.match(l)]
+        others = [l for i, l in enumerate(final) if l != line and not TRAILER_LINE.match(l)
+                  and not (l[:1].isspace() and i > 0 and TRAILER_LINE.match(final[i - 1].lstrip()))]  # continuation
         if line in final and others:
             causes.append(f"the final paragraph has a non-trailer line (`{others[0].strip()}`); it may hold only trailers")
         key, _, value = line.strip().partition(":")
@@ -271,6 +289,8 @@ def trailer_hint(body: str) -> str:
         if line not in final or len(paragraphs) == 1:
             causes.append("it is outside the final trailer block (git reads trailers only from the last paragraph, "
                           "after a blank line)")
+        if not causes:   # D34 fallback: show what git read instead of an empty cause list
+            causes.append("git read no `Spec` trailer from the final paragraph; check it holds only `Key: value` lines")
         return f" A `Spec:` line was found but {HINT}: " + "; ".join(causes) + "."
     return ""
 
