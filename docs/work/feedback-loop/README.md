@@ -30,12 +30,14 @@ Companion to `docs/work/agentic-loop/` (split by its 5-milestone limit). Impleme
 | # | Decision | Status | Choice | Alternatives | Why it is hard to reverse |
 |---|---|---|---|---|---|
 | D-A | History model | **confirmed** (D43) | frozen original, append-only Amendments log, folded current view | in-place edits (D37) | every spec's format |
-| D-G | Where an escape is recorded | open, recommended | on the bug record itself (an `Escape` table), linked to the origin spec's Amendments row | a separate defect database | every bug record and the tally read it |
-| D-H | The escape classes | open, recommended | the table below, adapted from IBM's Orthogonal Defect Classification (trigger and stage) | free text | the tally and every agent checklist key on it |
+| D-G | Where an escape is recorded | **confirmed** (owner 2026-11-03, D45) | on the bug record itself (an `Escape` table), linked to the origin spec's Amendments row | a separate defect database | every bug record and the tally read it |
+| D-H | The escape classes | **confirmed** (owner 2026-11-03, D45): one enum, one meaning source | the table below, adapted from IBM's Orthogonal Defect Classification (trigger and stage) | free text | the tally and every agent checklist key on it |
 
 ### Escape classes (D-H)
 
-The question for each bug: **which stage should have caught it, and why didn't it?**
+The question for each bug: **which stage should have caught it, and why didn't it?** The enum and each value's
+meaning have one source, `contracts/escape-class.v1.json`; this table is a rendering of it, and a test keeps the two
+equal (AC-11). The glossary points to the contract instead of restating it.
 
 | Should have caught it | Signal in the origin spec | Cause class | What changes next time |
 |---|---|---|---|
@@ -115,7 +117,8 @@ flowchart TD
 | Name | Version | Schema | Fixtures |
 |---|---|---|---|
 | Amendments row | v1 | `contracts/work-item.v3.json` | `contracts/fixtures/amendments-*.md` |
-| Escape table and classes | v1 | `contracts/work-item.v3.json` | `contracts/fixtures/escape-*.md` |
+| Escape table | v1 | `contracts/work-item.v3.json` | `contracts/fixtures/escape-*.md` |
+| escape classes: enum, meaning, stage, next-time change | v1 | `contracts/escape-class.v1.json` | `contracts/fixtures/escape-class-*.json` |
 | escape tally | v1 | `contracts/escape-tally.v1.json` | `contracts/fixtures/tally-*.json` |
 
 ## Behaviour
@@ -131,6 +134,7 @@ flowchart TD
 | AC-7 | F3 | two escapes of one class in one capability | the tally lists them; a proposal for a checklist line, reviewer check or eval is written to the retro queue with an owner | no proposal, or a duplicate on a third escape | tests/test_feedback_loop.py |
 | AC-8 | F3 | a T2 probe for a capability with escapes on record | the probe must cite them; one that does not is refused | it lands without | tests/test_feedback_loop.py |
 | AC-9 | F3 | `/retrospect` run with a tally and retro-queue rows | it lists them with their proposals | it reads only telemetry | tests/test_feedback_loop.py |
+| AC-11 | D-H | `contracts/escape-class.v1.json` and the Escape classes table in this README; a temp copy of the contract with a value added | the table equals the contract; the checker accepts the new value and refuses one absent from the contract | the table drifts, or any code keeps its own list | tests/test_feedback_loop.py |
 | AC-10 | docs | agents/designer.md, adversary.md, implementer.md, reviewer.md and SPEC-STANDARD-V3.md | each states its part: read escapes at the probe, append don't edit, classify escapes | a doc contradicts the code | tests/test_feedback_loop.py |
 
 ## Outcomes

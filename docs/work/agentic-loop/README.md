@@ -37,11 +37,9 @@ were split by this spec's own limit (5 milestones).
 | # | Decision | Status | Choice | Alternatives | Why it is hard to reverse |
 |---|---|---|---|---|---|
 | D-A | How a spec changes after lock | **confirmed** (owner 2026-11-03, D43) | frozen original + append-only Amendments log + folded current view; built by `feedback-loop` | D37 in-place edits | every spec, gate rule and reviewer reads this format |
-| D-B | Where per-project switches live | open, recommended | one owner-only manifest per repo, `catalog-info.yaml` (approved, unbuilt) | `.claude/gates.json`; CLAUDE.md keys | Foreman, Catwalk, the gate and the brief all read it |
+| D-B | Where per-project switches live | **confirmed, expanded** (owner 2026-11-03, D45): one source of truth for every config and core fact, built by spec `project-manifest` | one owner-only manifest per repo, `catalog-info.yaml` (approved, unbuilt) | `.claude/gates.json`; CLAUDE.md keys | Foreman, Catwalk, the gate and the brief all read it |
 | D-C | What sets the loop's caution | **confirmed** (owner 2026-11-03, D44): cashcow `revenue`, every other repo `yolo` | a project **profile** in the manifest: `yolo`, `public` or `revenue` (table below); defaults follow the profile | one default for all; `deploymentTier` alone | every gate default in every repo |
 | D-D | Final gate per profile | **confirmed** (owner 2026-11-03, D44) | `yolo`: auto (goal check + health check); `public` and `revenue`: manual | manual everywhere | what ships without a human |
-| D-E | Background sections | open, recommended | a visible one-line summary per pattern, detail collapsed; owner preference `background: expanded` | expanded by default | every spec's layout |
-| D-F | Size limits and depth | open, recommended | the limits and levels table below | per-project only, no defaults | every spec's size and the number of agents per build |
 
 ### Profiles (D-C, D-D)
 
@@ -54,7 +52,15 @@ were split by this spec's own limit (5 milestones).
 A repo with no manifest is `yolo` when its `deploymentTier` is `pre-traffic` and `revenue` when it is `live`.
 A manifest can raise a repo's caution but never set a `live` repo below `revenue`.
 
-### Levels and limits for large projects (D-F)
+## Assumed defaults (reversible, listed for the owner's review)
+
+| # | Default | Why assumed | Revisit when |
+|---|---|---|---|
+| A-1 (was D-E) | Background: a visible one-line summary per pattern, detail collapsed; `background: expanded` in the manifest opens everything | owner: not a one-way door (2026-11-03) | the owner opens most collapsed sections |
+| A-2 (was D-F) | The limits in the table below are starting values, not measured optima; a project overrides them in its manifest `limits`, and one item overrides them in its frontmatter `limits:` with a `why`; every milestone brief reports actual against limit | owner: no accurate estimate yet, keep it reversible and tunable (2026-11-03) | five items per tier have reported actuals |
+| A-3 | A missing manifest falls back to the tier's profile (`yolo` or `revenue`) | safe in both directions | `project-manifest` ships |
+
+### Levels and limits for large projects (A-2)
 
 A document holds at most two levels; scale grows sideways (more capabilities) and up (one thin product brief), never
 deeper inside a spec.
@@ -197,6 +203,7 @@ spec-structure proposal. The chart is revised after M1.
 | AC-11 | M4, D-F | a change with 16 ACs or 6 milestones; a child of a child; a product brief with 10 capabilities and no domains; a capability SPEC.md over 200 lines; a manifest raising a limit | each refused naming the limit and the split to make; the raised limit applies | a limit is ignored | tests/test_agentic_loop.py |
 | AC-12 | D-B | a T2 lock whose Decisions table has open rows, without and with an owner `owner-decision` record; a T2 without open rows | refused, lands, lands on the design record | otherwise | tests/test_agentic_loop.py |
 | AC-13 | compatibility | every v2 item and every shipped v3 item in the fleet | judged exactly as before | any result changes | tests/test_agentic_loop.py |
+| AC-15 | A-2 | a project manifest raising one limit; an item's frontmatter `limits:` with and without a `why`; a milestone brief | the project limit applies; the item override applies only with a `why`, refused without; the brief shows actual against limit | an override is silently ignored or applied without a reason | tests/test_agentic_loop.py |
 | AC-14 | docs | SPEC-STANDARD-V3.md, agents/implementer.md, agents/reviewer.md, DEVELOPMENT_LIFECYCLE.md | each states the loop: one milestone at a time, owned paths only, contracts change only through the planner, the profile table | a doc contradicts the code | tests/test_agentic_loop.py |
 
 ## Outcomes
@@ -222,6 +229,7 @@ spec-structure proposal. The chart is revised after M1.
 |---|---|---|
 | Foreman's autonomy ladder can serve as the final gate | `D:/repo/Factory/foreman/core/repos.js:290` | flag: M3 maps manual and auto onto the ladder; a gap is logged before M3 starts |
 | Catwalk's Review Queue confirm API can write an owner record | `D:/repo/docs/research_notes/Agentic loop design/internal_survey.md:1` | defer: until it can, owner records are written with the CLI only |
+| The per-project manifest exists before M2 | `C:/Users/Michael/.claude/docs/work/agentic-loop/README.md:41` | defer: M2 reads the tier's profile until `project-manifest` ships |
 | The capability layer exists before M4 | `D:/repo/docs/reports/2026-11-03 Spec structure proposal.md:1` | defer: M4 waits; M1-M3 do not need it |
 
 ## Probe
