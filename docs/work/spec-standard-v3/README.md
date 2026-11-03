@@ -1,7 +1,7 @@
 ---
 id: spec-standard-v3
 type: feature
-status: draft
+status: spec-locked
 touches: [harness]
 layers:
   architecture: none
@@ -140,9 +140,9 @@ from facts the checker can count and never lowered by a declaration.
 | split-state | n/a: no mutable state; the contract is the one enum store |
 | untestable-ac | one fault per AC row with a specific message substring; AC-1 and AC-12 use real files and real git |
 | scope-drift-oversize | 15 ACs; Non-goals name the deferred pieces |
-| enforcement-allowlist | AC-1 (v2 and killed items), AC-12 (merge, squash, revert), AC-11 (the move back to draft) |
+| enforcement-allowlist | AC-1 (v2 and killed items), AC-12 (merge, squash, revert), AC-11 (a lowering refused, a raise with a design record) |
 | hand-copied-enum | AC-14 |
 | escape-record | n/a: a record row, not a spec category |
 | composite-history-vs-per-commit | AC-12 (merge, squash and revert fixtures), AC-11 |
 | citation-regex-false-positive | AC-9 (look-alikes of `path:line` and of `TBD` get negative fixtures) |
-| lifecycle-gate-legitimate-commit-blocked | AC-10, AC-11, AC-12 (the lock of a T1 item, a move back to draft and a merge all land) |
+| lifecycle-gate-legitimate-commit-blocked | AC-10, AC-11, AC-12 (the lock of a T1 item, a mid-build raise with its record, and a merge all land) |

@@ -39,6 +39,7 @@ computed_tier(fm, ac_count, live: bool) -> "T1" | "T2" | "SPLIT"
 spec_v3.check(item, tree, root) -> list[Finding]   # called from spec_check.check_work_item only when read_v3 is not None
 required_records(tree, item_dir, edges, item_type, v3) -> str | None   # v3 is the staged V3Frontmatter or None
 frozen_set_problem(head_fm, staged_fm, moves_to_draft) -> str | None
+raises_scrutiny(head_fm, staged_fm) -> bool   # tier raised or a flag added past draft: record_problem demands a design record
 ```
 
 ### Functional requirements
@@ -55,7 +56,7 @@ frozen_set_problem(head_fm, staged_fm, moves_to_draft) -> str | None
 | FR-8 | A bugfix carries `Must not change` as `\| ID \| Must not change \| Test \|`, ids `MNC-n`, at least 1 row. `Build amendments`, when present, is `\| Change \| Why (what the test exposed) \| Test \|` with every Test cell non-empty. From `building`, tests cite `<id>/AC-n` and `<id>/MNC-n` (CK-20 rule). |
 | FR-9 | The `Assumptions` table is `\| Assumption \| Observed \| If violated \|`; If violated starts with `keep`, `refuse`, `flag` or `defer` plus `:`; each `path:line` in Observed resolves (v2 CK-48 resolver). `Probe` links an existing file under `evidence/`. From `spec-locked`, `[NEEDS CLARIFICATION` and `TBD` outside inline code are errors. |
 | FR-10 | Lock edge. `required_records` demands a design record for an edge into `spec-locked` unless the STAGED content is a v3 T1 feature or an unflagged v3 bugfix (computed tier from FR-3, never the declaration alone). v2 items and every ship edge are unchanged: the ship needs a code record for all. |
-| FR-11 | Frozen set. When HEAD's copy of a v3 README is past `draft`, the staged `standard`, `type`, `tier` and `risk` must equal HEAD's unless the staged status is `draft`. A v2 item gaining `standard` past draft is refused by the same rule. |
+| FR-11 | Frozen set. When HEAD's or the staged copy is a v3 README and HEAD's copy is past `draft`: `standard` and `type` must equal HEAD's (adding or deleting `standard` included); `tier` may not fall and `risk` may not lose a flag (compared as sets) unless the staged status is `draft`, which the lifecycle allows only from `spec-locked`. A commit that raises `tier` or adds a flag is treated as a lock edge: it needs a fresh `pass` design (or verify) record for the staged content (`required_records`). This is how an item that grows during `building` gets its heavier review without a new lifecycle edge (design review finding 1, 2026-11-03). |
 | FR-12 | Arrival channels: the lock rule and the frozen set run on the staged content for commit, merge, squash and revert as the gate runs today; they add no second edge derivation (probe row 13). |
 | FR-13 | `contracts/work-item.v3.json` is loaded on the first v3 item only; a missing, unparseable or schema-invalid file yields `CK-V3: <file>: contract <path> <reason>` for v3 items and nothing for v2. |
 | FR-14 | Flags, dimensions, levels, the flag-to-dimension map and the frontmatter schema are read from the contract by the checker and the gate; no module holds a second list. |
