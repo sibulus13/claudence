@@ -77,6 +77,9 @@ requirement cap, coverage metrics, and a smaller bug artifact.
 Corpus fact from the adversary: 54 v2 items across `D:/repo` and `C:/Users/Michael/.claude`; none has a `standard`,
 `tier` or `risk` key, so refusing those keys on a non-v3 item changes no v2 result.
 
+Rows 4 and 6 are superseded by FR-11 and D41: the frozen set lets `tier` and `risk` rise past draft (a raise needs a fresh
+design record) and lets them fall only in a commit that moves the item back to `draft`; `standard` and `type` never change.
+
 | # | Gap (breaking?) | Disposition | Closing rule |
 |---|---|---|---|
 | 1 | lock requirement read from the staged copy (yes) | accept, narrowed | the lock needs a design record unless the STAGED content's computed tier is T1 or an unflagged bugfix; computed tier comes from AC count and flags, so a declaration alone cannot lower it |

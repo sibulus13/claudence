@@ -1,0 +1,65 @@
+{
+  "$comment": "Work-Item Standard v3: the ONE source of the risk flags, outcome dimensions, levels, the flag-to-dimension map and the frontmatter schema (work item docs/work/spec-standard-v3). scripts/work_item_schema.py loads it lazily for a `standard: 3` item; scripts/spec_v3.py, spec_gate.py and review_record.py read every list from there. The frontmatter schema refers to $defs and never repeats a list. `x-ck` maps a failing keyword to its rule id, as in work-item.v2.json.",
+  "version": 1,
+  "$defs": {
+    "flag": {"enum": ["contract", "data", "security", "enforcement", "concurrency", "removal", "live"]},
+    "dimension": {
+      "enum": ["success", "invalid input", "dependency fails", "timeout", "crash mid-step", "concurrent actor",
+               "duplicate or replay", "arrival channel", "performance or cost", "security", "data and compatibility",
+               "operability"]
+    },
+    "level": {"enum": ["L1", "L2", "L3"]},
+    "none": {"const": "none"}
+  },
+  "flag_to_dimensions": {
+    "contract": ["data and compatibility", "arrival channel"],
+    "data": ["data and compatibility", "crash mid-step"],
+    "security": ["security", "invalid input"],
+    "enforcement": ["invalid input", "arrival channel"],
+    "concurrency": ["concurrent actor", "duplicate or replay"],
+    "removal": ["data and compatibility"],
+    "live": ["operability", "dependency fails"]
+  },
+  "t1_l3_dimensions": ["success", "invalid input"],
+  "frontmatter": {
+    "type": "object",
+    "x-ck": {"type": "CK-1", "required": "CK-1", "additionalProperties": "CK-1"},
+    "required": ["id", "type", "standard", "status", "touches", "layers", "created", "owner", "risk"],
+    "additionalProperties": false,
+    "properties": {
+      "id": {"type": "string", "minLength": 1, "x-ck": {"*": "CK-1"}},
+      "type": {"enum": ["feature", "bugfix"], "x-ck": {"*": "CK-1"}},
+      "standard": {"const": 3, "x-ck": {"*": "CK-1"}},
+      "tier": {"enum": ["T1", "T2"], "x-ck": {"*": "CK-1"}},
+      "risk": {"type": "array", "items": {"$ref": "#/$defs/flag"}, "uniqueItems": true, "x-ck": {"*": "CK-1"}},
+      "status": {
+        "enum": ["draft", "spec-locked", "building", "shipped", "killed", "promoted"],
+        "x-ck": {"*": "CK-2"}
+      },
+      "touches": {"type": "array", "items": {"type": "string"}, "x-ck": {"*": "CK-1"}},
+      "layers": {
+        "type": "object",
+        "required": ["architecture", "component", "functional", "data"],
+        "additionalProperties": false,
+        "x-ck": {"*": "CK-1"},
+        "properties": {
+          "architecture": {"$ref": "#/$defs/none"},
+          "component": {"$ref": "#/$defs/none"},
+          "functional": {"$ref": "#/$defs/none"},
+          "data": {"$ref": "#/$defs/none"}
+        }
+      },
+      "created": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$", "x-ck": {"*": "CK-1"}},
+      "owner": {"type": "string", "minLength": 1, "x-ck": {"*": "CK-1"}},
+      "supersededBy": {"type": "string", "minLength": 1, "x-ck": {"*": "CK-1"}},
+      "introducedBy": {"type": "string", "pattern": "^[^#\\s]+#\\d+@[0-9a-fA-F]{7,40}$", "x-ck": {"*": "CK-1"}}
+    },
+    "allOf": [
+      {"if": {"properties": {"type": {"const": "feature"}}, "required": ["type"]}, "then": {"required": ["tier"]}},
+      {
+        "if": {"properties": {"type": {"const": "bugfix"}}, "required": ["type"]},
+        "then": {"properties": {"tier": {"not": {}, "x-ck": {"*": "CK-1"}}}}
+      }
+    ]
+  }
+}

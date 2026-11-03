@@ -1,7 +1,7 @@
 ---
 id: spec-standard-v3
 type: feature
-status: spec-locked
+status: building
 touches: [harness]
 layers:
   architecture: none
@@ -53,7 +53,7 @@ flowchart TD
 | `contracts/work-item.v3.json` loads and validates | AC-13, loaded lazily on the first `standard: 3` item | refuse: a named refusal of v3 items only, v2 unaffected |
 | The repo's `deploymentTier: live` line in CLAUDE.md is the authority for the `live` flag | AC-3, read from the committed CLAUDE.md | flag: a missing or unreadable CLAUDE.md means not live; the reviewer persona rule files a missing flag as breaking |
 | Risk flags other than `live` are declared by the author | the reviewer persona rule, AC-15 | defer: path-derived flags go to work item `gate-ci` |
-| A local hook sees the commit that makes the lock move | `scripts/spec_gate.py:365` and AC-10 | defer: commits the hook cannot judge are re-checked by work item `gate-ci` after the push |
+| A local hook sees the commit that makes the lock move | `scripts/spec_gate.py:225-265` and AC-10 | defer: commits the hook cannot judge are re-checked by work item `gate-ci` after the push |
 | The checker is a pure function of the committed tree | AC-1, AC-12 | refuse: a tree that cannot be read is an error, never a v2 fallback |
 
 ## Purpose
@@ -72,7 +72,7 @@ from facts the checker can count and never lowered by a declaration.
 
 | CAP | Statement |
 |---|---|
-| CAP-1 | The service must judge every v2 item exactly as it does today |
+| CAP-1 | The service must judge every v2 item exactly as it does today, except a v2 item that carries `standard`, `tier` or `risk` (FR-2 refuses it; the corpus has none) |
 | CAP-2 | The service must read a v3 item's frontmatter through one reader and refuse look-alike and unknown values |
 | CAP-3 | The service must compute the tier from AC count and risk flags and require the sections and tables that tier, type and flags name |
 | CAP-4 | The service must require a design record at the lock only where the computed tier or a flag calls for one |
@@ -146,3 +146,22 @@ from facts the checker can count and never lowered by a declaration.
 | composite-history-vs-per-commit | AC-12 (merge, squash and revert fixtures), AC-11 |
 | citation-regex-false-positive | AC-9 (look-alikes of `path:line` and of `TBD` get negative fixtures) |
 | lifecycle-gate-legitimate-commit-blocked | AC-10, AC-11, AC-12 (the lock of a T1 item, a mid-build raise with its record, and a merge all land) |
+
+## Build amendments
+
+| Change | Why (what the test exposed) | Test |
+|---|---|---|
+| CAP-1 and FR-1 state the exception FR-2 creates: a v2 item carrying `standard`, `tier` or `risk` is refused; the duplicate-key check applies only to `standard: 3` items | design finding 6: "byte-identical" was false for exactly those items | tests/test_spec_v3.py: spec-standard-v3/AC-2 (tier-without-standard, risk-without-standard, duplicate-key) and AC-1 (corpus) |
+| AC-1 is a one-time acceptance check, not a standing golden: pytest mark `corpus`, pinned base 94b1b4b via `git archive`, 18 cases per item through one batch harness (`tests/corpus_batch.py`) | design finding 6: the corpus, the pin and the skip behaviour were unspecified | tests/test_spec_v3.py: spec-standard-v3/AC-1 |
+| FR-2: `risk` is required (may be `[]`); `supersededBy` and `introducedBy` stay optional keys | design finding 8: the doc and the item disagreed | tests/test_spec_v3.py: spec-standard-v3/AC-2 (risk-missing) |
+| FR-4: the diagram (a Mermaid block before the first H2, rule CK-6) and at least 1 AC for a feature are enforced; Purpose length, goal counts, Approach options and Contracts content are advisory | design finding 8 | tests/test_spec_v3.py: spec-standard-v3/AC-4 (diagram, advisory limits) and AC-5 (needs one AC) |
+| FR-5 `loosens:` v2's "Traces `-` only for bugfix" is not applied to a v3 AC table, because v3 has no CAP table to trace to; Traces must be non-empty | the build's valid fixtures need a free-text Traces cell | tests/test_spec_v3.py: spec-standard-v3/AC-5 (traces_is_free_text) |
+| AC-6 fixture `L3 ` (trailing space) is replaced by `L3.`; `loosens:` padding around a cell is not content in a Markdown table, and the parser strips it | the parser cannot see a cell's padding, so that fixture could never fail | tests/test_spec_v3.py: spec-standard-v3/AC-6 (level-lookalike) |
+| FR-3 and FR-10: `live` is read from HEAD's CLAUDE.md by the gate and from the given tree by the standalone checker; no file or no declaration is not live; only a line-start or backticked `deploymentTier: live` counts (not prose, a fence, `live-later` or a trailing comment) | design finding 3: the source was ambiguous and the staged copy could drop the line | tests/test_spec_v3.py: spec-standard-v3/AC-3 (live reader look-alikes) and AC-10 (live from HEAD) |
+| FR-10: the lock exemption uses the higher of the declared and the computed tier and fails closed on an unreadable v3 frontmatter or AC table; the interface drops the `v3` parameter and `required_records(..., *, live=None)` reads through the one reader | design findings 4 and 8: the declaration alone must not lower scrutiny; the parameter was inconsistent | tests/test_spec_v3.py: spec-standard-v3/AC-10 (computed tier, declared T2, fails closed) |
+| FR-11: raise detection applies only when the staged status is past draft; the synthetic lock edge is added before `record_problem`'s early return and before the merge-side exemption; the frozen set exempts a README equal to a merge side's and is skipped when HEAD's frontmatter is unreadable | design finding 5 and verify findings 1 and 4 | tests/test_spec_v3.py: spec-standard-v3/AC-11 (raise, draft, shipped, unreadable HEAD) and AC-12 (gated re-lock merge) |
+| The v2 pardon for an unmoved README without References (`historical`) never applies to a v3 item, which has no References section | the build exposed that every unmoved v3 item would have its errors downgraded to warnings | tests/test_spec_v3.py: spec-standard-v3/AC-10 (a_v3_item_that_stays_in_its_status_is_still_judged) |
+| AC-8 adds the case of a test file that misses one `<id>/AC-n`; AC-10 tests the 6-AC lock on `required_records`; AC-11 adds first commit, deleting `standard`, reorder and repeat; AC-12 adds a merge resolved to neither side and a gated re-lock merge | design findings 2, 4, 5 and 7 | tests/test_spec_v3.py: spec-standard-v3/AC-8, AC-10, AC-11, AC-12 |
+| New rule ids `CK-V3` (always), `CK-V3-TIER`, `CK-V3-OUT`, `CK-V3-BUG`, `CK-V3-DOC` (from spec-locked) are registered in the status tiers | design finding 2: `Report.err` drops an unregistered id | tests/test_spec_v3.py: test_ac14_every_new_rule_id_is_registered_in_the_status_tiers (cites spec-standard-v3/AC-8) |
+| AC-14's scan covers `.py` under scripts/ and hooks/ and the contract itself (the frontmatter schema refers to `$defs`); the flags and the T1 thresholds are data in the contract | design finding 8 | tests/test_spec_v3.py: spec-standard-v3/AC-14 (no_module_outside_the_contract) |
+| README envelope row 5 cites `scripts/spec_gate.py:225-265` (the lock move), not `:365`; probe.md notes that dispositions rows 4 and 6 are superseded by FR-11 and D41; the Outcome inventory gains "a raise with a fresh design record lands" | design finding 9 and verify findings 2 and 3 | tests/test_spec_v3.py: spec-standard-v3/AC-11 (spec_text_amendments) |
