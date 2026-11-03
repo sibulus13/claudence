@@ -21,6 +21,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import spec_check  # noqa: E402
+import spec_v3  # noqa: E402
 import yaml  # noqa: E402
 
 SOURCE = re.compile(r"(\.(py|[cm]?[jt]sx?|ps1|psm1|lua|go|rs|sh|bat|cmd|rb|java|cs|php|sql|vbs|vue|svelte|html|css|"
@@ -101,6 +102,17 @@ def ref_text(ref: str, path: str) -> str | None:
 def head_text(path: str) -> str | None:
     """The HEAD version of a file; None when it is absent, HEAD is unborn, or the object cannot be read."""
     return ref_text("HEAD", path)
+
+
+def head_live() -> bool:
+    """Whether HEAD's repo CLAUDE.md declares `deploymentTier: live`. HEAD's copy, never the staged one: a commit cannot
+    drop the declaration and lock under the lighter rule in the same breath (spec-standard-v3, FR-3)."""
+    return spec_v3.live_of(head_text("CLAUDE.md"))
+
+
+def live_kwargs(v3_item: bool) -> dict[str, bool]:
+    """`live=` for a call that judges a v3 item; no keyword at all for a v2 item, so v2 calls stay as they were."""
+    return {"live": head_live()} if v3_item else {}
 
 
 def reachable(frm: str, item_type: str) -> set[str]:
@@ -242,8 +254,15 @@ def lifecycle_problem(tree: spec_check.Tree, readmes: list[tuple[str, str]], mer
         if not repair and not move_allowed(before if head is not None else None, status, item_type, merging=merging):
             hint = "; a new item starts at draft (a folder rename is detected as a move)" if head is None else ""
             return f"{path}: move not allowed: {before or '(new)'} -> {status}{hint}"
-        errors, warnings = spec_check.check_work_item(tree, path, require_sections=True)
-        historical = not moved and head is not None and not LEADING.search(head)
+        staged_text = tree.read(path)
+        v3_item = spec_v3.involves_v3(head, staged_text)
+        if v3_item and head is not None and (frozen := spec_v3.frozen_set_problem(head, staged_text)):
+            import review_record  # lazy (FR-11)
+            if not (merging and merged_item_equals_a_side(tree, path, head_path, status, review_record)):
+                return f"{path}: {frozen}"  # a README equal to a merge side's was gated on that side's branch
+        errors, warnings = spec_check.check_work_item(tree, path, require_sections=True, **live_kwargs(v3_item))
+        # A v3 item has no References section: the pardon for an old README without one never applies to it.
+        historical = not moved and head is not None and not LEADING.search(head) and not v3_item
         if errors and not historical:
             return f"{path} is not committable: {'; '.join(errors[:4])}"
         WARNINGS.extend(f"warn: {e}" for e in errors)
@@ -256,12 +275,16 @@ def record_problem(tree: spec_check.Tree, path: str, head_path: str, head: str |
                    item_type: str, *, merging: bool) -> str | None:
     """FR-8, FR-10: on an edge into spec-locked or shipped the item needs a fresh passing record."""
     edges = edges_of_move(head_path, head, before, status, item_type, merging=merging)
+    staged_text = tree.read(path)
+    if spec_v3.raises_scrutiny(head, staged_text):  # spec-standard-v3 FR-11: a raise is judged like a lock
+        edges = [*edges, [before, "spec-locked"]]
     if not any(to in RECORDED_STATES for _, to in edges):
         return None
     import review_record  # lazy (FR-11): a broken record or contract blocks only the moves that need it
     if merged_item_equals_a_side(tree, path, head_path, status, review_record):
         return None  # that side's history already passed the gate for exactly this content
-    why = review_record.required_records(tree, path.rsplit("/", 1)[0], edges, item_type=item_type)
+    why = review_record.required_records(tree, path.rsplit("/", 1)[0], edges, item_type=item_type,
+                                         **live_kwargs(spec_v3.involves_v3(head, staged_text)))
     return f"{path}: {why}" if why else None
 
 
@@ -366,7 +389,8 @@ def item_problem(cited: str, tree: spec_check.Tree, *, for_source_commit: bool) 
     """Run the Work-Item Standard checker on the README the trailer names, as staged; CK-26 binds source commits."""
     if not tree.is_file(cited):
         return f"{cited} is not committable: the work item does not exist in this commit"
-    errors, _ = spec_check.check_work_item(tree, cited, for_source_commit)
+    errors, _ = spec_check.check_work_item(tree, cited, for_source_commit,
+                                           **live_kwargs(spec_v3.involves_v3(tree.read(cited))))
     return f"{cited} is not committable: {'; '.join(errors[:4])}" if errors else None
 
 

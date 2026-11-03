@@ -51,8 +51,9 @@ COMPONENT_H3S = ["Interface", "Functional requirements", "Data", "Failure modes"
 AC_TYPES = {"feature", "integration", "bugfix", "refactor", "data-collection"}  # types that must carry an AC table
 L0_TYPES = {"feature", "integration", "data-collection"}  # types with a Capabilities section
 
-ALWAYS = {"CK-1", "CK-2", "CK-3", "CK-18"}
-STATIC = ALWAYS | {f"CK-{n}" for n in (*range(4, 18), 19, 21, 22, 23, 47, 48, 49)}
+V3_STATIC = {"CK-V3-TIER", "CK-V3-OUT", "CK-V3-BUG", "CK-V3-DOC"}  # rules of the v3 profile (scripts/spec_v3.py)
+ALWAYS = {"CK-1", "CK-2", "CK-3", "CK-18", "CK-V3"}  # CK-V3: the v3 contract cannot be loaded
+STATIC = ALWAYS | {f"CK-{n}" for n in (*range(4, 18), 19, 21, 22, 23, 47, 48, 49)} | V3_STATIC
 EXEC = STATIC | {"CK-20", "CK-24"}
 SHIPPED = EXEC | {"CK-25"}
 TIERS = {"draft": ALWAYS, "spec-locked": STATIC, "building": EXEC, "shipped": SHIPPED, "killed": ALWAYS | {"CK-21"},
@@ -281,6 +282,7 @@ class Item:
         text = tree.read(readme)
         if text is None:
             raise OSError(f"{readme} does not exist")
+        self.text = text
         m = re.match(r"^---\r?\n(.*?)\r?\n---\r?\n?", text, re.S)
         self.fm_error: str | None = None
         self.fm: dict = {}
@@ -423,7 +425,9 @@ def check_item(readme: Path, root: Path | None = None, for_source_commit: bool =
 
 
 def check_work_item(tree: Tree, readme: str, for_source_commit: bool = False,
-                    require_sections: bool = False) -> tuple[list[str], list[str]]:
+                    require_sections: bool = False, *, live: bool | None = None) -> tuple[list[str], list[str]]:
+    """`live` is whether the repo's CLAUDE.md declares `deploymentTier: live`, for a v3 item only: the commit gate passes
+    HEAD's reading, a standalone run (None) reads the tree it was given."""
     item = Item(tree, readme)
     item.require_sections = require_sections
     enabled = set(TIERS.get(item.status, ALWAYS)) | ({"CK-26"} if for_source_commit else set())
@@ -432,6 +436,18 @@ def check_work_item(tree: Tree, readme: str, for_source_commit: bool = False,
         rep.err("CK-26", "README.md", f"status is `{item.status}`; a source commit needs `building` or `shipped`")
     if item.fm_error:
         rep.err("CK-1", "README.md", item.fm_error)
+        return rep.errors, rep.warnings
+    try:  # the one early branch: a `standard: 3` item is judged by the v3 profile and never by the v2 rules below
+        v3 = work_item_schema.read_v3(item.text)
+    except work_item_schema.V3Refusal as e:
+        rep.add("README.md", e.findings)
+        return rep.errors, rep.warnings
+    except work_item_schema.ContractError as e:
+        rep.err("CK-V3", "README.md", str(e))
+        return rep.errors, rep.warnings
+    if v3 is not None:
+        import spec_v3  # lazy: a v2 item never loads the v3 module
+        spec_v3.check(item, v3, rep, live)
         return rep.errors, rep.warnings
     rep.add("README.md", work_item_schema.findings(item.fm))
     if str(item.fm["id"]) != item.id:
@@ -725,22 +741,27 @@ def cites(text: str, ref: str) -> bool:
 
 
 def ck20(item: Item, rep: Report) -> None:
-    label = item.ac_source[0]
-    for r in item.acs[0]:
-        names = [t.strip().strip("`").split("::")[0] for t in re.split(r",|<br\s*/?>", r.test) if t.strip()]
+    check_test_citations(item, rep, item.ac_source[0], [(r.ac, r.test) for r in item.acs[0]])
+
+
+def check_test_citations(item: Item, rep: Report, label: str, rows: list[tuple[str, str]]) -> None:
+    """CK-20 for (row id, Test cell) pairs: each named test file exists and cites `<item id>/<row id>`. The v3 profile
+    calls it for its AC and MNC rows."""
+    for ident, test in rows:
+        names = [t.strip().strip("`").split("::")[0] for t in re.split(r",|<br\s*/?>", test) if t.strip()]
         texts = []
         for n in names:
             path = inside("", n)
             if path is None:
-                rep.err("CK-20", label, f"{r.ac}: test path `{n}` must resolve inside the repo")
+                rep.err("CK-20", label, f"{ident}: test path `{n}` must resolve inside the repo")
             elif not TEST_PATH.search(path):
-                rep.err("CK-20", label, f"{r.ac}: `{n}` is not a test file (under tests/, test_*, *.test.*, *.spec.*)")
+                rep.err("CK-20", label, f"{ident}: `{n}` is not a test file (under tests/, test_*, *.test.*, *.spec.*)")
             elif (text := item.tree.read(path)) is None:
-                rep.err("CK-20", label, f"{r.ac}: test file `{n}` not found")
+                rep.err("CK-20", label, f"{ident}: test file `{n}` not found")
             else:
                 texts.append(text)
-        if texts and len(texts) == len(names) and not any(cites(t, f"{item.id}/{r.ac}") for t in texts):
-            rep.err("CK-20", label, f"{r.ac}: {', '.join(names)} does not cite `{item.id}/{r.ac}`")
+        if texts and len(texts) == len(names) and not any(cites(t, f"{item.id}/{ident}") for t in texts):
+            rep.err("CK-20", label, f"{ident}: {', '.join(names)} does not cite `{item.id}/{ident}`")
 
 
 def ck21(item: Item, rep: Report) -> None:

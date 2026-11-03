@@ -286,16 +286,25 @@ def disk_records(root: Path, item_dir: str, owner: object | None) -> list[Record
 
 # ---------------------------------------------------------------- FR-8: the gate's entry point
 
-def required_records(tree: spec_check.Tree, item_dir: str, edges: list, item_type: str | None = None) -> str | None:
+def required_records(tree: spec_check.Tree, item_dir: str, edges: list, item_type: str | None = None, *,
+                     live: bool | None = None) -> str | None:
     """None when the records the edges need are fresh passes in `tree`, else the reason. A lock needs the design
-    class; a ship needs the code class (design class for a research or experiment item). Code freshness is not
-    judged here (decision D32, work item gate-ci)."""
+    class unless the staged README is a v3 T1 feature or an unflagged v3 bugfix (spec_v3.lock_exempt: the computed tier,
+    read through the one v3 reader; `live` is the repo's tier, None reads it from `tree`); a ship needs the code class
+    (design class for a research or experiment item). Code freshness is not judged here (decision D32, work item gate-ci)."""
     facts = readme_facts(tree, item_dir)
     kind = str(item_type if item_type is not None else facts.get("type"))
     needs: list[str] = []
     for _, to in edges:
-        wanted = "design" if to == "spec-locked" or (to == "shipped" and kind in SHORT_ITEM_TYPES) else \
-            "code" if to == "shipped" else None
+        if to == "spec-locked":
+            import spec_v3  # lazy: only a lock edge reads the v3 rules
+            wanted = None if spec_v3.lock_exempt(tree, item_dir, live) else "design"
+        elif to == "shipped":
+            wanted = "code"
+            if kind in SHORT_ITEM_TYPES:
+                wanted = "design"
+        else:
+            wanted = None
         if wanted and wanted not in needs:
             needs.append(wanted)
     if not needs:

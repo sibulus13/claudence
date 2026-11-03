@@ -1,5 +1,9 @@
 # Work-Item Standard v2 — one spec per change: L0 intent, L1 architecture, L2 components, L3 acceptance criteria
 
+> **New features and bugfixes use v3** (`SPEC-STANDARD-V3.md`, opt-in by `standard: 3`, D38). This v2 page still
+> governs every item without that key: shipped history, and the types v3 does not cover (research, experiment,
+> refactor, integration, data-collection, and changes over 15 ACs).
+
 History: v1 adopted 2026-09-25 (C4 spine, `docs/work/<id>/`, per-layer before/after, per-type profiles; rendered by Catwalk, `D:/repo/Factory/catwalk/docs/work/c4-change-impact/`). **v2 adopted 2026-10-31**: merges the `docs/specs/<slug>.md` format (spec-gate, same day) into this standard, so there is one spec format, one folder, one checker. Changes are tagged **[v2]** below (tags stay until adoption is confirmed). Everything untagged is v1, unchanged.
 
 ```mermaid

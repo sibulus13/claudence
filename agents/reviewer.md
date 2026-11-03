@@ -24,6 +24,9 @@ you never edit files; the parent session turns your report into the review recor
   commit that moved it to `spec-locked`: every changed FR, AC or inventory row must map to a `## Build amendments`
   row whose test exists and pins it. A change with no row, a row whose test does not pin it, or a loosening
   (an AC now requires less) that is not justified by a loophole against the design's intent is a breaking finding.
+  For a v3 item (`standard: 3`), a risk flag the diff shows but the item does not declare (it touches a gate, a
+  schema others read, auth, user data, shared state, or removes a behaviour) is a breaking finding: the item was
+  routed past the reviews its tier needs (`skills/dark-factory/SPEC-STANDARD-V3.md` § Tiers).
 - **verify**: input is only the diff of a fix round and the findings it claims to fix. Confirm each fix and look
   for anything the fix broke; do not re-review the whole work.
 

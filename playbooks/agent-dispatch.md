@@ -10,8 +10,15 @@
 - Separate repos need no worktree; same-repo parallel writers each get one.
 
 ## Design closes before lock (owner, 2026-11-02; ADR `~/.claude/docs/adr/0001-review-records-gate-lock-and-ship.md`)
-- Every design runs: designer draft (with its Outcome inventory) -> adversary pass (`agents/adversary.md`) -> the
-  designer adds or rejects each row with a reason -> reviewer in design mode. No exemption for small work.
+- **v3 items (`standard: 3`) scale by tier** (`~/.claude/skills/dark-factory/SPEC-STANDARD-V3.md` § Tiers, D38-D40):
+  - T1 feature or unflagged bugfix: draft -> red tests -> build -> code review. No adversary, no design review.
+  - T2 feature or flagged bugfix: probe first (the adversary on the problem plus a real-input run, saved to
+    `evidence/probe.md`), then draft -> one design review -> red tests -> build -> code review. With 2+ flags, add
+    the security reviewer in design mode.
+  - Each tier has an agent-stage cap (T1 and bugfix 4, flagged bugfix 5, T2 9). Hitting it stops the item as
+    `repair-budget-exhausted`; it is never extended.
+- v2 items: designer draft (with its Outcome inventory) -> adversary pass (`agents/adversary.md`) -> the designer
+  adds or rejects each row with a reason -> reviewer in design mode. No exemption for small work.
 - **Who locks:** the parent session, and only by committing the `draft` → `spec-locked` move while a fresh `pass`
   design (or verify) record sits in `reviews/`. The designer never locks; the parent never locks content changed
   after its last review. A dark-factory pre-traffic GO is that record, not an automatic lock.

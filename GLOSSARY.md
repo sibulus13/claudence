@@ -21,6 +21,22 @@ _Avoid_: transition (in prose), status change
 The move from `draft` to `spec-locked`: the design is settled and may be built.
 _Avoid_: freeze, approve
 
+**Tier**:
+How much process a v3 work item gets (T1, T2, or the bugfix lane), computed from its acceptance-criteria count and risk flags; a declared tier below the computed one is refused.
+_Avoid_: size, priority, t-shirt size
+
+**Risk flag**:
+One of a fixed list of reasons a change needs the heavier tier: contract, data, security, enforcement, concurrency, removal, live.
+_Avoid_: risk level, severity
+
+**Probe**:
+The stage before a T2 draft that gathers context: the adversary's questions on the problem, a run of the real tool on real inputs, and environment facts, saved to the item's evidence.
+_Avoid_: spike, research, discovery
+
+**Frozen set**:
+The frontmatter keys of a v3 work item that are fixed after the lock: standard and type never change, and tier and risk may rise (with a fresh design review) but never fall.
+_Avoid_: locked fields, immutable keys
+
 **Historical item**:
 A work item last committed before the References and Operating envelope sections existed, judged with warnings until its next move.
 _Avoid_: legacy item, grandfathered item
