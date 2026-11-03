@@ -314,7 +314,9 @@ def commit_verbose(repo: Path, message: str, *config: str) -> subprocess.Complet
     stub.write_text("import sys\np = sys.argv[1]\nbody = open(p, encoding='utf-8').read()\n"
                     f"open(p, 'w', encoding='utf-8', newline='\\n').write({message!r} + '\\n' + body)\n", encoding="utf-8")
     editor = f'"{Path(sys.executable).as_posix()}" "{stub.as_posix()}"'
-    return git(repo, *config, "-c", f"core.editor={editor}", "commit", "-q", "-v", "-a", check=False)
+    # GIT_EDITOR, not core.editor: the environment may already set GIT_EDITOR, which outranks core.editor
+    return subprocess.run(["git", "-C", str(repo), *config, "commit", "-q", "-v", "-a"], capture_output=True,
+                          text=True, env={**ENV, "GIT_EDITOR": editor}, timeout=60)
 
 
 def test_a_divider_line_in_the_body_does_not_hide_the_trailers(repo2: Path) -> None:
@@ -399,3 +401,9 @@ def test_a_failed_trailer_parse_is_a_gate_error(monkeypatch: pytest.MonkeyPatch)
     monkeypatch.setattr(spec_gate.subprocess, "run", failed)
     with pytest.raises(spec_gate.GateError):
         spec_gate.git_trailers(Path("msg.txt"))
+
+
+def test_every_applicable_cause_is_reported(repo2: Path) -> None:
+    # fix-gate-trailer-hint/AC-4 (D34: all causes, not the first)
+    r = commit_msg(repo2, f"feat: x\n\nspec: docs/work/demo/README.md (building)\n\n{COAUTHOR}\n")
+    assert r.returncode != 0 and all(CAUSE[c] in r.stderr for c in (2, 3, 5)), r.stderr

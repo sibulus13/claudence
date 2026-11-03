@@ -156,7 +156,7 @@ def lifecycle_problem(tree: spec_check.Tree, readmes: list[tuple[str, str]], mer
     return None
 
 
-def reason_to_reject(message: str) -> str | None:
+def reason_to_reject(message: str, message_file: Path) -> str | None:
     root = Path(git("rev-parse", "--show-toplevel").strip())
     merging = any(Path(git("rev-parse", "--git-path", name).strip()).exists() for name in MERGING)
     lifecycle = lifecycle_problem(spec_check.IndexTree(root), staged_readmes(), merging)  # first, on every branch
@@ -169,8 +169,8 @@ def reason_to_reject(message: str) -> str | None:
     if branch and default is not None and branch != default:
         return None  # agent branches and worktrees carry work in progress; the default branch is the gate
     # A detached HEAD (empty branch) or an unresolvable default branch is gated (fail closed), never waved through.
-    body = "\n".join(line for line in message.splitlines() if not line.startswith("#")).strip()
-    trailers = re.findall(r"^Spec:\s*(\S+)\s*$", git_trailers(body), re.M)
+    body = message_body(message)
+    trailers = re.findall(r"^Spec:\s*(\S+)\s*$", git_trailers(message_file), re.M)
     if len(trailers) > 1:
         return f"found {len(trailers)} Spec trailers; a commit cites exactly one work item"
     cited = trailers[0] if trailers else None
@@ -184,7 +184,8 @@ def reason_to_reject(message: str) -> str | None:
     if cited is None:
         return (f"this commit stages source ({', '.join(source[:3])}) but has no `Spec: docs/work/<id>/README.md` "
                 "trailer. Write the work item first (AC table with pass/fail conditions and tests), set its status to "
-                f"`building`, cite it. Format: {STANDARD} (legacy `docs/specs/<slug>.md` is accepted until migration ends)")
+                f"`building`, cite it. Format: {STANDARD} (legacy `docs/specs/<slug>.md` is accepted until migration ends)"
+                + trailer_hint(body))
     if WORK_ITEM.match(cited):
         return item_problem(cited, tree, for_source_commit=True)
     if not cited.startswith("docs/specs/") or ".." in cited or not cited.endswith(".md"):
@@ -216,13 +217,62 @@ def item_problem(cited: str, tree: spec_check.Tree, *, for_source_commit: bool) 
     return f"{cited} is not committable: {'; '.join(errors[:4])}" if errors else None
 
 
-def git_trailers(body: str) -> str:
+def git_trailers(message_file: Path) -> str:
+    """The trailers exactly as git reads them: the raw message file (git handles comments, core.commentChar and the
+    `commit -v` scissors itself), no `---` divider, separators pinned so repo config cannot change the reading."""
     try:
-        r = subprocess.run(["git", "interpret-trailers", "--parse"], input=body, capture_output=True, text=True,
-                           encoding="utf-8", timeout=GIT_TIMEOUT_S)
+        r = subprocess.run(["git", "-c", "trailer.separators=:", "interpret-trailers", "--parse", "--no-divider",
+                            str(message_file)], capture_output=True, text=True, encoding="utf-8", errors="replace",
+                           timeout=GIT_TIMEOUT_S)
     except (OSError, subprocess.TimeoutExpired) as e:
         raise GateError(f"git interpret-trailers failed: {e}") from e
+    if r.returncode != 0:
+        raise GateError(f"git interpret-trailers exited {r.returncode}: {r.stderr.strip()[:200]}")
     return r.stdout
+
+
+# --- Why a Spec line was not read (docs/work/fix-gate-trailer-hint) ------------------------------------------------
+SPEC_SHAPED = re.compile(r"^\s*specs?\s*:\s*docs/(work|specs)/", re.I)
+TRAILER_LINE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9-]*\s*:")
+HINT = "not read as a trailer"
+
+
+def message_body(message: str) -> str:
+    """The message as a reader sees it: the text above the `commit -v` scissors, comment lines removed."""
+    char = git("config", "core.commentChar", ok_codes=(0, 1)).strip() or "#"
+    char = "#" if char == "auto" else char
+    lines: list[str] = []
+    for line in message.splitlines():
+        if line.startswith(char) and re.match(rf"^{re.escape(char)} -+ >8 -+$", line):
+            break
+        if not line.startswith(char):
+            lines.append(line)
+    return "\n".join(lines).strip()
+
+
+def trailer_hint(body: str) -> str:
+    """Every reason git did not read a path-shaped Spec line as the `Spec` trailer (empty when there is none)."""
+    paragraphs = [p.split("\n") for p in re.split(r"\n\s*\n", body.strip()) if p.strip()]
+    if not paragraphs:
+        return ""
+    final = paragraphs[-1]
+    for line in (l for p in paragraphs for l in p if SPEC_SHAPED.match(l)):
+        causes: list[str] = []
+        others = [l for l in final if l != line and not TRAILER_LINE.match(l)]
+        if line in final and others:
+            causes.append(f"the final paragraph has a non-trailer line (`{others[0].strip()}`); it may hold only trailers")
+        key, _, value = line.strip().partition(":")
+        if key.strip() != "Spec":
+            causes.append(f"the key must be exactly `Spec` (found `{key.strip()}`)")
+        if len(value.split()) > 1:
+            causes.append("text follows the path; the value must be the path alone")
+        if line[:1].isspace():
+            causes.append("the line is indented; a trailer starts at column 0")
+        if line not in final or len(paragraphs) == 1:
+            causes.append("it is outside the final trailer block (git reads trailers only from the last paragraph, "
+                          "after a blank line)")
+        return f" A `Spec:` line was found but {HINT}: " + "; ".join(causes) + "."
+    return ""
 
 
 def main(argv: list[str]) -> int:
@@ -230,7 +280,7 @@ def main(argv: list[str]) -> int:
         print("spec-gate: expected the commit message file path", file=sys.stderr)
         return 1
     try:
-        why = reason_to_reject(Path(argv[0]).read_text(encoding="utf-8", errors="replace"))
+        why = reason_to_reject(Path(argv[0]).read_text(encoding="utf-8", errors="replace"), Path(argv[0]))
     except (GateError, OSError, spec_check.ToolError, subprocess.TimeoutExpired) as e:
         why = f"gate error, so the commit is rejected (fails closed): {e}"
     for line in WARNINGS:
