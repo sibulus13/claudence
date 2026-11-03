@@ -14,6 +14,8 @@ from pathlib import Path
 
 import pytest
 
+from review_helpers import stage_record
+
 CLAUDE = Path(__file__).resolve().parents[1]
 GATE = CLAUDE / "scripts" / "spec_gate.py"
 FLEET_CONFIG = CLAUDE / "git-hooks" / "fleet-pre-commit-config.yaml"
@@ -263,6 +265,7 @@ def test_ac7_v2_building_and_shipped_items_let_a_source_commit_land(repo2: Path)
     set_status(repo2, "shipped")
     write(repo2, "docs/work/demo/evidence/demo.webm", "x")
     git(repo2, "add", "-A")
+    stage_record(repo2, "code")  # the ship move needs a fresh passing code record (work item review-records)
     write(repo2, "src/app.py", "x = 3\n")
     assert commit(repo2, "-am", f"feat: y\n\n{TRAILER}").returncode == 0
 

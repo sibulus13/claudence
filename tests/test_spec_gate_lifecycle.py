@@ -15,10 +15,12 @@ from pathlib import Path
 
 import pytest
 
+from review_helpers import stage_record
 from test_spec_gate import CLAUDE, README_REL, commit, git, repo2, write  # noqa: F401
 
 LIFECYCLE = json.loads((CLAUDE / "contracts" / "work-item.lifecycle.v1.json").read_text(encoding="utf-8"))
 ITEM_DIR = "docs/work/demo"
+RECORDED = {"spec-locked": "design", "shipped": "code"}  # moves that need a fresh passing record (review-records)
 
 
 def set_field(repo: Path, key: str, value: str, rel: str = README_REL) -> None:
@@ -39,6 +41,8 @@ def seed(repo: Path, status: str, **fields: str) -> None:
 def move(repo: Path, status: str) -> subprocess.CompletedProcess:
     set_field(repo, "status", status)
     git(repo, "add", README_REL)
+    if status in RECORDED:
+        stage_record(repo, RECORDED[status])
     return commit(repo, "-m", f"docs: move to {status}")
 
 
@@ -225,6 +229,7 @@ def test_review_repairing_an_unreadable_head_frontmatter_lands(repo2: Path) -> N
     git(repo2, "commit", "-qm", "chore: break", "--no-verify")
     p.write_text(good, encoding="utf-8", newline="\n")
     git(repo2, "add", README_REL)
+    stage_record(repo2, "design")  # a repair is judged as the chain draft -> building (review-records FR-10)
     r = commit(repo2, "-m", "docs: repair the frontmatter")
     assert r.returncode == 0, r.stderr
 

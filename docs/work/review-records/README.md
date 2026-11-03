@@ -1,7 +1,7 @@
 ---
 id: review-records
 type: feature
-status: spec-locked
+status: shipped
 touches: [harness]
 layers:
   architecture: none
@@ -131,3 +131,10 @@ redesign or a fix round can never ride on an older review.
 | a lock or ship lands without a fresh pass, or a legitimate one is refused | deterministic | python -m pytest tests/test_review_records.py -q (real commits in a temp repo) | blocking |
 | the existing gate and lifecycle behaviour regresses | deterministic | python -m pytest tests/test_spec_gate.py tests/test_spec_gate_review.py tests/test_spec_gate_lifecycle.py -q | blocking |
 | this item breaks its own rule | deterministic | the lock of this item itself carries a hand-written design record that `review_record.py --verify` accepts | blocking |
+
+## Build amendments
+
+| Change | Why (what the test exposed) | Test |
+|---|---|---|
+| FR-10: in a merge, an item whose hashed files equal HEAD's or MERGE_HEAD's version at the same status derives no edges | a correct `git merge main` (or diverged pull) after main locked, built and refined the item was refused as stale, because the chain from the branch's status needs a record for content that changed after the lock | tests/test_review_records.py::test_ac8_merging_main_into_a_branch_after_main_locked_built_and_refined_lands, test_ac8_merging_main_into_a_branch_that_lacks_the_item_lands, test_ac8_a_merge_whose_item_equals_neither_side_is_still_checked |
+| FR-12: a README with no frontmatter block is not a work item and may be deleted; replaces the part of D35 that treated an unreadable status as past draft for such files | deleting a legacy README such as `# Legacy plan` was refused as `(unreadable)`; eleven such files exist in the fleet | tests/test_review_records.py::test_ac10_deleting_a_legacy_readme_without_frontmatter_lands, test_ac10_deleting_a_readme_with_frontmatter_but_no_draft_status_is_refused |
