@@ -38,8 +38,9 @@ fleet code that needs a dev persona (Weaver's "resolve from the persona file", t
 ## Who may write which record
 
 The review, adversary, ADR and security records are written by the parent session from the named persona's report,
-and name that persona and its model. Owner records (milestone approval, owner decision, final approval) come only
-from the owner. The authority table and its enforcement are specified in
+and name that persona and its model. Owner records (milestone approval, owner decision, final approval) are
+written by the owner, or by an agent on the owner's explicit instruction in the conversation; each carries the date
+and time, the owner's words verbatim (their reasoning, or "none given"), the channel and the session id (D56). The authority table and its enforcement are specified in
 `D:/repo/docs/reports/2026-11-03 Loop service MVP proposal.md` and become one contract,
 `contracts/record-authority.v1.json`.
 
