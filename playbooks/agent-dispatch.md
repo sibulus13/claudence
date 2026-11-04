@@ -54,7 +54,10 @@
   edit to the running build, because each edit invalidates work already done and resets review.
 - Split by the nesting rule before dispatch (more than 15 ACs means children). One implementer gets one child's
   context pack, not the whole tree.
-- **Only breaking findings loop** (owner rule 2026-11-02, D36). A review blocks only on what breaks the application
+- **Design: one shot** (owner 2026-11-03, D60). Probe and adversary, then one draft; a design check only for flagged
+  T2 items or `public`/`revenue` repos (one parallel pass, one fix, no verify); then build. Design findings that do not
+  block implementation are build amendments, never another design round.
+- **Only breaking findings loop** (owner rule 2026-11-02, D36; on the design side superseded by D60). A review blocks only on what breaks the application
   (code review) or makes the build impossible or wrong-headed (design review); every other finding is recorded and
   goes to the backlog or a build-time spec amendment (D37). A breaking finding is a **stage miss**: classify its cause
   (context not loaded, spec quality, test strength, approach), fix that cause upstream (a probe, a checker rule or a

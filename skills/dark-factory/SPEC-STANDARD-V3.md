@@ -143,8 +143,11 @@ most 15. Tests cite `<id>/AC-n` and `<id>/MNC-n` verbatim (checked from `buildin
   required reads (both v3 stage misses on 2026-11-02): every state machine the change touches (for a gate, the
   lifecycle contract's edges), and every new parser run on the real corpus it will read (look-alike negatives come
   from that run, not from the design).
-- **Design review** (T2, flagged bugfix): one attempt; only breaking findings loop (D36); fix, verify the fix diff,
-  then the architect on a second `fix-first`.
+- **Design check** (owner 2026-11-03, D60): none by default; the probe and adversary inform a one-shot draft that
+  goes straight to red tests and the build. Only a T2 item with a `security`, `data`, `contract` or `live` flag, or
+  in a `public` or `revenue` repo, gets one check: the reviewer and the adversary or security reviewer in
+  parallel, one fix of the findings that would block implementation, no verify; everything else becomes a build
+  amendment. The code review that executes is the safety net.
 - **Code review** (every tier): runs the tests, a mutation check and, for parsers, guards and gates, a corpus diff. A
   missing risk flag seen in the diff is a breaking finding.
 - **Code verify**: T1 and bugfix rerun the tests and mutants on the fix diff; T2 dispatches a verify review.
