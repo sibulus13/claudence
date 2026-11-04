@@ -33,7 +33,7 @@ per stage. A stage that hits its cap stops and is reported, never extended silen
 | Code fix + verify | fix breaking findings once | implementer or parent, then reviewer verify | fix commit, verify record | verify `pass` | fix 175k, verify 75k |
 | Milestone brief (H3) | bring the owner up to speed on one milestone | generated (`milestone_brief.py`) | brief, progress view | delivered | - |
 | Goal check | does the result meet the original intent, not just the ACs | goal-checker (independent) | `goal` record | verdict line | 100k (no run yet) |
-| Final gate (H4) | judge the item's whole history, then ship or deploy | `final_gate.py`; owner when manual | ship commit or promote | range judged clean, approval if manual | - |
+| Final gate (H4) | ship edge: judge the item's history (early); deploy promote: judge from the last production deploy to the tip (binding; spec final-gate) | `final_gate.py`; owner when manual | ship commit or promote | range judged clean, every item in the span passed, approval if manual | - |
 | Ship and fold | close the item; fold amendments into the current spec (after the capability layer) | parent | shipped status, Timeline row | gate accepts the ship | - |
 | Escape intake | trace a later bug to the stage that missed it | implementer of the bugfix | Escape table, Amendments row on the origin | checker clean | (inside the bugfix's budget) |
 | Retro | turn repeated failures into checklist lines and reviewer checks | `/retrospect`, owner | proposals with state | proposal closed or applied | - |
@@ -50,7 +50,7 @@ probe, design review and architect.
 | a second `fix-first` | the architect decides; no third round | info, then blocker if an owner decision results |
 | a gate cannot judge (timeout, shallow history, bad contract) | refuses by name, never passes as judged | warn |
 | a guard false refusal of legitimate work | the action becomes an owner yes/no; never scripted around | blocker |
-| an owner record forged or attempted by an agent | guard denies; the attempt is logged | critical |
+| an owner record lacking an audit field, or written by an agent without the owner's words in the conversation (D56) | a record missing `recorded`, `owner_words`, `channel` or `session_id` is refused and never counts; no guard denies the write; the transcript audit reports a record whose `owner_words` match no owner message | critical |
 | a subagent ends without a report | one request to resend; never assume its result | none (logged) |
 | milestone review not given and the cap is reached | the loop waits; nothing auto-accepts | blocker, re-sent daily |
 | drift on a `public` or `revenue` repo (incl. host auto-deploy) | deploy refused until clean | warn; critical for `revenue` |
