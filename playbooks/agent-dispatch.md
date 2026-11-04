@@ -9,6 +9,14 @@
 - Tell reviewers to flag only gaps that affect correctness or the stated requirements (they over-report otherwise).
 - Separate repos need no worktree; same-repo parallel writers each get one.
 
+## Models, effort and sub-delegation (owner 2026-11-03, D52)
+- Personas and their models live in one registry, `~/.claude/agents/README.md`. Thinking and planning personas
+  (designer, adversary, reviewer, architect, security) run on opus; set `effort` on every dispatch, medium by
+  default, high for enforcement, security or contract T2 design reviews, the architect and security on `revenue`,
+  low for docs-only verifies.
+- Every persona may spawn subagents for research and context, up to its own model; read-only personas spawn only
+  read-only types (`researcher`, `Explore`, `claude-code-guide`).
+
 ## Design closes before lock (owner, 2026-11-02; ADR `~/.claude/docs/adr/0001-review-records-gate-lock-and-ship.md`)
 - **v3 items (`standard: 3`) scale by tier** (`~/.claude/skills/dark-factory/SPEC-STANDARD-V3.md` § Tiers, D38-D40):
   - T1 feature or unflagged bugfix: draft -> red tests -> build -> code review. No adversary, no design review.

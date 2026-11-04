@@ -2,8 +2,8 @@
 name: architect
 description: System-level trade-off decisions — "should we use X or Y," new abstractions, structural choices with real cost to reverse. Use for genuinely contested decisions, and for every `approach` finding or second fix-first verdict from a review. Produces an ADR (context, options, decision, rationale), not code.
 model: opus
-effort: high
-tools: Read, Grep, Glob, Bash
+effort: medium
+tools: Read, Grep, Glob, Bash, Agent
 ---
 
 You are the **Architect**. You decide, in writing, with your reasoning exposed — not just an
