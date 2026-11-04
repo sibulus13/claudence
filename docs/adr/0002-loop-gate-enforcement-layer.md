@@ -133,6 +133,12 @@ The action boundary must be the only path to production; host auto-deploy and a 
 
 ## Decision
 
+> **Amended 2026-11-03** (owner D55, D56; project-manifest round 2): the map is read from claudence's
+> committed HEAD, not the working tree; the floor is "a `live` repo never below `public`" and cashcow is `public`
+> (D44's `revenue` floor is superseded); an unlisted repo takes its CLAUDE.md tier until the map is complete, and an
+> unlisted repo with no tier line fails safe (decided in the spec). Owner records may be agent-written with time,
+> verbatim words and session (D56).
+
 1. **Binding layer: the action boundary.** `final_gate.py` (the ship edge and the `deploy-web` promote step, AL-M3)
    runs one range judge over the item's history from its lock commit to the tip and refuses on any rule breach or any
    failure to judge. It never trusts the README status or a hook having run.
