@@ -4,7 +4,7 @@ type: feature
 standard: 3
 tier: T2
 risk: [contract, enforcement]
-status: draft
+status: spec-locked
 touches: [harness]
 layers: {architecture: none, component: none, functional: none, data: none}
 created: "2026-11-03"
