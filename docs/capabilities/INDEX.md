@@ -37,7 +37,10 @@ One order across the three specs. A shared file has exactly one owning milestone
 after the previous one has shipped. Parallel work is allowed only where the milestones' Owns are disjoint
 (PM-P3 and AL-M4 are).
 
-`PM-P1 -> AL-M1 -> PM-P2 -> AL-M2 -> FL-F1 -> AL-M3 -> FL-F2 -> FL-F3 -> PM-P4 -> PM-P5`
+`PM-P1 -> AL-M1 -> PM-P2 -> AL-M2 -> ST-S1 -> (GC-G1 || FL-F1) -> AL-M3 -> FL-F2 -> FL-F3 -> PM-P4 -> PM-P5`
+
+ST-S1 is `stage-trace`'s first milestone (a per-stage record with cost; owner 2026-11-03, D48) and GC-G1 is
+`gate-ci`'s range judge (ADR 0002, D47); both items are planned, not yet drafted.
 
 PM-P3 is absent from the default order: its Owns are disjoint, so it runs at any step after PM-P1 and before PM-P4.
 AL-M4 and the capability layer come after FL-F3.
