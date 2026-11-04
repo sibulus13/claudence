@@ -48,7 +48,7 @@ and the rest moves into two new drafts.
 Re-pointed Outcomes: `operability` cited old AC-10 (moved); it now cites AC-6 (the generated brief reaching Catwalk and
 TeleFi is what the owner operates by in M1 and M2). `security` no longer claims the `goal` and deploy rules. Applied in
 the same edit from that verify: finding 3 (the rules key on the item's Milestones table and the map profile, never on
-`processes`: AC-12), finding 4 (a building milestone item's Owns are exclusive: AC-13) and finding 5
+`processes`: AC-12), finding 4 (exclusive Owns: added as AC-13, then reverted in verify round 3 because it deadlocked the build order; now a stated limit closed by final-gate) and finding 5
 (`evidence/stage-catalog.md:53` now states D56). ACs renumbered: old AC-12, AC-13 and AC-14 are now AC-9, AC-10 and
 AC-11.
 
@@ -171,7 +171,7 @@ The table is the plan only (no Status column, no color classes). Build order and
 | Milestone | Slice (what works after it) | Depends on | Owns | Outer test (red first) | Unblocks |
 |---|---|---|---|---|---|
 | M1 | a T2 spec with Decisions, Milestones and Contracts passes the checker; this spec checks itself; the standard states the plan sections | PM-P1 (spec_v3.py order) | `scripts/spec_v3.py`, `contracts/work-item.v3.json`, `skills/dark-factory/SPEC-STANDARD-V3.md` | AC-1 | every T2 spec can carry a checked plan |
-| M2 | owner-kind records exist, carry the four audit fields and count only for the current content; a source commit on a milestone spec is gated by records through pure predicates (cap, trailers, dependencies, Owns, exclusive Owns) that commit-msg runs on every branch and the range judge reuses; progress and the brief are generated and reach Catwalk and TeleFi | M1, PM-P1 (reads `scripts/manifest.py` and the profile map) | `scripts/spec_v3.py`, `scripts/spec_gate.py`, `scripts/review_record.py`, `contracts/review-record.v1.json`, `scripts/progress.py`, `scripts/milestone_brief.py`, `contracts/progress-status.v1.json`, `contracts/milestone-brief.v1.json` | AC-4 | the owner checks each milestone |
+| M2 | owner-kind records exist, carry the four audit fields and count only for the current content; a source commit on a milestone spec is gated by records through pure predicates (cap, trailers, dependencies, Owns) that commit-msg runs on every branch and the range judge reuses; progress and the brief are generated and reach Catwalk and TeleFi | M1, PM-P1 (reads `scripts/manifest.py` and the profile map) | `scripts/spec_v3.py`, `scripts/spec_gate.py`, `scripts/review_record.py`, `contracts/review-record.v1.json`, `scripts/progress.py`, `scripts/milestone_brief.py`, `contracts/progress-status.v1.json`, `contracts/milestone-brief.v1.json` | AC-4 | the owner checks each milestone |
 
 ### Gates on real work (AL-2)
 
@@ -192,11 +192,10 @@ final-gate's (ADR 0002).
   self-asserted trailer cannot reach outside its milestone. A commit inside a milestone's Owns after that milestone's
   `milestone` record lands as rework and the milestone reads **not done** until a new record, so its dependents are
   refused. A commit naming a waiting milestone is rework, allowed only inside that milestone's Owns.
-- **Exclusive Owns** (verify finding 4). While a milestone item is `building`, its milestones' Owns belong to it alone:
-  a source commit that changes a path inside them must cite that item and the owning milestone. A commit citing any
-  other item (v3, v2 or a legacy `docs/specs/` file) or none is refused naming the owner, on every branch. A path owned
-  by two building items refuses every commit to it, and the brief names the overlap for the planner. Owns release when
-  the item is `shipped` or `killed`.
+- **Known limit: a commit citing another item can touch a milestone's files** (verify finding 4 of 2026-11-04). An
+  exclusive-Owns rule was tried and reverted: it deadlocked the program build order, because an item holds its paths
+  until it ships (verify 3, finding 1). The bypass is closed at deploy instead: final-gate refuses a span in which any
+  source commit's item lacks a final-gate pass (final-gate D-P). Before final-gate ships, the cap is early warning.
 - **Arrival (ADR 0002 channel table).** commit-msg runs these rules on every branch for a commit, an amend and a local
   `merge --squash` followed by a commit. It returns early while a merge, rebase, cherry-pick or revert is in progress
   (`spec_gate.py:341-342`); a plain cherry-pick, `revert --no-edit`, a rebase and a fast-forward run no commit-msg at
@@ -244,7 +243,7 @@ Signatures: `review_record.py approve --item ID --kind <owner kind> [--milestone
 --channel chat|!|telefi --session ID` (the owner's `!` or an agent on the owner's behalf; `write` refuses owner kinds);
 `progress.milestone_states(tree, item) -> dict[str, Status]`; `spec_gate.milestone_problem(commits:
 Sequence[CommitFacts], records: Sequence[Record], plans: Sequence[MilestonePlan], config: EffectiveConfig) -> str | None`
-(pure; composes the cap, trailer, dependency, Owns, exclusive-Owns and not-done rules; `plans` holds every milestone
+(pure; composes the cap, trailer, dependency, Owns and not-done rules; `plans` holds every milestone
 item in the repo, so exclusivity is judged; `CommitFacts` and `MilestonePlan` are defined here, produced by
 commit-msg's driver and by the range judge); `spec_gate.milestone_plans(tree, lock_reader) -> list[MilestonePlan]`
 (the driver's reader; a lock commit it cannot find or read refuses by name).
@@ -263,13 +262,12 @@ commit-msg's driver and by the range judge); `spec_gate.milestone_plans(tree, lo
 | AC-8 | M2, AL-2 | fixture histories built by real git operations on a temp repo with a logging commit-msg hook, each holding an AC-4 breach: a worktree-branch commit, an amend, a local `merge --squash` commit with one `Spec:` and one `Milestone:`, then with two of either and with none; and, for the channels commit-msg does not see, a non-fast-forward merge, a fast-forward, a rebase, a plain cherry-pick and `revert --no-edit`, whose resulting history's `CommitFacts` are fed to `milestone_problem`; a driver whose git call times out | commit-msg refuses the branch commit, the amend and a squash with missing or doubled trailers, and judges a squash with one of each against its milestone; for each other channel the log shows no commit-msg run and `milestone_problem` over its facts refuses the breach naming the rule and the commit; the timed-out driver refuses naming the timeout | a breach passes commit-msg on a channel it runs on, the predicate passes a breach on any channel, or a timeout lets a commit land | tests/test_agentic_loop.py |
 | AC-9 | D-B, D-L | a T2 lock whose Decisions table has open rows: with no `owner-decision` record; with one lacking an audit field; with a complete one for the current content (the owner's `!` or an agent on the owner's behalf); with one for older content; a T2 without open rows | refused, refused naming the field, lands, refused, lands on the design record | otherwise | tests/test_agentic_loop.py |
 | AC-10 | compatibility | every v2 item and every shipped v3 item in the fleet, and the records on disk | judged exactly as before | any result changes | tests/test_agentic_loop.py |
-| AC-11 | docs | SPEC-STANDARD-V3.md and `D:/repo/docs/DEVELOPMENT_LIFECYCLE.md` | each states the loop: one milestone at a time, owned paths only and exclusive while building, contracts change only through the planner, the profile table, and that the final gate is spec final-gate's | a doc contradicts the code | tests/test_agentic_loop.py |
+| AC-11 | docs | SPEC-STANDARD-V3.md and `D:/repo/docs/DEVELOPMENT_LIFECYCLE.md` | each states the loop: one milestone at a time, owned paths only, contracts change only through the planner, the profile table, and that the final gate is spec final-gate's | a doc contradicts the code | tests/test_agentic_loop.py |
 | AC-12 | M2, D-C | an item locked with a Milestones table at the cap, and a source commit breaching AC-4, in a repo whose manifest at the tip says `processes.loop: off`, then `loop: frozen`, then `v3: frozen`; the same breach with a staged README that drops the Milestones table or widens the milestone's Owns | each breach is refused naming the rule, exactly as with `loop: on`; the plan read is the lock commit's, so the staged edit changes nothing | a `processes` flag or a staged README edit lets the breach land | tests/test_agentic_loop.py |
-| AC-13 | M2, AL-2 | item A `building` with M1 owning `scripts/x.py`; a source commit changing `scripts/x.py` that cites item B (v3, no milestones), a v2 item, a legacy `docs/specs/` file, or nothing, on the default branch and on a worktree branch; the same commits after A is `shipped`; two building items whose Owns share one path | each refused naming A and M1 while A builds; after A ships the commits are judged as today; every commit to the shared path is refused and the brief names the overlap | a commit outside A lands inside A's Owns while A builds, or A's Owns still bind after it ships | tests/test_agentic_loop.py |
 
 ## Fixture sources
 
-Fixtures come from reality, not from this text. Git histories (AC-4, AC-8, AC-12, AC-13) are made by real `git`
+Fixtures come from reality, not from this text. Git histories (AC-4, AC-8, AC-12) are made by real `git`
 operations on a temp repo with the real `spec_gate.py` installed as commit-msg; the channel behaviour they expect was
 observed in the verify scratch repo (git 2.39). Map and manifest fixtures (AC-3, AC-7, AC-12) start from cashcow's real
 entry and real `catalog-info.yaml` once PM-P1 writes them. Record fixtures (AC-5, AC-9) are written by the real
@@ -284,7 +282,7 @@ entry and real `catalog-info.yaml` once PM-P1 writes them. Record fixtures (AC-5
 | dependency fails | L3 | a repo missing from the map reads its CLAUDE.md tier until `complete`; an unreadable map is refused | AC-3 |
 | timeout | L3 | an owner who never reviews blocks the loop at the cap; nothing auto-accepts | AC-4 |
 | crash mid-step | L3 | the predicates are pure over commit facts; a driver whose git call times out or fails refuses by name | AC-8 |
-| concurrent actor | L3 | two building items, or two milestones without a dependency, owning one path cannot both commit to it | AC-13 |
+| concurrent actor | L3 | two milestones without a dependency owning one path cannot both run | AC-2 |
 | duplicate or replay | L3 | an owner record for other content or another commit does not count | AC-5 |
 | arrival channel | L3 | commit-msg judges a commit, an amend and a local squash on every branch; every other channel reaches the same predicates through the range judge and final-gate FG-1 | AC-8 |
 | performance or cost | L3 | each brief reports stages used against the cap | AC-6 |
@@ -325,3 +323,8 @@ from M2: D-L, AC-5, AC-9).
 ## Probe
 
 [Probe and critique](evidence/probe.md), from the owner's words in [owner-design.md](evidence/owner-design.md).
+
+## Design fix round 3
+
+Verify 3 (2026-11-04) finding 1: exclusive Owns (old AC-13) reverted; the cross-item bypass is a stated limit,
+closed at deploy by final-gate D-P. Lesson logged: a fix round applied a non-breaking finding and created a breaking one.
