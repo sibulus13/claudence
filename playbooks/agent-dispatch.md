@@ -1,5 +1,5 @@
 # Agent dispatch playbook (cue: Agent, Workflow, /orchestrate)
-- Order: named skill > role flow (`/orchestrate`) > `cycle` workflow (`~/.claude/workflows/cycle.js`) > named agent (implementer, reviewer, adversary, researcher, designer, architect, security) > general-purpose (say why).
+- Order: named skill > role flow (`/orchestrate`) > `cycle` workflow (`~/.claude/workflows/cycle.js`) > named agent (researcher, designer, implementer, reviewer, each in the mode the brief names: `agents/README.md`) > general-purpose (say why).
 - Before any fan-out, pin per stage: persona (its frontmatter sets model and effort), input/output contract, the exact gate command (interpreter included), worktree isolation, and an independent reviewer. One verdict set everywhere: `pass` / `fix-first` / `block` (a shared enum in `Lib/contracts` lands with work item `review-records`); one rating scale: R / F / H (`~/.claude/GLOSSARY.md`). The author never verifies their own work.
 - Tag every dispatch description with its stage and work item, e.g. `[design-review review-records]`, so per-stage cost can be totalled from transcripts.
 - A missing hand-back (an agent that finished without a report) gets one request to resend; never assume its result.
@@ -10,10 +10,10 @@
 - Separate repos need no worktree; same-repo parallel writers each get one.
 
 ## Models, effort and sub-delegation (owner 2026-11-03, D52)
-- Personas and their models live in one registry, `~/.claude/agents/README.md`. Thinking and planning personas
-  (designer, adversary, reviewer, architect, security) run on opus; set `effort` on every dispatch, medium by
-  default, high for enforcement, security or contract T2 design reviews, the architect and security on `revenue`,
-  low for docs-only verifies.
+- Personas and their models live in one registry, `~/.claude/agents/README.md`. All four personas
+  (researcher, designer, implementer, reviewer) run on opus (D64, D65); set `effort` on every dispatch, medium by
+  default, high for enforcement, security or contract T2 design reviews, decision mode and security mode on
+  `revenue`, low for docs-only verifies.
 - Every persona may spawn subagents for research and context, up to its own model; read-only personas spawn only
   read-only types (`researcher`, `Explore`, `claude-code-guide`).
 
@@ -22,12 +22,12 @@
   - T1 feature or unflagged bugfix: draft -> red tests -> build -> code review. No adversary, no design review.
     The drafter still reads the existing specs and the code for the area first and cites them in the draft.
   - T2 feature or flagged bugfix: probe first (existing specs, the code and a dated web survey of industry practice,
-    then the adversary on the problem and a real-input run, saved to `evidence/probe.md`; it reads every state machine the change touches and runs each new parser on its real
+    then the reviewer in adversary mode on the problem and a real-input run, saved to `evidence/probe.md`; it reads every state machine the change touches and runs each new parser on its real
     corpus), then draft -> one design review -> red tests -> build -> code review. With 2+ flags, add
-    the security reviewer in design mode.
+    the security reviewer (the reviewer in security mode) in parallel.
   - Each tier has an agent-stage cap (T1 and bugfix 4, flagged bugfix 5, T2 9). Hitting it stops the item as
     `repair-budget-exhausted`; it is never extended.
-- v2 items: designer draft (with its Outcome inventory) -> adversary pass (`agents/adversary.md`) -> the designer
+- v2 items: designer draft (with its Outcome inventory) -> adversary pass (the reviewer in adversary mode) -> the designer
   adds or rejects each row with a reason -> reviewer in design mode. No exemption for small work.
 - **Who locks:** the parent session, and only by committing the `draft` → `spec-locked` move while a fresh `pass`
   design (or verify) record sits in `reviews/`. The designer never locks; the parent never locks content changed
@@ -62,11 +62,11 @@
   goes to the backlog or a build-time spec amendment (D37). A breaking finding is a **stage miss**: classify its cause
   (context not loaded, spec quality, test strength, approach), fix that cause upstream (a probe, a checker rule or a
   persona line, logged in `$FLEET_DOCS/RETRO-QUEUE.md`), then the stage gets one re-attempt; a second miss goes to the
-  architect. The tracked metric is first-attempt pass rate per stage.
+  designer in decision mode. The tracked metric is first-attempt pass rate per stage.
 - Review budget, every size (GLOSSARY.md: Review budget), counted **per work item per review kind** (the design
   review and the code review each have their own): one review, at most one fix round, then one verify review of only
-  the fix diff. A `fix-first` from that verify review is the second one: a stop that goes to the architect
-  (`agents/architect.md`), who decides between redesign at another layer and cutting scope. This replaces the
+  the fix diff. A `fix-first` from that verify review is the second one: a stop that goes to the designer in decision
+  mode (`agents/designer.md`), who decides between redesign at another layer and cutting scope. This replaces the
   size-scaled 1/2/3 budget in `CYCLE.md`.
 - Why: the spec-gate checker took 6+ review rounds on 2026-10-31. The spec grew during the build (v2 merge, work
   breakdown, context packs, off-the-shelf validators, exemption policy) inside one 46-rule work item.

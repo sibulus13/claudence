@@ -16,11 +16,11 @@ pointed you here, this version is what actually backs that description now.
 
 ## Real building blocks this skill dispatches — nothing here is prose-only
 
-- **Personas**: `~/.claude/agents/{implementer,researcher,reviewer,designer,architect}.md` are real,
+- **Personas**: `~/.claude/agents/{researcher,designer,implementer,reviewer}.md` are real,
   dispatchable subagent types — pass `subagent_type: "implementer"` / `"researcher"` / `"reviewer"` /
-  `"designer"` / `"architect"` to the Agent tool (or `agentType` to a `Workflow` script's `agent()`
+  `"designer"` to the Agent tool, naming the mode in the brief, (or `agentType` to a `Workflow` script's `agent()`
   calls) and get the real persona file, not a prompt you hand-roll. Planner is covered by the
-  built-in `Plan` agent; QA is covered by the `/qa` skill; Security is `subagent_type: "security"`;
+  built-in `Plan` agent; QA is covered by the `/qa` skill; Security is `subagent_type: "reviewer"` in security mode;
   Questioner/Marketing/Business are deferred (see the Agent Personas table in CLAUDE.md for each one's build trigger) — write their
   persona into the prompt text explicitly if a flow below needs one before it's promoted to a file.
 - **Multi-component fan-out**: when a flow's work naturally splits into ≥2 independently-testable
@@ -66,7 +66,7 @@ symptom; this is exactly the kind of thing a self-certifying fix misses). No Des
 unless the bug is in one of those surfaces.
 
 ### arch-decision
-Architect (`~/.claude/agents/architect.md`, ADR format: context → options → decision → rationale).
+The designer in decision mode (`~/.claude/agents/designer.md`, ADR format: context → options → decision → rationale → reversibility).
 For a genuinely contested decision with real trade-offs, use a judge-panel pattern instead of one
 agent's opinion: dispatch 2-3 independent agents each arguing a different option from first
 principles, then a final Architect-persona agent synthesizes given all arguments — cheap insurance

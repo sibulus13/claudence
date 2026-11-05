@@ -76,7 +76,7 @@ The weight of one finding: R (real now), F (future: real only if an Operating en
 _Avoid_: severity, critical/warn/info, blocker/concern/nit
 
 **Review budget**:
-Per work item and per review kind: one review, at most one fix round, then one verify review; a second fix-first verdict goes to the architect.
+Per work item and per review kind: one review, at most one fix round, then one verify review; a second fix-first verdict goes to the designer in decision mode.
 _Avoid_: review rounds, fix budget
 
 ## Records

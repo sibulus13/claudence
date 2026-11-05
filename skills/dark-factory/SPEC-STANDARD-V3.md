@@ -41,7 +41,7 @@ The tier is computed, not chosen: a declared tier below the computed one is an e
   hook that admits or refuses), `concurrency` (state changed by more than one actor), `removal` (a behaviour removed
   or narrowed), `live` (the repo's CLAUDE.md says `deploymentTier: live`; derived, and it also needs recorded human
   approval).
-- **2 or more flags**: still T2, plus the security reviewer (`agents/security.md`) in design mode.
+- **2 or more flags**: still T2, plus the security reviewer (the reviewer in security mode, `agents/reviewer.md`) in parallel.
 - **Budget**: a stage is one agent dispatch. Exhausting the cap stops the item as `repair-budget-exhausted`; it is
   never extended. Changes over 400 changed lines are code-reviewed in slices of at most 400 lines.
 - **Frozen after lock**: once the committed copy is past `draft`, `standard` and `type` never change, and `tier` and
@@ -139,13 +139,13 @@ most 15. Tests cite `<id>/AC-n` and `<id>/MNC-n` verbatim (checked from `buildin
   area (every work item and design doc whose scope or tested paths overlap, shipped ones included), (2) the code
   itself (entry points, call sites, tests, and a real run of the tool on real inputs), and (3) a web survey of
   current industry practice for similar implementations (dated URLs; heuristics worth reusing, known failure
-  modes). Then the adversary's outcome-kind questions on the problem. Two
+  modes). Then the reviewer's adversary-mode outcome-kind questions on the problem. Two
   required reads (both v3 stage misses on 2026-11-02): every state machine the change touches (for a gate, the
   lifecycle contract's edges), and every new parser run on the real corpus it will read (look-alike negatives come
   from that run, not from the design).
 - **Design check** (owner 2026-11-03, D60): none by default; the probe and adversary inform a one-shot draft that
   goes straight to red tests and the build. Only a T2 item with a `security`, `data`, `contract` or `live` flag, or
-  in a `public` or `revenue` repo, gets one check: the reviewer and the adversary or security reviewer in
+  in a `public` or `revenue` repo, gets one check: the reviewer in design mode and, when flagged `security` or with 2+ flags, in security mode, in
   parallel, one fix of the findings that would block implementation, no verify; everything else becomes a build
   amendment. The code review that executes is the safety net.
 - **Code review** (every tier): runs the tests, a mutation check and, for parsers, guards and gates, a corpus diff. A

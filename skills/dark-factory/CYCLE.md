@@ -9,11 +9,11 @@ implementer to set `building` and commit, which the implementer persona now forb
 retired severity words. Until then, run the stages by hand (designer, adversary, reviewer in design mode, implementer,
 reviewer in code mode) as `playbooks/agent-dispatch.md` describes. Lines below marked *(retired 2026-11-02)* no
 longer apply.
-- **Adversary pass** between Design and DesignReview (`agents/adversary.md`); the designer adds or rejects each row.
+- **Adversary pass** between Design and DesignReview (the reviewer in adversary mode); the designer adds or rejects each row.
 - **Budget, every size**: one review, at most one fix round, then a **verify review** of only the fix diff. A second
-  `fix-first` goes to the architect. The S/M/L 1/2/3 budget (inputs table, caller rule 6) is retired.
+  `fix-first` goes to the designer in decision mode. The S/M/L 1/2/3 budget (inputs table, caller rule 6) is retired.
 - **Verdicts** `pass` / `fix-first` / `block`; **ratings** R (real now) / F (future) / H (hardening); finding
-  **class** adds `approach` (routed to the architect).
+  **class** adds `approach` (routed to the designer in decision mode).
 - **Review records**: every review leaves `docs/work/<id>/reviews/<date>-<kind>.md`; `steps.jsonl` keeps only a
   pointer (path and hash). Lock and ship need a fresh `pass` record.
 - **Ship** becomes a traced stage; the trace moves to `docs/work/<id>/trace.jsonl` for every work item.

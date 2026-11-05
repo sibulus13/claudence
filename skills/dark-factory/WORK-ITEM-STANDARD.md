@@ -144,7 +144,7 @@ FR delta (v1), then `## Acceptance criteria` with exactly this header:
 
 ## Outcome inventory [adopted 2026-11-02; checker rule lands with work item `outcome-inventory`]
 
-The single definition used by `agents/designer.md`, `agents/adversary.md` and `agents/reviewer.md` (owner decisions
+The single definition used by `agents/designer.md` and `agents/reviewer.md` (its adversary and design modes) (owner decisions
 D24, grilling round 1 Q8-Q10). Required in every feature and integration item and in any item with a state diagram,
 under `## Outcome inventory` in `functional.md` (README for bugfix and refactor). An item with no stages writes exactly
 `No states.` followed by one sentence saying why.
