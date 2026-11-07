@@ -11,6 +11,7 @@ Checks (ids are the `check` field of a finding):
   wikilink  (e) [[wikilink]] targets exist as a note in some memory dir
   drift     (f) the harness repo has no uncommitted or untracked files
   lifecycle (g) every fleet doc has a lifecycle class (context_catalog.py), and live docs name their trigger
+  context-index (h) the context index resolves, is reachable from its root, and is dated (context_index.py)
 
 Private inventory (deny patterns, repo root, budgets, skipped files) lives in a config file read at runtime,
 `$FLEET_DOCS/upkeep.config.json` by default (see upkeep_config.py); every key is optional. Writes the report to
@@ -30,6 +31,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from context_catalog import CLASSES, classify, docs, rules
+import context_index
 from fleet_paths import fleet_docs_dir
 from upkeep_config import HIDDEN, commit_pending, config_path, load_config, previous_ids, store_pending
 
@@ -239,7 +241,7 @@ def run(root: Path, cfg: dict, previous_ids: set[str] | None) -> dict:
     files = scan_files(root)
     findings = (check_paths(root, cfg, files) + check_deny(root, cfg, files) + check_parity(root)
                 + check_budget(root, cfg) + check_wikilinks(root) + check_drift(root)
-                + check_lifecycle(fleet_docs_dir()))
+                + check_lifecycle(fleet_docs_dir()) + check_context_index(fleet_docs_dir()))
     ids = {f["id"] for f in findings}
     new = ids if previous_ids is None else ids - previous_ids
     counts: dict[str, int] = {}
@@ -269,6 +271,12 @@ def check_lifecycle(fleet: Path) -> list[dict]:
         elif c["lifecycle"] == "live" and not c.get("updatedBy"):
             out.append(finding("lifecycle", p.as_posix(), "live doc names no updatedBy trigger", f"owner|{p.name}"))
     return out
+
+
+def check_context_index(fleet: Path) -> list[dict]:
+    """(h) the context index: every reference resolves, every area is reachable, every entry is dated."""
+    return [finding("context-index", f"{FLEET_LABEL}{f['path']}", f["detail"], f["key"])
+            for f in context_index.check(fleet)] if fleet.is_dir() else []
 
 
 def main(argv: list[str] | None = None) -> int:
