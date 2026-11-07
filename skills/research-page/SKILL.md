@@ -9,7 +9,7 @@ Answer four questions on one page. Stop when they are answered: this is not a su
 
 | Question | How |
 |---|---|
-| **Have**: what do we already run, know or decide? | Grep the repos, then read decisions, reports, memory and the fleet docs. Cite absolute `file:line`. Run the thing if it exists. |
+| **Have**: what do we already run, know, plan or decide? | Grep every repo for the role, then read the roadmap, specs, decisions, reports, memory and the fleet docs. Files named in the brief are a starting point, not the scope. Cite absolute `file:line`. Run the thing if it exists. |
 | **Standard**: what is current practice? | Primary sources first, dated. Label blogs and vendor pages as weak. Say what you could not confirm. |
 | **Gap**: where do we differ, and what does nobody offer? | Compare the two, row by row. A difference is only a gap if it costs something real. |
 | **Do**: what are the top 3 changes? | Rank by how much it hurts today, with evidence from our own records. Name what to ignore. |
