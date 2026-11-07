@@ -18,6 +18,7 @@ Answer four questions on one page. Stop when they are answered: this is not a su
 
 - Measure before you claim: counts from real logs beat opinions.
 - Reuse beats building. If something fits, say so and stop.
+- "What we have" includes plans as well as code. Search the roadmap (`$FLEET_DOCS/LEDGER.md`), `$FLEET_DOCS/ARCHITECTURE_*.md`, and every repo's `docs/work` and `docs/specs` for the role before proposing anything.
 - Keep to 300 words plus one comparison table.
 - Give each row a criticality: high, medium or low. Only high rows reach the owner.
 - State your sample and who rated it when you classify anything by judgement.
