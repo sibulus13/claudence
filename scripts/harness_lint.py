@@ -10,6 +10,7 @@ Checks (ids are the `check` field of a finding):
   budget    (d) size budgets for CLAUDE.md files and memory indexes
   wikilink  (e) [[wikilink]] targets exist as a note in some memory dir
   drift     (f) the harness repo has no uncommitted or untracked files
+  lifecycle (g) every fleet doc has a lifecycle class (context_catalog.py), and live docs name their trigger
 
 Private inventory (deny patterns, repo root, budgets, skipped files) lives in a config file read at runtime,
 `$FLEET_DOCS/upkeep.config.json` by default (see upkeep_config.py); every key is optional. Writes the report to
@@ -28,6 +29,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+from context_catalog import CLASSES, classify, docs, rules
 from fleet_paths import fleet_docs_dir
 from upkeep_config import HIDDEN, commit_pending, config_path, load_config, previous_ids, store_pending
 
@@ -236,7 +238,8 @@ def check_drift(root: Path) -> list[dict]:
 def run(root: Path, cfg: dict, previous_ids: set[str] | None) -> dict:
     files = scan_files(root)
     findings = (check_paths(root, cfg, files) + check_deny(root, cfg, files) + check_parity(root)
-                + check_budget(root, cfg) + check_wikilinks(root) + check_drift(root))
+                + check_budget(root, cfg) + check_wikilinks(root) + check_drift(root)
+                + check_lifecycle(fleet_docs_dir()))
     ids = {f["id"] for f in findings}
     new = ids if previous_ids is None else ids - previous_ids
     counts: dict[str, int] = {}
@@ -250,6 +253,22 @@ def run(root: Path, cfg: dict, previous_ids: set[str] | None) -> dict:
         "resolved": 0 if previous_ids is None else len(previous_ids - ids),
         "findings": findings,
     }
+
+
+def check_lifecycle(fleet: Path) -> list[dict]:
+    """(g) every fleet doc has one lifecycle class, and a live doc names what keeps it current."""
+    out = []
+    catalogue = rules(fleet)
+    for p in docs(fleet) if fleet.is_dir() else []:
+        c = classify(fleet, p, catalogue)
+        if c is None:
+            out.append(finding("lifecycle", p.as_posix(), "no lifecycle class: add a lifecycle.json rule or frontmatter",
+                               f"none|{p.name}"))
+        elif c["lifecycle"] not in CLASSES:
+            out.append(finding("lifecycle", p.as_posix(), f"unknown class {c['lifecycle']}", f"bad|{p.name}"))
+        elif c["lifecycle"] == "live" and not c.get("updatedBy"):
+            out.append(finding("lifecycle", p.as_posix(), "live doc names no updatedBy trigger", f"owner|{p.name}"))
+    return out
 
 
 def main(argv: list[str] | None = None) -> int:

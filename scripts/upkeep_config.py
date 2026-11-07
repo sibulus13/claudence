@@ -34,6 +34,12 @@ DEFAULTS: dict = {
     "draftsDir": "drafts",
     "ledgerDraftMinCommits": 10,  # a day above this with no LEDGER row is flagged
     "sweepMinAgeDays": 7,
+    # Lifecycle cycle (owner-approved 2026-11-07): days unread before archiving, and days archived before deleting.
+    "memoryArchiveDays": 60,
+    "memoryDeleteDays": 90,
+    "reportArchiveDays": 60,
+    "scratchArchiveDays": 14,
+    "scratchDeleteDays": 30,
     "sweepTempPatterns": [  # projects/ dir-name regexes (cwd under Temp or a probe) that are clutter
         r"-AppData-Local-Temp-remember-summarizer-cwd-",
         r"-AppData-Local-Temp-claude-.*-scratchpad",
