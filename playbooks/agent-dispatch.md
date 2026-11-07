@@ -70,7 +70,7 @@
   persona line, logged in `$FLEET_DOCS/RETRO-QUEUE.md`), then the stage gets one re-attempt; a second miss goes to the
   designer in decision mode. The tracked metric is first-attempt pass rate per stage.
 - Review budget, every size (GLOSSARY.md: Review budget), counted **per work item per review kind** (the design
-  review and the code review each have their own): one review, at most one fix round, then one verify review of only
+  review and the code review each have their own): one review, up to the unit's limit of fix rounds (default 2, D68), then one verify review of only
   the fix diff. A `fix-first` from that verify review is the second one: a stop that goes to the designer in decision
   mode (`agents/designer.md`), who decides between redesign at another layer and cutting scope. This replaces the
   size-scaled 1/2/3 budget in `CYCLE.md`.
