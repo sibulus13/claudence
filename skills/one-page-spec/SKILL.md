@@ -10,7 +10,7 @@ Size it by the cost of being wrong. 400 words plus diagrams.
 ## The page
 
 1. **Why**: the owner's words, two lines.
-2. **Have and reuse**: what already exists, from the research page. Before writing, search the roadmap (`$FLEET_DOCS/LEDGER.md`), the architecture docs (`$FLEET_DOCS/ARCHITECTURE_*.md`) and every repo's `docs/work` and `docs/specs` for the same role. A planned or locked spec counts as existing, and the new spec names it and states the split.
+2. **Have and reuse**: what already exists, from the research page. Before writing, search the roadmap (`$FLEET_DOCS/LEDGER.md`), the architecture docs (`$FLEET_DOCS/ARCHITECTURE_*.md`) and every repo's `docs/work` and `docs/specs` for the same role. A planned or locked spec counts as existing, and the new spec names it and states the split. Read the open categories in `C:/Users/Michael/.claude/docs/SPEC-GAP-LEDGER.md`, what earlier builds found that their specs missed, and cover each one that applies.
 3. **User path**: a flowchart of the normal journey.
 4. **States**: a state diagram of what a user can reach, including bad days: outage, restart, retry, bad input from a real source.
 5. **Architecture**: boxes and arrows. Label every arrow with what crosses it.
@@ -25,6 +25,7 @@ Leave out background, milestones, measurement and rejected options unless a deci
 2. **Build out**, test first, one state at a time. Each test goes through the path production uses.
 3. **Change the producer last.** When an arrow's contract changes, update and restart the consumer first.
 4. Hand off with the run record, not a claim.
+5. Record everything the build met that the spec did not say, with the `spec-deltas` skill (`C:/Users/Michael/.claude/skills/spec-deltas/SKILL.md`).
 
 ## When a diagram was wrong
 

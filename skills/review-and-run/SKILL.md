@@ -27,6 +27,8 @@ Run the real thing, not its tests. Pilot a UI end to end, or start the script or
 
 If it cannot be run, say why and what that leaves unproven.
 
+A state, input or behaviour the run met that the spec does not cover is a spec delta: record it with the `spec-deltas` skill (`C:/Users/Michael/.claude/skills/spec-deltas/SKILL.md`), whether or not it blocks.
+
 ## Findings
 
 Each finding states its class, the path to reach it, and what you saw.

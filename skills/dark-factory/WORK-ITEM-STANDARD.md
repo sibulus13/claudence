@@ -167,9 +167,11 @@ One table per state machine or staged flow, header exactly:
 Optional README section, written during the build by the implementer (or the parent) when a test exposes a gap in
 the spec or a loophole in specified behaviour that does not match the design's intent. Header exactly:
 
-`| Change | Why (what the test exposed) | Test |`
+`| Stage | Change or discovery | Why (what exposed it) | Test |`
 
-- One row per amendment; `Test` names the test that pins the amended behaviour (a row without one is not allowed).
+Stage is `implement`, `refactor` or `qa` (owner 2026-11-07: all three record what the spec did not say; procedure in the `spec-deltas` skill). A discovery with no behaviour change writes `none: <reason>` as its Test. Rows written before 2026-11-07 keep the old three-column header.
+
+- One row per amendment; `Test` names the test that pins the amended behaviour (a row without one is not allowed, except a discovery's `none: <reason>`).
 - The section goes last in the README, after every required heading (CK-47 orders the leading ones).
 - Amendments add or tighten FR text, ACs, Outcome inventory rows and examples; a loosening is allowed only to close a
   loophole against the design's intent and its row starts `loosens:`. They never delete an AC, change `status:`,

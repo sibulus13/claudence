@@ -12,6 +12,9 @@ Run a friction retrospective. Analyze accumulated session friction reports, prop
 
 ### 1. Load friction reports
 
+Also read the two retro inboxes: rows marked `pending retro` in `C:/Users/Michael/.claude/docs/SPEC-GAP-LEDGER.md` (what builds, refactors and QA found that the spec missed; the `spec-deltas` skill writes them) and open rows in `D:/repo/docs/RETRO-QUEUE.md` (behaviours that needed patching). For each recurring category, fix it in one layer and set its "Now checked in Phase 2 as" cell.
+
+
 Read all JSON files in `~/.claude/telemetry/reports/`. For each report, extract:
 - `score`, `overrides`, `additions`, `perm_req_count`, `perm_repeat_count`
 - `friction_notes[]`

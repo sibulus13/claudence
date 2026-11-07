@@ -12,6 +12,7 @@ flowchart TD
 Cue: a milestone, project or service feature is done, or code is about to go public. Behaviour-preserving
 only: a behaviour change found here becomes its own `fix:` commit with a test. Adopted 2026-10-29 (owner:
 "clean up, refactor, simplify... at the end of every large milestone"); first run: `D:/repo/Lib/meter` 253d678.
+Anything the pass finds that the spec did not say is a spec delta: record it with the `spec-deltas` skill (`C:/Users/Michael/.claude/skills/spec-deltas/SKILL.md`).
 
 1. **Inventory.** List files and line counts; grep every export across `D:/repo` for its consumers. Unexport
    or delete what nothing uses. Note the public API you must not break.
