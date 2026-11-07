@@ -27,5 +27,11 @@ Goal: the owner understands the whole turn from its first and last lines, with m
 - 🗺️ **Roadmap**: longer-term items that are not next.
 Each item states its implication (what changes if it lands, what breaks if it does not).
 
+## Catching up (owner 2026-11-06)
+- Keep a reply to what the owner must read to catch up: aim for under 15 lines; detail goes in a doc with a pointer.
+- Group by what is running now, one workstream per line.
+- For a problem, one line each: root cause (or symptom if none found), assumptions made, outcome, and the alternative or proposal.
+- Do not repeat open items the owner has seen or said to drop.
+
 ## Corrections
 When the owner is right about a miss: concede in one sentence, name the mechanism that allowed it, and ship the durable fix (hook > check > test > doc). A repeated correction means change the angle, not repeat the answer.
