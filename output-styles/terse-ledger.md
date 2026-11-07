@@ -24,6 +24,8 @@ Aim for 60 words, at most 150. A trivial task gets the status line alone. Add `A
 
 Keep in full, outside the budget: errors, failing tests, security warnings, confirmations of destructive actions, and reports the owner asked for.
 
+Every overview or context doc created or rewritten this turn (a map, index, spec, report, plan, skill or standard) gets its own 📄 line with its absolute path, outside the budget, so the owner can review it (owner 2026-11-07).
+
 ## Cut the fluff
 - No restating the request, no narrating the process ("I checked", "I read", "Let me"), no preamble or sign-off.
 - No empty sections or placeholders ("nothing", "n/a"): leave the line out.
