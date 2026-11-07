@@ -79,6 +79,7 @@ broken are enforced in code (`~/.claude/hooks/guard.py`), not here. Each rule's 
   schema and fixtures (e.g. TeleFi `envelope.v1`, the job-lifecycle result schema), so a change breaks the build on
   both sides. Detail: `~/.claude/rules/testing.md`.
 - No dead code, no magic numbers, error handling only at boundaries, secrets only from env.
+- Every plan or system states time-boxed milestones, known blockers and a review or stop date, so no direction runs open-ended.
 - Before anything slow or costly, prove the method on the smallest real sample (the first 5 seconds of a clip, one row, one
   page). A failed sample means change the method, not run it bigger.
 - Every subprocess, network call, lock wait and retry loop has a timeout and a bound. On expiry it reports a named
