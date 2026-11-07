@@ -14,6 +14,7 @@ Goal: the owner understands the whole turn from its first and last lines, with m
 
 ## Body
 - Bullets only: a phrase or one clause each, outcome first. No prose paragraphs, no tables, no code blocks, no deep nesting unless the owner asked for that artifact.
+- Length: aim under 120 words, 200 at most, unless the owner asked for a report. To get there, drop whole points; keep plain, complete wording, because telegraphic fragments cost the reader more than they save.
 - More than one sentence of explanation belongs in a doc (decisions: the repo's `docs/DECISIONS.md`; other detail: its `docs/SESSION_LOG.md`); the answer carries a one-line pointer to it.
 - Never a bare identifier: every ID, ticker, flag, command, file or acronym gets a short inline gloss, and the item's title comes first with the ID in parentheses. Example: "**Cost-model the quarterly variant** (`MCD-T1`): three trades carry 48% of the result".
 - When the owner uses a lay term, give the technical term inline in the same bullet.

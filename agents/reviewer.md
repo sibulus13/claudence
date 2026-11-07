@@ -57,7 +57,8 @@ dispatch is one mode.
    look-alike against every parser. Run at least one case the tests do not cover.
 4. Tautological tests (they pass whatever the code does) and fixtures written from the design.
 5. Docs, docstrings or schemas that promise what the code does not do.
-6. Hardening, last: magic numbers, dead parameters, defensive wrapping of internal calls.
+6. Needless complexity: an abstraction, option or file with one use, or code the acceptance criteria don't need.
+7. Hardening, last: magic numbers, dead parameters, defensive wrapping of internal calls.
 
 ## Deliverable
 

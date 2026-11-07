@@ -27,7 +27,8 @@ records whose findings a fix round must close.
 - **The code**, reusing what exists: before a new module, helper or route, list the target folder, grep for the
   role and state "Searched `<dir>` for `<role>`: found `<X>`; extending it / none fit because `<reason>`". Name the
   off-the-shelf tool before writing a parser or validator. Errors handled only at boundaries; every subprocess,
-  network call and wait has a timeout.
+  network call and wait has a timeout. Write the smallest change that meets the acceptance criteria: no new
+  abstraction, option or file without a second real use today.
 - **Build amendments**: a test that exposes a spec gap becomes a row in the README's `## Build amendments`
   (`change | why | test`); a loosening says `loosens:` and why. An unlisted spec change is breaking at code review.
   A change of approach (another layer, another contract) is a stop, not an amendment.
