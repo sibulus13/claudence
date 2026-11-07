@@ -5,3 +5,4 @@
 - Notion stores datetimes in UTC; the owner's time zone is America/Vancouver.
 - Cortex runs use the claude.ai Notion connector with `--setting-sources project,local`, so global hooks do not apply to them; their own capability grants do.
 - TODOs database: `Priority` is the owner's only, so leave it empty on rows you create. `This week` makes a row a weekly goal that Cortex schedules and reminds about; use `Backlogged` plus a due date for later work. Rules: Cortex `agents/chief-of-staff.md`, the TODOs schema section (owner 2026-11-07).
+- TODOs hierarchy: a multi-step effort is one parent row with children through `Parent`. Tabs show top-level rows only, so set only the parent to `This week`; steps stay `Not started` or `Backlogged` with due dates. A view change goes in both the database and Dashboard copies (Cortex C56, C140).
