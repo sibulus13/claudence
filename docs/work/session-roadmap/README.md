@@ -4,7 +4,7 @@ type: feature
 standard: 3
 tier: T1
 risk: []
-status: draft
+status: spec-locked
 touches: [harness]
 layers: {architecture: none, component: none, functional: none, data: none}
 created: "2026-11-07"
@@ -57,7 +57,7 @@ stateDiagram-v2
 | dependency fails | L2 | A missing ledger is already handled | - |
 | timeout | L1 | Local file read only | - |
 | crash mid-step | L1 | It writes nothing | - |
-| concurrent actor | L1 | Read-only | - |
+| concurrent actor | L1 | It only reads files | - |
 | duplicate or replay | L1 | Computed fresh each session | - |
 | arrival channel | L2 | Startup and clear only, as the hand-off is | - |
 | performance or cost | L2 | Six shortened rows, about 1,000 characters, inside the existing cap | - |
