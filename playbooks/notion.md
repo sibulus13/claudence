@@ -1,5 +1,6 @@
 # Notion playbook (cue: any Notion MCP tool)
 - Writes, deletes and moves run without a prompt (owner 2026-11-06); deletes go to Notion's Trash and stay restorable. Reads are free. The scheduled tiktok-sync job may update matched Content Bank rows (metrics, Status=Done, review body) unattended; nothing else.
 - Add a database property only when a script joins on it or a person sorts/filters by it at a glance; everything else goes in the page body.
+- Notion is the overview: status, question, result and links. Specs and technical detail stay in GitHub or the work tree, and each side links the other (owner 2026-11-06).
 - Notion stores datetimes in UTC; the owner's time zone is America/Vancouver.
 - Cortex runs use the claude.ai Notion connector with `--setting-sources project,local`, so global hooks do not apply to them; their own capability grants do.

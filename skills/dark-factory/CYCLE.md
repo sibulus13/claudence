@@ -10,7 +10,7 @@ retired severity words. Until then, run the stages by hand (designer, adversary,
 reviewer in code mode) as `playbooks/agent-dispatch.md` describes. Lines below marked *(retired 2026-11-02)* no
 longer apply.
 - **Adversary pass** between Design and DesignReview (the reviewer in adversary mode); the designer adds or rejects each row.
-- **Budget, every size**: one review, at most one fix round, then a **verify review** of only the fix diff. A second
+- **Budget, every size** (D68 raises hand-run units to 2 fix rounds): one review, at most one fix round, then a **verify review** of only the fix diff. A second
   `fix-first` goes to the designer in decision mode. The S/M/L 1/2/3 budget (inputs table, caller rule 6) is retired.
 - **Verdicts** `pass` / `fix-first` / `block`; **ratings** R (real now) / F (future) / H (hardening); finding
   **class** adds `approach` (routed to the designer in decision mode).

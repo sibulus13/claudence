@@ -93,8 +93,10 @@ broken are enforced in code (`~/.claude/hooks/guard.py`), not here. Each rule's 
   Research and spikes are exempt until their code is committed.
 
 ## 6. Dispatch
-- Skill > `/orchestrate` role flow > `cycle` workflow > named agent (implementer, reviewer, researcher, designer,
-  architect, security) > general-purpose. Details: `~/.claude/playbooks/agent-dispatch.md`.
+- Skill > `/orchestrate` role flow > named agents (researcher, designer, implementer, reviewer) > general-purpose.
+  `cycle.js` is suspended, so run its stages by hand. Details: `~/.claude/playbooks/agent-dispatch.md`.
+- Hand off only approved, well-specified work, and every hand-off has an independent reviewer; ambiguous work told to
+  start stays in the main session.
 - Independent steps run in parallel. Every agent gets a deliverable and a stop condition.
 - A manual pattern seen 2-3 times becomes a proposed skill. A blocking gate states its exit condition.
 
