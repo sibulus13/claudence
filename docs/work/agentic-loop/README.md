@@ -37,7 +37,7 @@ see the Scope cut below. Build order across the specs, the owner of each shared 
 
 The third review round (record `reviews/2026-11-04-verify-052d2ae8.md`) found one breaking gap, finding 1, and it lay
 entirely in M3: the deploy judge was item-scoped while a deploy ships the whole repo tip. The minimal first build
-needs only M1 and M2 (`D:/repo/docs/reports/2026-11-03 Loop first build proposal.md:35`). So this item keeps M1 and M2
+needs only M1 and M2 (`D:/repo/docs/reports/2026-11-03-loop-first-build-proposal.md:35`). So this item keeps M1 and M2
 and the rest moves into two new drafts.
 
 | Moved | To | Why |
@@ -133,7 +133,7 @@ may do unattended (owner design, `evidence/owner-design.md`).
   end-to-end suite runs once, at the final gate.
 - Doors: Bezos letters 2015/2016; Poppendieck (2003). Ship/Show/Ask: Wilsenach, martinfowler.com (2021-09-08).
 - Pugh: Hazelrigg on false precision of weighted scores.
-- Full notes: `D:/repo/docs/research_notes/Agentic loop design/`.
+- Full notes: `D:/repo/docs/research_notes/agentic-loop-design/`.
 
 </details>
 
@@ -294,7 +294,7 @@ entry and real `catalog-info.yaml` once PM-P1 writes them. Record fixtures (AC-5
 
 | Assumption | Observed | If violated |
 |---|---|---|
-| Catwalk's Confirm writes STATE.md, not a review record | `D:/repo/docs/research_notes/Agentic loop design/internal_survey.md:131` | defer: owner records are written only through `approve` (the owner's `!` or an agent on the owner's behalf) until the Catwalk and TeleFi child items exist |
+| Catwalk's Confirm writes STATE.md, not a review record | `D:/repo/docs/research_notes/agentic-loop-design/internal_survey.md:131` | defer: owner records are written only through `approve` (the owner's `!` or an agent on the owner's behalf) until the Catwalk and TeleFi child items exist |
 | PM-P1 ships `scripts/manifest.py` and the profile map before M2 | `C:/Users/Michael/.claude/docs/capabilities/INDEX.md:51` | defer: M2 waits for PM-P1 |
 | An approval record with no matching owner message in its session transcript is possible: the writer is trusted (D56) and `owner_words` cannot be machine-verified | `C:/Users/Michael/.claude/docs/DECISIONS.md:65` | flag: a later audit compares each owner record's `owner_words` and `session_id` with the transcript and reports a mismatch; the record still counts until the owner revokes it |
 | `review_record.py approve` can learn the session id from the hook event or the environment; M2's probe finds the source | `C:/Users/Michael/.claude/scripts/review_record.py:431` | refuse: without a source `approve` requires `--session` (writer-typed, audited); a record with no session id never counts |

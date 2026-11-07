@@ -10,8 +10,8 @@ flowchart TD
 ```
 
 Sources (all read 2026-11-03): the owner's words `owner-design.md`; internal survey
-`D:/repo/docs/research_notes/Agentic loop design/internal_survey.md`; web
-`D:/repo/docs/research_notes/Agentic loop design/web_milestones_contracts.md` and `web_gates_history.md`; the
+`D:/repo/docs/research_notes/agentic-loop-design/internal_survey.md`; web
+`D:/repo/docs/research_notes/agentic-loop-design/web_milestones_contracts.md` and `web_gates_history.md`; the
 consolidated reference `D:/repo/docs/DEVELOPMENT_LIFECYCLE.md`.
 
 ## Critique of each requirement

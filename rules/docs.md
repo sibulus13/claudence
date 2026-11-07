@@ -7,4 +7,5 @@ paths:
 - One canonical doc per concern: update it instead of creating a parallel one; mark an overlapping doc `SUPERSEDED` with a pointer.
 - Decisions go in the repo's `docs/DECISIONS.md`, one row: `| id | date | decision | status (assumed/confirmed/superseded/needs-owner) | rationale | revisit-when |`.
 - Repos with several living docs keep a table mapping each doc to its purpose and update trigger.
+- File and folder names are lowercase kebab-case with no spaces (`2026-11-07-agent-audit.md`): a terminal link stops at a space. The `portable-filenames` commit hook refuses a space.
 - Cite files as absolute forward-slash paths with a line number (`D:/repo/x/docs/Y.md:1`) so WezTerm makes them clickable.

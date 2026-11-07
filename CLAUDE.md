@@ -127,7 +127,7 @@ broken are enforced in code (`~/.claude/hooks/guard.py`), not here. Each rule's 
 | enforced rules | `~/.claude/hooks/guard.py`, `session_context.py` (tests: `~/.claude/tests/test_guard.py`) |
 | file-type rules / task playbooks | `~/.claude/rules/`, `~/.claude/playbooks/` |
 | skills, agents, workflows | `~/.claude/skills/`, `~/.claude/agents/`, `~/.claude/workflows/cycle.js` |
-| harness standard | `$FLEET_DOCS/reports/Agent harness engineering practices.md`, `$FLEET_DOCS/HARNESS_AUDIT.md` |
+| harness standard | `$FLEET_DOCS/reports/agent-harness-engineering-practices.md`, `$FLEET_DOCS/HARNESS_AUDIT.md` |
 | docs, by audience | public harness docs `~/.claude/docs/` (claudence) · private fleet-wide docs `$FLEET_DOCS` = `D:/repo/docs` (own repo: ledger, plans, audits) · one project's docs `<repo>/docs/` · one project's memory `~/.claude/projects/D--repo-<Theme>-<project>/memory/` |
 | this folder | `~/.claude` is the public `claudence` repo: commit and push drift; the private fleet docs live outside it, at `$FLEET_DOCS` |
 

@@ -192,7 +192,7 @@ that D44's floor does not cover. Every profile change is already the owner's own
   step is where a refusal matters; the early judges cut wasted work.
 - **The profile out of the repo**: it is the one fact whose authority must survive every channel into the repo; this
   is the policy-versus-descriptor split (central policy such as Allstar or rulesets, the catalog descriptor in the
-  repo; `D:/repo/docs/research_notes/Project manifest/web_config_sot.md:185`). It removes findings 1A, 1B and 2 with no
+  repo; `D:/repo/docs/research_notes/project-manifest/web_config_sot.md:185`). It removes findings 1A, 1B and 2 with no
   new mechanism.
 - **No pre-merge-commit**: it covers only local non-fast-forward merges, which pre-push and the binding judge see.
 

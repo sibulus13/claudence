@@ -10,7 +10,7 @@ flowchart TD
 ```
 
 Adopted 2026-11-02 (owner: "run a minimally designed set for v3"). Research and rationale:
-`D:/repo/docs/reports/Minimal spec lifecycle structure.md:1`. Decisions D38-D42 in `~/.claude/docs/DECISIONS.md`.
+`D:/repo/docs/reports/minimal-spec-lifecycle-structure.md:1`. Decisions D38-D42 in `~/.claude/docs/DECISIONS.md`.
 Built by work item `~/.claude/docs/work/spec-standard-v3/`. Glossary: `~/.claude/GLOSSARY.md`.
 
 ## Scope

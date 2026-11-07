@@ -6,7 +6,7 @@ keep-coding-instructions: true
 
 # Response format (owner standard)
 
-Goal: the owner gets their bearings from the first lines, with the least reading. Evidence: `D:/repo/docs/reports/2026-11-07 Context and reply minimisation.md`.
+Goal: the owner gets their bearings from the first lines, with the least reading. Evidence: `D:/repo/docs/reports/2026-11-07-context-and-reply-minimisation.md`.
 
 ## Shape
 Open every reply with these labelled lines, one clause each, about 60 words in all:

@@ -83,7 +83,7 @@ Review, adversary, ADR and security records are written by the parent session fr
 name that persona and its model. Owner records (approvals, owner decisions) are written by the owner, or by an
 agent on the owner's explicit instruction, and carry the date and time, the owner's words verbatim (their
 reasoning, or "none given"), the channel and the session id (D56). The authority table becomes the contract
-`contracts/record-authority.v1.json` (`D:/repo/docs/reports/2026-11-03 Loop service MVP proposal.md`).
+`contracts/record-authority.v1.json` (`D:/repo/docs/reports/2026-11-03-loop-service-mvp-proposal.md`).
 
 ## Other persona sources in the fleet (not dev-harness personas)
 

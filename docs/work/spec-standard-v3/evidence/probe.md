@@ -9,7 +9,7 @@ flowchart TD
 ```
 
 Owner ask (2026-11-02 19:26): "Let's run a minimally designed set for v3", after the report
-`D:/repo/docs/reports/Minimal spec lifecycle structure.md:1` and the owner's earlier ask for size-scaled effort, a
+`D:/repo/docs/reports/minimal-spec-lifecycle-structure.md:1` and the owner's earlier ask for size-scaled effort, a
 requirement cap, coverage metrics, and a smaller bug artifact.
 
 ## Facts read (local, verified this session)

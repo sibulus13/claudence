@@ -76,8 +76,8 @@ profile, cannot live inside that repo; ADR 0002 moves it to an owner-only map.
   so a broken edit stays invisible unless the commit is checked.
 - Catalog rot: a descriptor stays true only when an existing gate reads it; derive what code can tell, hand-write
   only human facts (owner, lifecycle, tier, purpose).
-- Policy versus descriptor: `D:/repo/docs/research_notes/Project manifest/web_config_sot.md:185`.
-- Notes: `D:/repo/docs/research_notes/Project manifest/` (web_config_sot.md, config_inventory.md).
+- Policy versus descriptor: `D:/repo/docs/research_notes/project-manifest/web_config_sot.md:185`.
+- Notes: `D:/repo/docs/research_notes/project-manifest/` (web_config_sot.md, config_inventory.md).
 - Reuse: searched `contracts/` and `D:/repo/Factory/foreman` for a per-repo policy map; none fits (`repos.json` is a
   generated cache with two writers and no owner-only guarantee), so the map is new and `repos.json` reads it through
   `fleet config --json`.
@@ -203,7 +203,7 @@ base and the tip of the span only); `guard.protected_config_problem(event) -> st
 
 | Assumption | Observed | If violated |
 |---|---|---|
-| Backstage allows a custom `fleet:` block in `catalog-info.yaml` | `D:/repo/docs/research_notes/Project manifest/web_config_sot.md:1` | flag: if not, the block moves under `metadata.annotations` or a sibling file named in the descriptor |
+| Backstage allows a custom `fleet:` block in `catalog-info.yaml` | `D:/repo/docs/research_notes/project-manifest/web_config_sot.md:1` | flag: if not, the block moves under `metadata.annotations` or a sibling file named in the descriptor |
 | The guard can protect files outside `.claude/` for subagents and the main session, as it protects governance paths for subagents today | `C:/Users/Michael/.claude/hooks/guard.py:33`, `:352`, `:397` | refuse: P1 does not ship until AC-5 passes |
 | The owner's `!` commands do not pass through PreToolUse, so the owner can edit the map | `C:/Users/Michael/.claude/hooks/guard.py:397` | refuse: P1 does not ship; map edits then need a signed-owner alternative |
 | The guard sees only the command string: a helper script or an import that writes the map is not seen | `C:/Users/Michael/.claude/hooks/guard.py:352` | refuse: not closed by this design; detector: the map's history is public and the session hook shows its last commit (AC-4), and a profile read from a committed HEAD ignores an uncommitted write (AC-15) |

@@ -8,8 +8,8 @@ flowchart TD
   W --> S
 ```
 
-Research: `D:/repo/docs/research_notes/Project manifest/config_inventory.md` (every fact, its copies, readers,
-writers and cardinality across 28 repos) and `D:/repo/docs/research_notes/Project manifest/web_config_sot.md`
+Research: `D:/repo/docs/research_notes/project-manifest/config_inventory.md` (every fact, its copies, readers,
+writers and cardinality across 28 repos) and `D:/repo/docs/research_notes/project-manifest/web_config_sot.md`
 (Backstage, Renovate, ESLint, Kustomize, Nx, drift and validation gates).
 
 ## The owner's words (verbatim, 2026-11-03)
@@ -29,12 +29,12 @@ writers and cardinality across 28 repos) and `D:/repo/docs/research_notes/Projec
 
 | Fact | Where |
 |---|---|
-| The tier has two sources (CLAUDE.md in 13 of 28 repos, STATE.md in 6) and five parsers | `D:/repo/docs/research_notes/Project manifest/config_inventory.md:1` |
+| The tier has two sources (CLAUDE.md in 13 of 28 repos, STATE.md in 6) and five parsers | `D:/repo/docs/research_notes/project-manifest/config_inventory.md:1` |
 | Cashcow, the only `live` repo, has no STATE.md, so Foreman sees no tier for it | config_inventory.md |
 | Three of six Foreman gate commands differ from their repos (cortex, catwalk, pocket-agent) | config_inventory.md |
 | `repos.json` has two writers and two schemas; autonomy values are never validated | config_inventory.md |
 | `catalog-info.yaml` is approved but exists in no repo | `D:/repo/docs/ARCHITECTURE_PLATFORM_SPLIT.md:58` |
-| Every layered config tool ships a merged-view command; validation and drift are separate gates | `D:/repo/docs/research_notes/Project manifest/web_config_sot.md:1` |
+| Every layered config tool ships a merged-view command; validation and drift are separate gates | `D:/repo/docs/research_notes/project-manifest/web_config_sot.md:1` |
 
 ## Found along the way, for the owner
 

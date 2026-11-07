@@ -43,7 +43,7 @@ flowchart TD
 
 | Source (URL) | Date checked | What it shows | Decision |
 |---|---|---|---|
-| n/a: not re-fetched for this item | - | the conventions (tiered review, bug-to-spec escalation, no size-only gate) were surveyed in D:/repo/docs/reports/Minimal spec lifecycle structure.md:30 and are cited there with dates | - |
+| n/a: not re-fetched for this item | - | the conventions (tiered review, bug-to-spec escalation, no size-only gate) were surveyed in D:/repo/docs/reports/minimal-spec-lifecycle-structure.md:30 and are cited there with dates | - |
 
 ## Operating envelope
 

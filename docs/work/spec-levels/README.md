@@ -76,7 +76,7 @@ a product (owner design O-19 and O-20, `../agentic-loop/evidence/owner-design.md
 - C4: c4model.com ("context and container diagrams are sufficient for most teams"); arc42; OpenSpec and the Spec Kit
   domain extension group capabilities into domains.
 - Split defaults and their sources: agentic-loop probe, section "Split defaults".
-- Full notes: `D:/repo/docs/research_notes/Spec folder structure/`.
+- Full notes: `D:/repo/docs/research_notes/spec-folder-structure/`.
 
 </details>
 
@@ -157,7 +157,7 @@ fixtures start from the real `catalog-info.yaml` that project-manifest PM-P1 wri
 
 | Assumption | Observed | If violated |
 |---|---|---|
-| The capability layer exists before SL-1 | `D:/repo/docs/reports/2026-11-03 Spec structure proposal.md:31` | defer: SL-1 waits; the change-level limits alone could ship earlier as an amendment |
+| The capability layer exists before SL-1 | `D:/repo/docs/reports/2026-11-03-spec-structure-proposal.md:31` | defer: SL-1 waits; the change-level limits alone could ship earlier as an amendment |
 | Per-repo size limits live in the manifest as a fleet default a repo may override | `C:/Users/Michael/.claude/docs/work/project-manifest/README.md:93` | defer: SL-1 waits for PM-P1's reader |
 | The limits are starting values taken from the agentic-loop probe's split defaults | `C:/Users/Michael/.claude/docs/work/agentic-loop/evidence/probe.md:45` | keep: A-2 makes them tunable; briefs report actuals |
 | The milestone brief exists (agentic-loop AL-M2) before SL-1 adds its limits part | `C:/Users/Michael/.claude/docs/capabilities/INDEX.md:51` | defer: SL-1 waits for AL-M2 |

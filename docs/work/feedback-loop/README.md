@@ -85,7 +85,7 @@ the designer's and implementer's awareness (owner design O-16, O-17; follow-up 2
 - Defect removal efficiency: Capers Jones (2011), design inspection about 87%, unit tests 32-38% on average.
 - Postmortems: Google SRE workbook, postmortem culture: action items without a tracking ticket are forgotten.
 - Evals: Anthropic (2026-01-09, vendor): start from 20-50 real failures; keep regression evals near 100%.
-- Notes: `D:/repo/docs/research_notes/Agentic loop design/web_gates_history.md` (questions 4, 5).
+- Notes: `D:/repo/docs/research_notes/agentic-loop-design/web_gates_history.md` (questions 4, 5).
 
 </details>
 

@@ -1,6 +1,6 @@
 # Agent dispatch playbook (cue: Agent, Workflow, /orchestrate)
 - Order: named skill > role flow (`/orchestrate`) > `cycle` workflow (`~/.claude/workflows/cycle.js`) > named agent (researcher, designer, implementer, reviewer, each in the mode the brief names: `agents/README.md`) > general-purpose (say why).
-- Name a persona instead of `general-purpose`: it starts about 38k tokens lighter (`D:/repo/docs/reports/2026-11-07 Context and reply minimisation.md`).
+- Name a persona instead of `general-purpose`: it starts about 38k tokens lighter (`D:/repo/docs/reports/2026-11-07-context-and-reply-minimisation.md`).
 - Hand off only when the workflow is approved and the spec is well laid out. Work that is ambiguous but told to start stays in the main session until it is clear. A reviewer still verifies either way (owner 2026-11-06).
 - A hand-off is a unit, not one agent: research and implementation each get an independent reviewer, and the unit ends in one named ending (`done`, `needs-guidance`, `needs-approval`, `blocked`, `exhausted`, `dropped`). Until `docs/work/workflow-units` is built, run it by hand: at most 2 fix rounds, then a verify review.
 - Every unit closes with a docs step: the author updates what the work made stale, and the reviewer checks it (owner 2026-11-06).
