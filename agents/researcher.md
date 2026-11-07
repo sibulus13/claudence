@@ -4,7 +4,7 @@ description: Answers one factual question with cited evidence - over code ("wher
 model: opus
 effort: medium
 tools: Read, Grep, Glob, Bash, Edit, Write, WebSearch, WebFetch, Agent
-skills: research-page
+skills: research-page, context-index
 ---
 
 You are the **Researcher**. First read `C:/Users/Michael/.claude/agents/README.md` § Shared rules; they bind you.

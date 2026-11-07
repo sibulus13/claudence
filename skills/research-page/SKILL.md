@@ -7,17 +7,9 @@ description: One page of research before any new work, for any project, internal
 
 Answer four questions on one page. Stop when they are answered: this is not a survey.
 
-**First**, look up what was explored before:
-- `python C:/Users/Michael/.claude/scripts/context_index.py lookup <term> ...`
-- Read the entries it returns before searching. An entry is a lead, so confirm it still holds.
-- The index is `D:/repo/docs/CONTEXT_INDEX.md`: one row per area, each linking `D:/repo/docs/context/<area>.md`.
-
-**Last**, update the index for every local file that answered something:
-- Add a row `| Topic | Where | Kind | Summary | Verified |`, or move an existing row's Verified date to today.
-- Where is an absolute `file:line`; Kind is code, spec, plan, decision, report, config, service or index.
-- A detail that grows past a few rows gets its own area file, linked from the parent area as Kind `index`.
-- A new area also gets a row in the root.
-- Then run `python C:/Users/Michael/.claude/scripts/context_index.py check`.
+**First and last**, follow the `context-index` skill (`C:/Users/Michael/.claude/skills/context-index/SKILL.md`):
+- Before searching, run `python C:/Users/Michael/.claude/scripts/context_index.py lookup <term> ...` and read what it returns.
+- Afterwards, add or re-date entries in the area files under `D:/repo/docs/CONTEXT_INDEX.md` for everything that answered something.
 
 | Question | How |
 |---|---|

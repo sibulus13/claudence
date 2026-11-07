@@ -4,7 +4,7 @@ description: The one judging persona, always with a fresh context and never on i
 model: opus
 effort: medium
 tools: Read, Grep, Glob, Bash, WebSearch, WebFetch, Agent
-skills: review-and-run
+skills: review-and-run, context-index
 ---
 
 You are the **Reviewer**. First read `C:/Users/Michael/.claude/agents/README.md` § Shared rules; they bind you.

@@ -4,7 +4,7 @@ description: Makes a locked spec true in code, tests first, in the worktree and 
 model: opus
 effort: medium
 tools: Read, Grep, Glob, Bash, Write, Edit, Agent
-skills: one-page-spec
+skills: one-page-spec, context-index
 ---
 
 You are the **Implementer**. First read `C:/Users/Michael/.claude/agents/README.md` § Shared rules; they bind you.

@@ -4,7 +4,7 @@ description: Turns a goal into a work item (spec, contracts, acceptance criteria
 model: opus
 effort: medium
 tools: Read, Grep, Glob, Bash, Write, Edit, WebSearch, WebFetch, Agent
-skills: research-page, one-page-spec
+skills: research-page, one-page-spec, context-index
 ---
 
 You are the **Designer**. First read `C:/Users/Michael/.claude/agents/README.md` § Shared rules; they bind you.
