@@ -107,6 +107,8 @@ def sweep(root: Path, cfg: dict, previous: set[str] | None = None, now: float | 
     }
 
 
+GIT_TIMEOUT_S = 30
+SCRATCH_ARCHIVE = Path("archive") / "scratch"  # the only fleet folder files are deleted from; snapshots never land here
 MONTH = re.compile(r"(\d{4})-(\d{2})-\d{2}")
 
 
@@ -143,9 +145,10 @@ def plan(root: Path, fleet: Path, cfg: dict, now: float | None = None) -> list[d
             dest = p.parent / "archive" / month_of(p) / p.name
             actions.append({"action": "archive", "kind": "snapshot", "path": p.as_posix(), "dest": dest.as_posix()})
         elif cls == "scratch" and unread_days(p) > cfg["scratchArchiveDays"]:
-            dest = fleet / "archive" / p.relative_to(fleet)
+            dest = fleet / SCRATCH_ARCHIVE / p.relative_to(fleet)
             actions.append({"action": "archive", "kind": "scratch", "path": p.as_posix(), "dest": dest.as_posix()})
-    for p in (q for q in (fleet / "archive").rglob("*") if q.is_file()) if (fleet / "archive").is_dir() else []:
+    scratch_archive = fleet / SCRATCH_ARCHIVE
+    for p in (q for q in scratch_archive.rglob("*") if q.is_file()) if scratch_archive.is_dir() else []:
         if aged(p) > cfg["scratchDeleteDays"]:
             actions.append({"action": "delete", "kind": "scratch", "path": p.as_posix()})
     if (root / "projects").is_dir():
@@ -165,20 +168,57 @@ def drop_index_line(index: Path, name: str) -> None:
         index.write_text("".join(line for line in lines if f"]({name})" not in line), encoding="utf-8")
 
 
-def apply(actions: list[dict], now: float | None = None) -> None:
-    """Carry out `plan`'s actions one file at a time; an archived file's age restarts at the move."""
+def apply_one(a: dict, now: float) -> None:
+    src = Path(a["path"])
+    if a["action"] == "delete":
+        shutil.rmtree(src) if src.is_dir() else src.unlink(missing_ok=True)
+        return
+    dest = Path(a["dest"])
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(src), str(dest))
+    os.utime(dest, (now, now))
+    if a.get("index"):
+        drop_index_line(Path(a["index"]), src.name)
+
+
+def apply(actions: list[dict], now: float | None = None) -> list[dict]:
+    """Carry out `plan`'s actions one file at a time; an archived file's age restarts at the move. An error stops the run
+    (exit 1, traceback in the task log); the moves already made are marked done."""
     now = now if now is not None else time.time()
     for a in actions:
-        src = Path(a["path"])
-        if a["action"] == "delete":
-            shutil.rmtree(src) if src.is_dir() else src.unlink(missing_ok=True)
-            continue
-        dest = Path(a["dest"])
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        shutil.move(str(src), str(dest))
-        os.utime(dest, (now, now))
-        if a.get("index"):
-            drop_index_line(Path(a["index"]), src.name)
+        apply_one(a, now)
+        a["outcome"] = "done"
+    return actions
+
+
+def git_run(repo: Path, *args: str) -> subprocess.CompletedProcess:
+    return subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True, timeout=GIT_TIMEOUT_S)
+
+
+def commit_moves(fleet: Path, actions: list[dict]) -> list[str]:
+    """Commit only the fleet docs paths the sweep changed: tracked sources, and destinations git does not ignore.
+    Other sessions' work in progress is never staged. Returns named failures; an empty list means committed or nothing to do."""
+    root = fleet.resolve()
+    touched = sorted({Path(p).resolve().relative_to(root).as_posix() for a in actions if a.get("outcome") == "done"
+                      for p in (a["path"], a.get("dest")) if p and Path(p).resolve().is_relative_to(root)})
+    if not touched:
+        return []
+    tracked = set(git_run(fleet, "ls-files", "--", *touched).stdout.split("\n"))
+    ignored = set(git_run(fleet, "check-ignore", "--", *touched).stdout.split("\n"))
+    paths = sorted(p for p in touched if p in tracked or (p not in ignored and (root / p).exists()))
+    if not paths:
+        return []
+    failures = []
+    for step in (["add", "-A", "--", *paths],
+                 ["commit", "-q", "-m", f"chore: weekly context sweep moved {len(paths)} fleet doc paths", "--", *paths]):
+        r = git_run(fleet, *step)
+        if r.returncode != 0:
+            return [f"git-{step[0]}-failed: {(r.stderr or r.stdout).strip()[:300]}"]
+    if git_run(fleet, "rev-parse", "--abbrev-ref", "@{u}").returncode == 0:
+        r = git_run(fleet, "push", "-q")
+        if r.returncode != 0:
+            failures.append(f"git-push-failed: {r.stderr.strip()[:300]}")
+    return failures
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -198,10 +238,11 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.plan or args.apply:
         actions = plan(args.root, fleet_docs_dir(), cfg)
+        failures = []
         if args.apply:
-            apply(actions)
-        sys.stdout.write(json.dumps({"applied": args.apply, "actions": actions}, indent=1) + "\n")
-        return 0
+            failures = commit_moves(fleet_docs_dir(), apply(actions))
+        sys.stdout.write(json.dumps({"applied": args.apply, "failures": failures, "actions": actions}, indent=1) + "\n")
+        return 1 if failures else 0
     report = sweep(args.root, cfg, previous_ids(out))
     store_pending(out, report)
     if args.json:

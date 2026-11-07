@@ -44,7 +44,9 @@ stateDiagram-v2
   Archived --> Kept: reports are snapshots, never deleted
 ```
 
-Read means the file's path appears in any tool call of any transcript, subagents included: Read, Grep, Glob, Bash or Edit. Claude Code keeps transcripts 180 days (`cleanupPeriodDays`), longer than every cycle. Without `--apply` nothing moves.
+Scratch also covers the leftover temp and orphaned-worktree folders under `~/.claude/projects/` (the owner approved deleting them, 2026-11-07). They move to `~/.claude/archive/projects/` and are deleted 30 days later. Scratch from the fleet docs goes to `archive/scratch/`, the only fleet folder anything is deleted from. A snapshot's archive (`<dir>/archive/YYYY-MM/`) is never under it. The sweep commits only the fleet paths it moved, leaving out ignored ones, and any failed move or git step makes it exit 1.
+
+Read means the file's parent folder and name appear in any tool call of any transcript, subagents included: Read, Grep, Glob, Bash or Edit. Claude Code keeps transcripts 180 days (`cleanupPeriodDays`), longer than every cycle. Without `--apply` nothing moves.
 
 ## Behaviour
 
@@ -77,5 +79,5 @@ Read means the file's path appears in any tool call of any transcript, subagents
 
 | Assumption | Observed | If violated |
 |---|---|---|
-| Transcripts are kept 180 days, and unread time counts only from the oldest transcript | `cleanupPeriodDays: 180` in `~/.claude/settings.json`; the oldest is from 2026-10-01 | keep: a file counts as read at the oldest transcript's time, so nothing moves before the record is long enough |
+| Transcripts are kept 180 days, and unread time counts only from the oldest transcript | `cleanupPeriodDays: 180` in `~/.claude/settings.json`; the oldest tool call the tracker saw is from 2026-10-25, so nothing can move before about 2026-11-15 | keep: a file counts as read at the oldest transcript's time, so nothing moves before the record is long enough |
 | A path in a tool call is a fair proxy for use | lower bound: injected context is not counted | keep: the memory index and CLAUDE.md files are live and never swept |

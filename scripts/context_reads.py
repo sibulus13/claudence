@@ -7,6 +7,7 @@ these are lower bounds: live context (CLAUDE.md files, memory indexes) is never 
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -14,6 +15,19 @@ from pathlib import Path
 def key(path: Path | str) -> str:
     """One spelling per path: forward slashes, lower case (Windows paths are case-insensitive)."""
     return str(path).replace("\\", "/").lower()
+
+
+SLASHES = re.compile(r"/+")
+
+
+def _norm(text: str) -> str:
+    """Any spelling to one: backslashes (escaped or not) to single forward slashes, lower case."""
+    return SLASHES.sub("/", text.replace("\\", "/")).lower()
+
+
+def _tail(k: str) -> str:
+    """The parent folder and file name: matches absolute, relative, ~, $VAR and Git Bash /c/ spellings alike."""
+    return "/".join(k.split("/")[-2:])
 
 
 def _epoch(stamp: object) -> float | None:
@@ -47,9 +61,10 @@ def _tool_inputs(line: str):
 
 
 def last_reads(projects: Path, targets: list[Path]) -> tuple[dict[str, float], float | None]:
-    by_name: dict[str, list[str]] = {}
+    """A target is read when its parent folder and name appear in a tool call (see _tail); keys are key(target)."""
+    by_name: dict[str, list[tuple[str, str]]] = {}
     for k in {key(t) for t in targets}:
-        by_name.setdefault(k.rsplit("/", 1)[-1], []).append(k)
+        by_name.setdefault(k.rsplit("/", 1)[-1], []).append((k, _tail(k)))
     reads: dict[str, float] = {}
     oldest: float | None = None
     for transcript in projects.rglob("*.jsonl") if projects.is_dir() else []:
@@ -61,10 +76,10 @@ def last_reads(projects: Path, targets: list[Path]) -> tuple[dict[str, float], f
                 if when is None or not inputs:
                     continue
                 oldest = when if oldest is None else min(oldest, when)
-                for text in (key(s) for s in _strings(inputs)):
+                for text in (_norm(s) for s in _strings(inputs)):
                     for name, keys in by_name.items():
                         if name in text:
-                            for k in keys:
-                                if k in text and when > reads.get(k, 0.0):
+                            for k, tail in keys:
+                                if tail in text and when > reads.get(k, 0.0):
                                     reads[k] = when
     return reads, oldest
