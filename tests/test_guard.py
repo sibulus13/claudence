@@ -95,21 +95,10 @@ def test_subagent_can_read_governance_through_shell() -> None:
                agent_id="sub-1") is None
 
 
-def test_notion_write_to_owner_approved_ids_does_not_ask() -> None:
-    sys.path.insert(0, str(HOOK.parent))
-    from guard import targets_only_approved
-    ok = {"1675eed4845d8056992fd03c7227da76"}
-    assert targets_only_approved({"page_id": "1675eed4-845d-8056-992f-d03c7227da76", "command": "update_content"}, ok)
-    assert not targets_only_approved({"page_id": "1675eed4845d8056992fd03c7227da76",
-                                      "new_str": "<page url=\"https://n.so/p/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\">"}, ok)
-    assert not targets_only_approved({"query": "x"}, ok)
-
-
-def test_notion_write_asks_unless_unattended() -> None:
-    tool = "mcp__plugin_Notion_notion__notion-update-page"
-    assert run(tool, {}) == "ask"
-    assert run(tool, {}, permission_mode="bypassPermissions") is None
-    assert run("mcp__plugin_Notion_notion__notion-fetch", {}) is None
+# notion-prompt-removal/AC-1, notion-prompt-removal/MNC-1
+def test_notion_writes_never_prompt() -> None:
+    for name in ("update-page", "create-view", "delete-pages", "move-pages"):
+        assert run(f"mcp__plugin_Notion_notion__notion-{name}", {}) is None
 
 
 def _bad_repo_target(path: str) -> bool:

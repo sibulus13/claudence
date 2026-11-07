@@ -3,7 +3,7 @@ id: notion-prompt-removal
 type: bugfix
 standard: 3
 risk: []
-status: spec-locked
+status: building
 touches: [harness]
 layers: {architecture: none, component: none, functional: none, data: none}
 created: "2026-11-06"
