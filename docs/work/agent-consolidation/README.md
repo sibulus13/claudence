@@ -26,7 +26,7 @@ After:
 
 ```mermaid
 flowchart TD
-  P[agents/: 4 main-session personas; cards/personas/: 3 cortexd-only] --> K[cards/: 11 agent cards]
+  P[claudence agents/: 4 main-session personas; private cortex repo: 3 cortexd-only] --> K[cards: 7 in claudence, 4 in the cortex repo]
   S[skills/: one procedure per responsibility] --> K
   K -->|card: persona@version, skills, grant, output schema| L[launcher: main session, Foreman, cortexd; later Weaver]
   L -->|output checked against the card| R[run, recorded]
@@ -62,7 +62,8 @@ Owner, 2026-11-07: "consolidating the orchestration, including turning the agent
 ## Model
 
 - A **persona** is a role plus a tool ceiling, with a `version`. There is a new persona only where the tools or permissions differ (`lean-delivery-proposal.md:131`). That gives seven: researcher, designer, implementer, reviewer, chief-of-staff, harness-steward and web-scout. web-scout is the Cortex researcher and deal-scout persona: its ceiling holds Notion and the browser, which the main-session researcher must never get (the main session takes a subagent's tools straight from its persona file).
-- Only the four main-session personas live in `C:/Users/Michael/.claude/agents/`, the folder the main session loads agents from. The three personas only cortexd runs (web-scout, chief-of-staff, harness-steward) live in `C:/Users/Michael/.claude/cards/personas/`, so the main session can never dispatch one with its Notion, Calendar or browser tools.
+- Only the four main-session personas live in `C:/Users/Michael/.claude/agents/`, the folder the main session loads agents from. The three personas only cortexd runs (web-scout, chief-of-staff, harness-steward) and the four Cortex cards live in the private cortex repo, `D:/repo/Assistant/cortex/cards/`. So the main session can never dispatch one with its Notion, Calendar or browser tools. These files also hold page ids, database names and the owner's routines, and `claudence` is public. `claudence` keeps the schema, synthetic fixtures, and the 7 main-session and Foreman cards, which carry no private data.
+- **The card id is the run's identity.** Each cortexd job names its card, and `-Agent` carries the card id. Everything keyed by agent today resolves through that one card: the grant (`compileGrant`), the Notion, memory and browser scope hooks, the memory folder, the lock, the budget, the lane and the ledger (`D:/repo/Assistant/cortex/core/cortexd.js:33`, `D:/repo/Assistant/cortex/bin/notion-scope-hook.js:27`). A grant must stay inside its persona's ceiling. A card holding `notion.read` or `notion.write` with no allowlist is refused, because a null allowlist allows every database today (`D:/repo/Assistant/cortex/core/capabilities.js:84`).
 - A **card** is one agent: its persona at a version, its skills, its grant, its loop and states, its output schema, its checks and its eval. A grant only narrows the persona's tool ceiling, and it belongs to the card, not the persona. So the Cortex researcher (web reader, no Bash) and deal-scout (Wishlist-only Notion) share the web-scout persona but never each other's grants.
 - **Skills** hold procedure, one responsibility each. Reviewer modes and ADR mode become skills.
 
@@ -94,7 +95,7 @@ Owner, 2026-11-07: "consolidating the orchestration, including turning the agent
 ```mermaid
 stateDiagram-v2
   [*] --> Resolved: launcher reads the card, its persona at a version, and its skills
-  Resolved --> Refused: unknown persona version, or a missing skill
+  Resolved --> Refused: unknown persona version, missing skill, grant outside ceiling, or Notion without allowlist
   Resolved --> Running: one skills file, tools = persona ceiling narrowed by the grant
   Running --> Checked: output matches the card's output schema
   Running --> Incomplete: no output, or it fails the schema
@@ -103,20 +104,21 @@ stateDiagram-v2
   Refused --> [*]: named failure, no run
 ```
 
-Failure classes: `persona-version-unknown` (Weaver's own, `agent-platform.md:83`), `card:skill-missing`, `card:output-invalid`.
+Failure classes: `persona-version-unknown` (Weaver's own, `agent-platform.md:83`), `card:skill-missing`, `card:output-invalid`, `card:grant-outside-ceiling`, `card:notion-allowlist-missing`.
 
 ## Behaviour
 
-Each repo tests its own launcher against the shared fixtures in `C:/Users/Michael/.claude/contracts/fixtures/agent-card.v1/`. No test reads another repo's code.
+Each repo tests its own launcher against the shared, synthetic fixtures in `C:/Users/Michael/.claude/contracts/fixtures/agent-card.v1/` (no real ids). No test reads another repo's code.
 
 | AC | Traces | Given / when | Pass when | Fail when | Test |
 |---|---|---|---|---|---|
-| AC-1 | Model | the card lint over `agents/`, `cards/personas/` and `cards/` | 7 personas, each with a `version`; 11 cards, each valid against `agent-card.v1` with no empty cell; every skill named by at least one card | a persona without a version, a card missing a cell, or an orphan skill | `C:/Users/Michael/.claude/tests/test_agent_cards.py` |
+| AC-1 | Model | the card lint over `C:/Users/Michael/.claude/agents/`, `C:/Users/Michael/.claude/cards/` and `D:/repo/Assistant/cortex/cards/` | 7 personas, each with a `version`; 11 cards, each valid against `agent-card.v1` with no empty cell; every skill named by at least one card | a persona without a version, a card missing a cell, or an orphan skill | `C:/Users/Michael/.claude/tests/test_agent_cards.py` |
 | AC-2 | Why | Foreman and cortexd each launch a fixture card | the prompt is the persona file plus the card's skills file; no launcher-owned role text | the launcher adds its own role text | Foreman `test/agent-card.test.js`; Cortex `test/agent-card.test.js` |
 | AC-3 | States | a fixture card naming an unknown persona version, or a missing skill | refused with `persona-version-unknown` or `card:skill-missing` before any run | a run starts | same two launcher tests |
 | AC-4 | Why | a Foreman run with no mode named | runs design, spec, implement, refactor and QA, with design review only when the spec has a risk flag; the QA stage runs the core use cases; a QA block goes back to implement once, then to the owner | runs build-only, skips QA, skips design review on a flagged spec or runs it on an unflagged one, or parks a QA block without sending it back to implement once | Foreman `test/core/dispatch-modes.test.js`, one fixture per case |
 | AC-5 | Model | the harness lint | names any skill pair with the same responsibility, and any playbook holding a rule no skill or check holds | either passes | `C:/Users/Michael/.claude/tests/test_agent_cards.py` |
-| AC-6 | Model | the deal-scout and Cortex researcher fixture cards | each run's `--tools` and Notion allowlist equal its own card's grant | either run gets a tool or database from the other card | Cortex `test/agent-card.test.js` |
+| AC-6 | Model | the deal-scout and Cortex researcher fixture cards, run through the real Notion hook command from the generated settings | each run's `--tools` and Notion allowlist equal its own card's grant; a deal-scout `notion-create-pages` into a non-Wishlist database is denied; a Notion card with no allowlist, or a grant outside the persona's ceiling, is refused before the run | either run gets a tool or database from the other card, or a run starts unchecked | Cortex `test/agent-card.test.js` |
+| AC-11 | Model | the `claudence` repo | no tracked file holds a Notion page or database id, a Cortex persona or a Cortex card; the lint fails if one is staged | one is tracked; or the lint flags a sha256 hash or a test UUID (negative fixtures) | `C:/Users/Michael/.claude/tests/test_agent_cards.py` |
 | AC-10 | Model | every persona file in `agents/` after the fold | each has only tools from the main-session set (`Read, Grep, Glob, Bash, Edit, Write, WebSearch, WebFetch, Agent`), and web-scout, chief-of-staff and harness-steward are not in `agents/` | a persona there has a Notion, Calendar or browser tool | `C:/Users/Michael/.claude/tests/test_agent_cards.py` |
 | AC-7 | Why | the chief-of-staff run on a fixture Dashboard | Dashboard reconcile and wishlist move run as code before the model starts; the prompt has no stage 0 or 0b | either stage is still prompt text | Cortex `test/reconcile.test.js` |
 | AC-8 | Why | the harness lint | no file outside `_Archive` references `workflows/cycle.js` or `Factory/factory` as a loop driver | a live reference remains | `C:/Users/Michael/.claude/tests/test_agent_cards.py` |
@@ -130,7 +132,7 @@ Today is Sat 2026-11-07. Scheduled Cortex runs keep their current files until M4
 - **M1, by 2026-11-10:** prove the mechanism. A Foreman run's transcript contains the attached skill text (issue #104 carries `context-index`, D-SK-2). Reviewer modes and ADR mode become skills. Harness only; no Cortex file changes.
 - **M2, by 2026-11-14:** the `agent-card.v1` schema, fixtures and card lint (AC-1, AC-5). Personas get a `version`. The designer, implementer and reviewer cards are migrated.
 - **M3, by 2026-11-21:** the Foreman cards (build, spec, review). Foreman reads cards (AC-2, AC-3, AC-9 on Foreman). Playbooks become pointers.
-- **M4, by 2026-11-28:** the Cortex cards. cortexd reads cards (AC-2, AC-3, AC-9 on Cortex). The Cortex researcher and deal-scout move onto web-scout with their own grants (AC-6, AC-10). Stages 0 and 0b become code (AC-7).
+- **M4, by 2026-11-28:** the Cortex cards. cortexd reads cards (AC-2, AC-3, AC-9 on Cortex). The Cortex researcher and deal-scout move onto web-scout with their own grants, and every per-agent key moves to the card id (AC-6, AC-10, AC-11). Skills holding Notion ids (`playbooks/notion.md`, `skills/tiktok-sync`, `skills/wish-research`) move to the private repo before AC-11 lands. The `routine.read` grant names the exact card file, never a wider path (`D:/repo/Assistant/cortex/config/capabilities.json:141`). Stages 0 and 0b become code (AC-7).
 - **M5, by 2026-12-05 (review date):**
   - Foreman's default becomes the five stages (AC-4). `cycle.js` and `Factory/factory` are retired (AC-8).
   - The first creative eval runs, and spec loops get spend caps.
@@ -151,7 +153,7 @@ Stop if the first 3 card-built runs merge worse work than the 3 before them, or 
 | duplicate or replay | L1 | Launch is idempotent; reading a file twice changes nothing | - |
 | arrival channel | L3 | Main session, Foreman and cortexd read the same cards | AC-2 |
 | performance or cost | L2 | Fewer, shorter prompts; measured at M5 | - |
-| security | L3 | A card's grant narrows its persona's tools; no grant crosses cards | AC-6 |
+| security | L3 | The card id keys every hook; a grant stays inside its ceiling; no grant crosses cards; private cards stay in the private repo | AC-6, AC-11 |
 | data and compatibility | L3 | Run output is checked against the card's schema | AC-9 |
 | operability | L3 | Duplicate skills, stale playbooks and dead loop drivers are named by the lint | AC-5, AC-8 |
 
