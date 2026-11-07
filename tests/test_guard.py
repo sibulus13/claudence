@@ -95,6 +95,27 @@ def test_subagent_can_read_governance_through_shell() -> None:
                agent_id="sub-1") is None
 
 
+# guard-write-target/AC-1
+@pytest.mark.parametrize("cmd", [
+    "sed -n 1,5p C:/Users/M/.claude/agents/README.md 2>/dev/null",
+    "cat D:/repo/Lib/meter/CLAUDE.md 2>&1 | head -5",
+    "grep -n x C:/Users/M/.claude/rules/shell.md > C:/tmp/out.txt",
+])
+def test_subagent_read_of_governance_is_not_a_write(cmd: str) -> None:
+    assert run("Bash", {"command": cmd}, agent_id="sub-1") is None
+
+
+# guard-write-target/AC-2, guard-write-target/MNC-1
+@pytest.mark.parametrize("cmd", [
+    "echo x > C:/Users/M/.claude/rules/shell.md",
+    "echo x >> \"D:/repo/Lib/meter/CLAUDE.md\"",
+    "cd C:/Users/M/.claude/hooks; echo x > guard.py",
+    "cat a.md 2>/dev/null > C:/Users/M/.claude/agents/README.md",
+])
+def test_subagent_redirect_into_governance_is_denied(cmd: str) -> None:
+    assert run("Bash", {"command": cmd}, agent_id="sub-1") == "deny"
+
+
 # notion-prompt-removal/AC-1, notion-prompt-removal/MNC-1
 def test_notion_writes_never_prompt() -> None:
     for name in ("update-page", "create-view", "delete-pages", "move-pages"):

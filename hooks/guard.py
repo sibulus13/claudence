@@ -27,11 +27,28 @@ GOVERNANCE = re.compile(r"(/|\\)(CLAUDE\.md|AGENTS\.md)$|(/|\\)memory(/|\\)|(/|\
 # The same governance paths anywhere inside a shell command, and a command that writes (redirect, in-place edit,
 # move/copy/delete, an interpreter one-liner): together they are a subagent editing governance through the shell.
 GOVERNANCE_IN_SHELL = re.compile(r"(/|\\)(CLAUDE|AGENTS)\.md\b|(/|\\)memory(/|\\)|\.claude(/|\\)settings[^/\\\s]*\.json|"
-                                 r"\.claude(/|\\)(agents|hooks|rules|output-styles)(/|\\)", re.I)
-SHELL_WRITE = re.compile(r"(?<![<>=!])>{1,2}(?!&)|\bsed\s+-i|\b(mv|cp|rm|rmdir|tee|touch|truncate)\b|"
+                                 r"\.claude(/|\\)(agents|hooks|rules|output-styles)\b", re.I)
+SHELL_WRITE = re.compile(r"\bsed\s+-i|\b(mv|cp|rm|rmdir|tee|touch|truncate)\b|"
                          r"\b(Set-Content|Add-Content|Out-File|Remove-Item|Move-Item|Copy-Item|New-Item)\b|"
                          r"\b(python|node|perl|ruby)\b[^|;&]*\s-[ce]\b|\.write_text\(|writeFileSync|open\([^)]*['\"][wa]",
                          re.I)
+# A redirect is judged by its target: null and stream merges write nothing, and only a governance or relative target
+# (relative after a `cd`) can reach governance. Work item: docs/work/guard-write-target/.
+NULL_REDIRECT = re.compile(r"\d?>{1,2}\s*(/dev/null|\$null|NUL)\b|\d?>&\d", re.I)
+REDIRECT_TARGET = re.compile(r"(?<![<>=!])>{1,2}\s*(\"[^\"]+\"|'[^']+'|[^\s;|&]+)")
+ABSOLUTE_PATH = re.compile(r"^[\"']?(?:[A-Za-z]:[\\/]|/|~|\$)")
+
+
+def writes_governance(raw: str) -> bool:
+    """A shell command that could change a governance file."""
+    if not GOVERNANCE_IN_SHELL.search(raw):
+        return False
+    text = NULL_REDIRECT.sub(" ", raw)
+    if SHELL_WRITE.search(text):
+        return True
+    return any(GOVERNANCE_IN_SHELL.search(t) or not ABSOLUTE_PATH.match(t) for t in REDIRECT_TARGET.findall(text))
+
+
 LONG_RUNNERS = re.compile(r"\b(pnpm|npm|yarn)\s+(run\s+)?(build|test)\b|\bnext\s+build\b|\bplaywright\s+test\b|"
                           r"\bvitest\b(?!\s+\S*\.(test|spec)\.)|\bpytest\b|\bnpm\s+test\b")
 PYTEST_TARGET = re.compile(r"\.py\b|::|/|\\")
@@ -326,7 +343,7 @@ def check_shell(event: dict) -> dict | None:
     ti = event.get("tool_input") or {}
     # Quoted text (commit messages, echo strings) is data, not flags: match rules against the rest only.
     raw = ti.get("command") or ""
-    if event.get("agent_id") and GOVERNANCE_IN_SHELL.search(raw) and SHELL_WRITE.search(raw):
+    if event.get("agent_id") and writes_governance(raw):
         return decide("deny", "Subagents never edit governance (CLAUDE.md, memory, settings, agents, hooks, rules), "
                               "including through the shell: return the proposed change to the parent session.")
     cmd = QUOTED.sub("''", HEREDOC.sub("<<HEREDOC", raw))
