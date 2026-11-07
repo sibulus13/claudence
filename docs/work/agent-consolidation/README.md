@@ -85,7 +85,7 @@ Owner, 2026-11-07: "consolidating the orchestration, including turning the agent
 | Grants | Cortex grant lives in the persona file | per card, narrowing the persona's tools | AC-6 |
 | Procedures | 12 playbooks; 27,383 words of `dark-factory` docs; overlapping skills | one skill per responsibility; a playbook is at most a pointer | AC-5 |
 | Deterministic steps | Cortex Dashboard reconcile and wishlist move run as prompt stages 0 and 0b | plain code in cortexd | AC-7 |
-| Loop drivers | 3: `cycle.js` (suspended), Foreman's chain, `Factory/factory` | 1: Foreman's chain; default design, review, implement, review (D-RF-4) | AC-4, AC-8 |
+| Loop drivers | 3: `cycle.js` (suspended), Foreman's chain, `Factory/factory` | 1: Foreman's chain; default design, review, implement, review (D-RF-4). Pending owner go: the five-stage flow, `D:/repo/docs/reports/2026-11-07-lean-delivery-proposal.md` "Proposed stage flow", replaces it and AC-4 | AC-4, AC-8 |
 | Run ends early | prompt text; 3 of 71 Cortex runs wrote no report | the launcher checks the output against the card's schema after every run | AC-9 |
 | Hung run | wall-clock kill at 45 or 60 min | `heartbeat-stale` at 10 min | Weaver |
 
