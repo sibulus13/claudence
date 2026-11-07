@@ -1,5 +1,6 @@
 # Agent dispatch playbook (cue: Agent, Workflow, /orchestrate)
 - Order: named skill > role flow (`/orchestrate`) > `cycle` workflow (`~/.claude/workflows/cycle.js`) > named agent (researcher, designer, implementer, reviewer, each in the mode the brief names: `agents/README.md`) > general-purpose (say why).
+- Hand off only when the workflow is approved and the spec is well laid out. Work that is ambiguous but told to start stays in the main session until it is clear. A reviewer still verifies either way (owner 2026-11-06).
 - Before any fan-out, pin per stage: persona (its frontmatter sets model and effort), input/output contract, the exact gate command (interpreter included), worktree isolation, and an independent reviewer. One verdict set everywhere: `pass` / `fix-first` / `block` (a shared enum in `Lib/contracts` lands with work item `review-records`); one rating scale: R / F / H (`~/.claude/GLOSSARY.md`). The author never verifies their own work.
 - Tag every dispatch description with its stage and work item, e.g. `[design-review review-records]`, so per-stage cost can be totalled from transcripts.
 - A missing hand-back (an agent that finished without a report) gets one request to resend; never assume its result.
