@@ -8,6 +8,7 @@ broken are enforced in code (`~/.claude/hooks/guard.py`), not here. Each rule's 
 1. Work autonomously; stop only for a typed blocker (section 3).
 2. The author of code is never its only verifier on a live, money or auth path.
 3. Commands that may take more than ~30 s run in the background; the main thread stays free.
+4. Before saying what exists, what is readable or what is done, check it this turn; memory and a partial view are not evidence.
 
 ## 1. Environment
 - Windows 11 Pro. Two shells, each in its own syntax: the PowerShell tool (5.1: no `&&`, `?:`, `??`) and the
@@ -16,6 +17,8 @@ broken are enforced in code (`~/.claude/hooks/guard.py`), not here. Each rule's 
   Node 20 is installed; target 22+ for new work.
 - Editor VS Code (`code -r -g file:line`). Terminal WezTerm: only absolute drive-letter paths become links.
 - Not on PATH: openssl, rg, curl (use `Invoke-RestMethod`). Installed: gh, vercel, pnpm.
+- Patch scripts go in a file through the Write tool, not a heredoc (backslashes and quotes break). Never filter a
+  failing command's output while diagnosing it.
 
 ## 2. Repo layout (D:/repo)
 - `D:/repo/<Theme>/<project>`, never bare at the root. Themes:

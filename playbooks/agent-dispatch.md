@@ -3,6 +3,8 @@
 - Hand off only when the workflow is approved and the spec is well laid out. Work that is ambiguous but told to start stays in the main session until it is clear. A reviewer still verifies either way (owner 2026-11-06).
 - A hand-off is a unit, not one agent: research and implementation each get an independent reviewer, and the unit ends in one named ending (`done`, `needs-guidance`, `needs-approval`, `blocked`, `exhausted`, `dropped`). Until `docs/work/workflow-units` is built, run it by hand: at most 2 fix rounds, then a verify review.
 - Every unit closes with a docs step: the author updates what the work made stale, and the reviewer checks it (owner 2026-11-06).
+- Before giving an agent a new rule, check it against the rules it touches; a conflict found in review costs a round.
+- Set a work item's risk flags at draft, before any build; the builder never decides its own tier.
 - Before any fan-out, pin per stage: persona (its frontmatter sets model and effort), input/output contract, the exact gate command (interpreter included), worktree isolation, and an independent reviewer. One verdict set everywhere: `pass` / `fix-first` / `block` (a shared enum in `Lib/contracts` lands with work item `review-records`); one rating scale: R / F / H (`~/.claude/GLOSSARY.md`). The author never verifies their own work.
 - Tag every dispatch description with its stage and work item, e.g. `[design-review review-records]`, so per-stage cost can be totalled from transcripts.
 - A missing hand-back (an agent that finished without a report) gets one request to resend; never assume its result.
