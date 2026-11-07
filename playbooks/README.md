@@ -20,6 +20,7 @@ flowchart TD
 | `notion.md` | any Notion tool | write permission, field minimization |
 | `reliability.md` | guards, monitors, "done?" | verify the effect, quality floors |
 | `first-principles.md` | designing, fixing, reviewing; a fix that keeps finding new holes | authoritative layer, root cause, convergence stop |
+| `notifications.md` | writing or changing any message sent through TeleFi | plain title, context, what to do; when not to ping; `python -m telefi check-wording` |
 | `refactor-pass.md` | a large milestone is done, or code goes public | simplify, constants, minimal tests, mutation check, fresh review |
 | `agent-dispatch.md` | Agent / Workflow | dispatch order, fan-out pre-flight, isolation |
 
