@@ -34,6 +34,8 @@ BRIEF_SOURCES = ("startup", "clear")  # resume and compact already hold the brie
 MAX_CONTEXT_CHARS = 9000  # stays under the 10,000-character limit on hook context
 MAX_BANNER_CHANGES = 6
 MAX_CHANGE_CHARS = 90
+ROADMAP_ROWS = 6  # the ranked queue's head; planned work must be seen before new work is planned
+MAX_ROADMAP_ITEM_CHARS = 160
 
 
 def repo_root(cwd: str) -> Path | None:
@@ -139,6 +141,16 @@ def latest_day(ledger: str) -> tuple[str, str] | None:
     return (m.group(1), m.group(2)) if m else None
 
 
+def roadmap_top(ledger: str) -> str:
+    """The first rows of the roadmap's ranked queue, one line each; empty when the ledger has none."""
+    queue = re.search(r"^### Ranked queue[^\n]*\n(.*?)(?=^### |\Z)", section(ledger, "Roadmap"), re.M | re.S)
+    rows = [r for r in table_rows(queue.group(1)) if len(r) >= 2][:ROADMAP_ROWS] if queue else []
+    if not rows:
+        return ""
+    lines = [f"- #{r[0]} {textwrap.shorten(r[1], MAX_ROADMAP_ITEM_CHARS, placeholder='...')}" for r in rows]
+    return "# Roadmap, top of the ranked queue (LEDGER.md): check it before planning new work\n" + "\n".join(lines) + "\n\n"
+
+
 def banner_for(hand_off: str, day: tuple[str, str] | None, path: Path) -> str:
     written = re.search(r"\(written ([\d-]+)\)", hand_off)
     out = [f"Hand-off{f', written {written.group(1)}' if written else ''} (full: {path.as_posix()})"]
@@ -177,8 +189,9 @@ def handoff(cwd: str, source: str, docs: Path | None = None) -> tuple[str, str] 
         return missing, missing
     hand_off = path.read_text(encoding="utf-8", errors="replace")
     ledger_file = docs / "LEDGER.md"
-    day = latest_day(ledger_file.read_text(encoding="utf-8", errors="replace")) if ledger_file.exists() else None
-    context = re.sub(r"```mermaid.*?```\n*", "", hand_off, flags=re.S)
+    ledger = ledger_file.read_text(encoding="utf-8", errors="replace") if ledger_file.exists() else ""
+    day = latest_day(ledger) if ledger else None
+    context = roadmap_top(ledger) + re.sub(r"```mermaid.*?```\n*", "", hand_off, flags=re.S)
     if day:
         context += f"\n# Ledger, {day[0]}\n{day[1]}"
     if len(context) > MAX_CONTEXT_CHARS:
