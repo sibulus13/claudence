@@ -5,6 +5,7 @@
 - Every unit closes with a docs step: the author updates what the work made stale, and the reviewer checks it (owner 2026-11-06).
 - Before giving an agent a new rule, check it against the rules it touches; a conflict found in review costs a round.
 - Set a work item's risk flags at draft, before any build; the builder never decides its own tier.
+- Estimate a run from a small sample before starting it. Over 30 minutes, or crossing the owner's 22:00 sleep window, it must be resumable from saved results, and it moves to a detached worker once one exists: the agent ends and a fresh one picks up the result (`$FLEET_DOCS/SAFE_RESUME_POLICY.md`).
 - Before any fan-out, pin per stage: persona (its frontmatter sets model and effort), input/output contract, the exact gate command (interpreter included), worktree isolation, and an independent reviewer. One verdict set everywhere: `pass` / `fix-first` / `block` (a shared enum in `Lib/contracts` lands with work item `review-records`); one rating scale: R / F / H (`~/.claude/GLOSSARY.md`). The author never verifies their own work.
 - Tag every dispatch description with its stage and work item, e.g. `[design-review review-records]`, so per-stage cost can be totalled from transcripts.
 - A missing hand-back (an agent that finished without a report) gets one request to resend; never assume its result.
