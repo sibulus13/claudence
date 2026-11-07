@@ -96,7 +96,7 @@ def lines_for(cwd: str, source: str, drafts_dir: Path | None = None, ledger_file
         doc = next((root / d for d in STATE_DOCS if (root / d).exists()), None)
         if doc:
             behind = commits_behind(root, doc)
-            lag = (f" ({behind} commits since it was updated: its status is old, trust the live status below)"
+            lag = (f" ({behind} commit{'' if behind == 1 else 's'} since it was updated: its status is old, trust the live status below)"
                    if behind else "")
             out.append(f"State doc: {doc.as_posix()}{lag}. Read it before changing code.")
             out.append(live_status(root))
