@@ -25,6 +25,11 @@ from ledger_draft import ledger_has_day  # noqa: E402  (one definition of "the l
 STATE_DOCS = ("docs/STATE.md", "STATE.md", "workflow_state.md", "todo.md", "context.md", "docs/KNOWLEDGE.md",
               "ROADMAP.md", "docs/ROADMAP.md")
 TIER = re.compile(r"deploymentTier:\s*`?([a-z-]+)", re.I)
+UPDATED_AT = re.compile(r"^updatedAt:\s*[\"']?([0-9][0-9T:.+Z-]+)", re.M)
+ITEM_STATUS = re.compile(r"^status:\s*([a-z-]+)", re.M)
+IN_PROGRESS = ("spec-locked", "building")
+MAX_ITEMS_NAMED = 5
+GIT_TIMEOUT_S = 10
 BRIEF_SOURCES = ("startup", "clear")  # resume and compact already hold the brief
 MAX_CONTEXT_CHARS = 9000  # stays under the 10,000-character limit on hook context
 MAX_BANNER_CHANGES = 6
@@ -36,10 +41,34 @@ def repo_root(cwd: str) -> Path | None:
     return Path(r.stdout.strip()) if r.returncode == 0 else None
 
 
-def last_commit_epoch(root: Path) -> int:
-    r = subprocess.run(["git", "-C", str(root), "log", "-1", "--format=%ct"], capture_output=True, text=True,
-                       timeout=10)
-    return int(r.stdout.strip() or 0)
+def git_out(root: Path, *args: str) -> str:
+    """One bounded git read; a failure is an empty answer, never a crash at session start."""
+    try:
+        r = subprocess.run(["git", "-C", str(root), *args], capture_output=True, text=True, timeout=GIT_TIMEOUT_S)
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+    return r.stdout.strip() if r.returncode == 0 else ""
+
+
+def commits_behind(root: Path, doc: Path) -> int:
+    """Commits since the doc's own `updatedAt`, else since the last commit that changed it. Not mtime: any edit resets that."""
+    m = UPDATED_AT.search(doc.read_text(encoding="utf-8", errors="replace")[:4000])
+    if m:
+        return int(git_out(root, "rev-list", "--count", f"--since={m.group(1)}", "HEAD") or 0)
+    last = git_out(root, "log", "-1", "--format=%H", "--", doc.relative_to(root).as_posix())
+    return int(git_out(root, "rev-list", "--count", f"{last}..HEAD") or 0) if last else 0
+
+
+def live_status(root: Path) -> str:
+    """Facts computed now, so they cannot go stale: the last commit, items in progress, uncommitted files."""
+    last = git_out(root, "log", "-1", "--format=%s (%cr)")
+    items = sorted(r.parent.name for r in (root / "docs" / "work").glob("*/README.md")
+                   if (m := ITEM_STATUS.search(r.read_text(encoding="utf-8", errors="replace")[:2000]))
+                   and m.group(1) in IN_PROGRESS)
+    dirty = len([line for line in git_out(root, "status", "--porcelain").splitlines() if line.strip()])
+    named = ", ".join(items[:MAX_ITEMS_NAMED]) + (f" and {len(items) - MAX_ITEMS_NAMED} more" if len(items) > MAX_ITEMS_NAMED else "")
+    return (f"Live status: last commit {last or 'none'}. In progress: {named or 'none'}. "
+            f"{dirty} uncommitted file{'' if dirty == 1 else 's'}.")
 
 
 def pending_drafts(drafts_dir: Path | None = None, ledger_file: Path | None = None) -> list[str]:
@@ -66,9 +95,11 @@ def lines_for(cwd: str, source: str, drafts_dir: Path | None = None, ledger_file
     else:
         doc = next((root / d for d in STATE_DOCS if (root / d).exists()), None)
         if doc:
-            stale = doc.stat().st_mtime < last_commit_epoch(root) - 86400
-            out.append(f"State doc: {doc.as_posix()}{' (older than the last commit by >1 day: spot-check it)' if stale else ''}. "
-                       "Read it before changing code.")
+            behind = commits_behind(root, doc)
+            lag = (f" ({behind} commits since it was updated: its status is old, trust the live status below)"
+                   if behind else "")
+            out.append(f"State doc: {doc.as_posix()}{lag}. Read it before changing code.")
+            out.append(live_status(root))
         else:
             out.append(f"No state doc in {root.as_posix()}: that is itself a finding.")
         claude_md = root / "CLAUDE.md"
