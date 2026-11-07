@@ -83,3 +83,6 @@ state/
 __pycache__/
 
 node_modules/
+
+# claude.ai synced skills: local copies, never published (agent-consolidation M0)
+skills/synced/
