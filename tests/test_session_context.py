@@ -213,3 +213,33 @@ def test_hook_output_is_the_session_start_contract(tmp_path: Path, monkeypatch, 
     assert out["hookSpecificOutput"]["hookEventName"] == "SessionStart"
     assert "Fleet session (not inside a repo)" in out["hookSpecificOutput"]["additionalContext"]
     assert "| Now | Hub on 0.4.0 |" in out["hookSpecificOutput"]["additionalContext"]
+
+
+ROADMAP = """## Roadmap (as of 2026-11-07)
+
+### Ranked queue (one list, highest first)
+| # | item | why this rank | exit condition |
+|---|---|---|---|
+""" + "".join(f"| {i} | Roadmap item {i} {'w' * 300} | why | exit |\n" for i in range(8)) + """
+### Now
+- detail
+"""
+
+
+def test_session_roadmap_AC_1_the_top_of_the_roadmap_opens_the_context_even_when_cut(tmp_path: Path):
+    """session-roadmap/AC-1"""
+    docs = fleet_docs(tmp_path)
+    (docs / "LEDGER.md").write_text(ROADMAP + LEDGER, encoding="utf-8")
+    (docs / "NEXT_SESSION.md").write_text(NEXT + "x" * sc.MAX_CONTEXT_CHARS, encoding="utf-8")
+    _, context = sc.handoff(str(tmp_path), "startup", docs)
+    head = context[:2000]
+    assert all(f"#{i} Roadmap item {i}" in head for i in range(6))
+    assert "Roadmap item 6" not in context
+    assert len(context) <= sc.MAX_CONTEXT_CHARS
+
+
+def test_session_roadmap_AC_2_no_ranked_queue_leaves_the_context_as_before(tmp_path: Path):
+    """session-roadmap/AC-2"""
+    _, context = sc.handoff(str(tmp_path), "startup", fleet_docs(tmp_path))
+    assert "Roadmap" not in context
+    assert context.startswith(NEXT[:40].split("```")[0][:20])
