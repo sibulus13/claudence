@@ -85,7 +85,7 @@ stateDiagram-v2
 
 ## Milestones
 
-- **M1, by 2026-11-10:** the persona split (AC-1). Reviewer modes and ADR mode become skills; the Cortex researcher and deal-scout fold into one persona.
+- **M1, by 2026-11-10:** the persona split (AC-1). Reviewer modes and ADR mode become skills; the Cortex researcher and deal-scout fold into one persona; the Cortex researcher's local-context notes move into `D:/repo/docs/CONTEXT_INDEX.md`.
 - **M2, by 2026-11-13:** Foreman and cortexd launch from persona files (AC-2, AC-3). Cortex stages 0 and 0b become code.
 - **M3, by 2026-11-17:** Foreman's default becomes the full chain; `cycle.js` and `Factory/factory` are retired (AC-4).
 - **M4, by 2026-11-21:** the lint (AC-5); playbooks are retired; compare against the before column.

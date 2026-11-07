@@ -8,6 +8,8 @@ version: 1.0.0
 
 Generate a minimum viable context package for a specific role and task. The output is a self-contained briefing — paste it directly into an Agent prompt.
 
+First look up the task's terms in the context index (`python C:/Users/Michael/.claude/scripts/context_index.py lookup <terms>`) and put the matching entries' paths in the briefing as "Known context".
+
 ## Usage
 
 ```
