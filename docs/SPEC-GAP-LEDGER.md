@@ -45,3 +45,4 @@
 | 2026-11-07 | Foreman pin-lf (qa) | The spec asked for an index check, but the test isolation guard blocks git against the repo, so the build checked files on disk instead, which goes red on the very CRLF write the fix allows (docs/work/pin-lf/README.md) | NEW: test-isolation-vs-repo-state | pending retro | |
 | 2026-11-07 | Foreman merge-review (qa) | The review criteria told a read-only reviewer to run the tests (docs/work/merge-review/README.md, A6) | NEW: contradictory-agent-instructions | pending retro | |
 | 2026-11-07 | Foreman merge-review (qa) | The criteria asked for a Backlog line that was then dropped on a pass (A6) | NEW: output-requested-but-not-persisted | pending retro | |
+| 2026-11-07 | Foreman merge-review (qa) | A test fixture was written from the design (plain text), not from the real reviewer output (a json envelope), so a parser passed its test and failed on every live run (A7) | NEW: fixture-from-design-not-real-output | pending retro | |
