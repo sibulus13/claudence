@@ -61,7 +61,7 @@ Every unit ends in exactly one, written to the work item and sent as one event.
 | `needs-guidance` | Intent is unclear; more cycles won't help | Owner gate, with the one question |
 | `needs-approval` | Finished up to a C125 exception | Owner gate, Yes or No |
 | `blocked` | Waiting on something outside: credentials, data, another item | Names the unblock; resumes when it clears |
-| `exhausted` | Limit used without convergence | Designer decides, once; then owner gate with what was tried |
+| `exhausted` | Limit used without convergence, and the way forward is unclear | Designer decides, once; the owner only for a C125 exception. A limit reached with a known small fix is not `exhausted`: the parent decides and the unit carries on |
 | `dropped` | Evidence says stop: a study adds nothing, or an idea fails its check | Recorded with the reason; closed |
 
 Mapping to the global stop classes: `blocked` covers `credentials-no-agentic-path`, `needs-approval` covers `irreversible-approval`, `exhausted` covers `repair-budget-exhausted`, `needs-guidance` covers `hard-to-reverse-choice`.
