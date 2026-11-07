@@ -19,6 +19,16 @@ Read this before writing or changing any message sent through TeleFi. Owner's st
 - **What to do** (`next_step`, 200 characters at most): one concrete step and the recommended choice. Name a button only if it really does something.
 - **Details** (`body`, `sections`, `evidence`): collapsed, so technical text belongs here: logs, ids, paths, exit codes.
 
+## Layout of a rich message
+
+Check every layout against these before showing it to the owner; looking good on one try is not the test.
+
+- Two levels at most: the message, then one dropdown ([NN/g, progressive disclosure](https://www.nngroup.com/articles/progressive-disclosure/)).
+- Colour never alone: each dot or coloured button sits next to its word ([WCAG 2.2, 1.4.1](https://www.w3.org/WAI/WCAG22/Understanding/use-of-color.html)).
+- One emphasis code per meaning; spelled-out words, not symbol chips.
+- An item's details, options and buttons stay together inside its dropdown ([proximity](https://www.nngroup.com/articles/gestalt-proximity/)).
+- Red only for something destructive. Detail and the owner's agreed layout: `D:/repo/docs/telefi/notification-design.md` section 7.
+
 ## Plain words
 
 Say what a thing does, not what it is called. On the two glance lines, never use exit codes, error class names, file paths, code or job names, internal status labels (`gate-failed`, `dry-run`, `repair-budget-exhausted`) or a bare id as the subject.
