@@ -4,7 +4,7 @@ type: feature
 standard: 3
 tier: T1
 risk: []
-status: draft
+status: spec-locked
 touches: [harness]
 layers: {architecture: none, component: none, functional: none, data: none}
 created: "2026-11-07"
@@ -32,7 +32,9 @@ Reuse:
 - The index is by role and topic, across projects.
 - The lint pattern comes from `scripts/harness_lint.py`.
 
-## Shape
+## Goals and non-goals
+
+Goal: one place to look up where a role already lives, which the researcher keeps current. Non-goal: listing projects (REPOS.md) or docs (README.md).
 
 - Root `D:/repo/docs/CONTEXT_INDEX.md`: a table of areas, each linking its file under `D:/repo/docs/context/`.
 - An area file holds a table: `| Topic | Where | Kind | Summary | Verified |`.
