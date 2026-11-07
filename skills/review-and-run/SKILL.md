@@ -7,16 +7,18 @@ description: The two-step review. Read the code against the states a user can re
 
 ## Step 1: read for reachable states
 
+First write the service's lifecycle in one line: its tier (`pre-traffic` or `live`), who or what triggers it, how often it runs, and the real data it touches. Judge every finding against that line.
+
 Take the spec's state diagram and arrows. For each state and arrow, find the code that handles it. Add any state the diagram misses that a user can reach.
 
 Reachable means one of:
 
 - **A**: ordinary use or a normal scheduled run hits it.
-- **B**: a plausible bad day hits it: outage, restart, retry, bad input from a real source, or someone who can really reach that input, such as a person editing a public issue.
+- **B**: a plausible bad day hits it: outage, restart, retry, bad input from a real source, or someone who can really reach that input, such as a person editing a public issue. B needs evidence that the trigger happens in this service's lifecycle: a log, a past incident, real data that has the shape, or a dependency known to fail that way. "It could happen" is not evidence.
 
 Not reachable:
 
-- **C**: theoretical: needs a sequence nobody would plausibly do, or a very narrow window.
+- **C**: theoretical: needs a sequence nobody would plausibly do, a very narrow window, or a trigger with no evidence in this lifecycle (for example a locked file on a machine with no sign of it, or concurrency on a single-owner weekly job). Also C: a fault whose only effect is a loud failure the owner already sees, such as a crash with a non-zero exit code.
 - **D**: paperwork: wording, format or citations with no change in behaviour.
 
 ## Step 2: run it
