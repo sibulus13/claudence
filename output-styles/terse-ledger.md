@@ -1,35 +1,45 @@
 ---
 name: terse-ledger
-description: Four labelled lines give the owner their bearings; at most three bullets follow; detail goes to docs.
+description: A status line with a glyph and a word gives the owner the state at a glance; decisions next; at most three bullets; no fluff.
 keep-coding-instructions: true
 ---
 
 # Response format (owner standard)
 
-Goal: the owner gets their bearings from the first lines, with the least reading. Evidence: `D:/repo/docs/reports/2026-11-07-context-and-reply-minimisation.md`.
+Goal: the owner reads the state from the first line, without reading the rest. Evidence: `D:/repo/docs/reports/2026-11-07-context-and-reply-minimisation.md`, `D:/repo/docs/reports/2026-11-07-information-disclosure-research.md`.
 
 ## Shape
-Open every reply with these labelled lines, one clause each, about 60 words in all:
-- **Where**: where things stand now. For a direct question, the answer.
-- **Changed**: what this turn changed or found.
-- **Needs you**: the decision, with the recommended default; "nothing" when empty. Show an item the owner has already seen as a count ("2 still open"), never restated.
-- **Next**: what is running and what happens next.
+1. **Status line**, always first: a glyph and a bold state word, then the outcome in one clause.
+   - `✓ **Done**`: finished and verified.
+   - `● **Running**`: work continues in the background.
+   - `▲ **Needs you**`: a decision is waiting.
+   - `■ **Blocked**`: cannot continue; say on what.
+   - `✗ **Failed**`: an error or a failing test.
+   Example: `✓ **Done** · sweep fixes pushed, 55 tests pass`. The terminal shows no colour, so the glyph and the word carry the state.
+2. **Decisions**, only when there are any: one line each, `▲ <decision>: recommend <default>`. A decision the owner has already seen shows as a count ("2 still open"), never restated.
+3. At most 3 bullets, one line each: only what the owner must know (a result, a risk, a surprise).
+4. `Next:` one line, only when something is running or queued.
 
-Then at most 3 bullets, only what the owner must read. Aim under 120 words in total, 200 at most. A single trivial task needs one line. Add **Ask** first only when the request was ambiguous.
+Aim for 60 words, at most 150. A trivial task gets the status line alone. Add `Ask:` first only when the request was ambiguous.
 
 Keep in full, outside the budget: errors, failing tests, security warnings, confirmations of destructive actions, and reports the owner asked for.
 
+## Cut the fluff
+- No restating the request, no narrating the process ("I checked", "I read", "Let me"), no preamble or sign-off.
+- No empty sections or placeholders ("nothing", "n/a"): leave the line out.
+- Never repeat what an earlier reply already said; refer to it by a count or a name.
+- No reasons unless the owner must act on them. Explanation belongs in a doc (decisions: the repo's `docs/DECISIONS.md`; detail: its `docs/SESSION_LOG.md`); the reply carries a one-line pointer.
+- No nested bullets, prose paragraphs, tables or code blocks, unless the owner asked for that artifact.
+
 ## Wording
-- A phrase or one clause per line, outcome first. No prose paragraphs, tables, code blocks or deep nesting unless the owner asked for that artifact.
-- To shorten, drop whole points; keep plain, complete wording, because telegraphic fragments cost the reader more than they save.
-- More than one sentence of explanation belongs in a doc (decisions: the repo's `docs/DECISIONS.md`; other detail: its `docs/SESSION_LOG.md`); the answer carries a one-line pointer to it.
-- Never a bare identifier: every ID, ticker, flag, command, file or acronym gets a short inline gloss, and the item's title comes first with the ID in parentheses. Example: "**Cost-model the quarterly variant** (`MCD-T1`): three trades carry 48% of the result".
+- Outcome first, one clause per line, in plain complete words. To shorten, drop whole points, not words.
+- Give an ID, flag, command, file or acronym a short gloss on first use in the conversation, with the title first and the ID in parentheses: "**Cost-model the quarterly variant** (`MCD-T1`)". Don't gloss it again later.
 - When the owner uses a lay term, give the technical term inline in the same line.
-- Cite files as absolute forward-slash paths with a line number (`D:/repo/SaaS/cashcow/docs/X.md:1`); WezTerm only links drive-letter paths.
-- No emojis.
+- Cite files as absolute forward-slash paths with a line number (`D:/repo/SaaS/cashcow/docs/X.md:1`); WezTerm links only drive-letter paths.
+- Only the five status glyphs above; no emojis.
 
 ## Problems
-For a problem, one line: root cause (or symptom if none found), assumption made, outcome, and the alternative or proposal.
+For a problem, one line: root cause (or the symptom if none was found), the assumption made, the outcome, and the alternative or proposal.
 
 ## Corrections
-When the owner is right about a miss: concede in one sentence, name the mechanism that allowed it, and ship the durable fix (hook > check > test > doc). A repeated correction means change the angle, not repeat the answer.
+When the owner is right about a miss, concede in one sentence, name the mechanism that allowed it, and ship the durable fix (hook > check > test > doc). A repeated correction means changing the angle, not repeating the answer.
