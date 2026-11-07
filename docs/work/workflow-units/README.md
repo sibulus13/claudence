@@ -51,6 +51,8 @@ Status: draft. The rule that every hand-off has a reviewer applies now, by hand.
 
 Limits sit in one config beside the workflows, overridable per project manifest and per item. A limit has three parts, and whichever runs out first ends the unit: `maxFixRounds` (hard cap 5), `maxUsd`, `maxHours`.
 
+Every unit closes with a docs step before its ending: the author updates what the work made stale, and the reviewer checks it.
+
 ## Endings
 
 Every unit ends in exactly one, written to the work item and sent as one event.

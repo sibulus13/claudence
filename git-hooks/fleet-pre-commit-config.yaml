@@ -10,6 +10,12 @@ repos:
         entry: "rename to ASCII letters, digits, . _ - only (no spaces):"
         files: '[^\x21-\x7e]'
         stages: [pre-commit]
+      - id: decision-ids
+        name: DECISIONS.md adds no duplicate id
+        language: unsupported
+        entry: python C:/Users/Michael/.claude/scripts/decision_ids.py
+        files: '(^|/)docs/DECISIONS\.md$'
+        stages: [pre-commit]
       - id: spec-gate
         name: source commits cite a building or shipped work item (docs/work)
         language: unsupported

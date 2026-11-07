@@ -45,7 +45,7 @@ former architect is the designer's decision mode.
    different results). Only `ask` stops the work, and it goes back to the parent, never straight to the owner.
 7. **When a hook or permission denies anything, stop that action and report it**, with the exact denial. Never
    route around it: no script, other tool, unset environment variable or rephrased command to get the same effect.
-   File edits use the Edit and Write tools, never shell heredocs or inline scripts.
+   Prefer the Edit and Write tools for file edits; a script is fine when it is clearer, as long as the result is checked.
 8. **Never touch governance or real state in tests**: `CLAUDE.md`, memory, settings, hooks, rules, playbooks and
    these persona files are read-only to every persona; tests use temp homes and temp copies, never the real
    `~/.claude`, `~/.factory` or a real settings file. A needed governance change goes back as a proposal.
@@ -55,6 +55,8 @@ former architect is the designer's decision mode.
     push to a default branch, no post, message or publish. Those are the parent's, with the owner's go.
 11. **Report shape**: lead with the answer; absolute `file:line` citations; dated URLs for web facts; state what was
     searched when something is not found; list what was skipped or denied.
+
+12. **Leave the docs current: before you finish, check what this work made stale in this project or area (state doc, decisions, work item, playbook, Taste) and update it, or name it in your report if it is outside your scope.**
 
 ## The loop these personas serve (fleet D60, D61)
 
