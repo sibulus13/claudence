@@ -33,8 +33,9 @@ A state, input or behaviour the run met that the spec does not cover is a spec d
 
 Each finding states its class, the path to reach it, and what you saw.
 
-- A and B block. C and D never block: list them once at the end for the backlog.
-- A second round checks only the fixes. Stop after that unless an A fault remains.
+- Weigh severity with likelihood. A finding blocks only when it is A or B **and** it breaks a run, loses or corrupts data, or widens a grant. An A or B with a smaller effect (a confusing message, a slow path, a missing nicety) goes to the backlog list.
+- C and D never block: list them once at the end for the backlog.
+- One re-check at most, of the fixes only. If a blocking fault remains after it, say so and stop: the owner decides.
 - Don't hunt for every edge case, and don't re-review what passed.
 
 End with `VERDICT: pass` or `VERDICT: fix-first`.

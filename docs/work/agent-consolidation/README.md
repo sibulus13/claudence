@@ -2,7 +2,7 @@
 id: agent-consolidation
 type: feature
 standard: 3
-tier: T1
+tier: T2
 risk: [security, contract, removal]
 status: draft
 touches: [harness, foreman, cortex]
@@ -85,7 +85,7 @@ Owner, 2026-11-07: "consolidating the orchestration, including turning the agent
 | Grants | Cortex grant lives in the persona file | per card, narrowing the persona's tools | AC-6 |
 | Procedures | 12 playbooks; 27,383 words of `dark-factory` docs; overlapping skills | one skill per responsibility; a playbook is at most a pointer | AC-5 |
 | Deterministic steps | Cortex Dashboard reconcile and wishlist move run as prompt stages 0 and 0b | plain code in cortexd | AC-7 |
-| Loop drivers | 3: `cycle.js` (suspended), Foreman's chain, `Factory/factory` | 1: Foreman's chain; default design, review, implement, review (D-RF-4). Pending owner go: the five-stage flow, `D:/repo/docs/reports/2026-11-07-lean-delivery-proposal.md` "Proposed stage flow", replaces it and AC-4 | AC-4, AC-8 |
+| Loop drivers | 3: `cycle.js` (suspended), Foreman's chain, `Factory/factory` | 1: Foreman's chain, default the five stages: design, spec, implement, refactor, QA (owner go 2026-11-07, D76; `D:/repo/docs/reports/2026-11-07-lean-delivery-proposal.md` "Proposed stage flow") | AC-4, AC-8 |
 | Run ends early | prompt text; 3 of 71 Cortex runs wrote no report | the launcher checks the output against the card's schema after every run | AC-9 |
 | Hung run | wall-clock kill at 45 or 60 min | `heartbeat-stale` at 10 min | Weaver |
 
@@ -114,7 +114,7 @@ Each repo tests its own launcher against the shared fixtures in `C:/Users/Michae
 | AC-1 | Model | the card lint over `agents/`, `cards/personas/` and `cards/` | 7 personas, each with a `version`; 11 cards, each valid against `agent-card.v1` with no empty cell; every skill named by at least one card | a persona without a version, a card missing a cell, or an orphan skill | `C:/Users/Michael/.claude/tests/test_agent_cards.py` |
 | AC-2 | Why | Foreman and cortexd each launch a fixture card | the prompt is the persona file plus the card's skills file; no launcher-owned role text | the launcher adds its own role text | Foreman `test/agent-card.test.js`; Cortex `test/agent-card.test.js` |
 | AC-3 | States | a fixture card naming an unknown persona version, or a missing skill | refused with `persona-version-unknown` or `card:skill-missing` before any run | a run starts | same two launcher tests |
-| AC-4 | Why | a Foreman run with no mode named | runs design, design review, implement and code review | runs build-only | Foreman `test/dispatch-modes.test.js` |
+| AC-4 | Why | a Foreman run with no mode named | runs design, spec, implement, refactor and QA, with design review only when the spec has a risk flag; the QA stage runs the core use cases | runs build-only, or skips QA | Foreman `test/dispatch-modes.test.js` |
 | AC-5 | Model | the harness lint | names any skill pair with the same responsibility, and any playbook holding a rule no skill or check holds | either passes | `C:/Users/Michael/.claude/tests/test_agent_cards.py` |
 | AC-6 | Model | the deal-scout and Cortex researcher fixture cards | each run's `--tools` and Notion allowlist equal its own card's grant | either run gets a tool or database from the other card | Cortex `test/agent-card.test.js` |
 | AC-10 | Model | every persona file in `agents/` after the fold | each has only tools from the main-session set (`Read, Grep, Glob, Bash, Edit, Write, WebSearch, WebFetch, Agent`), and web-scout, chief-of-staff and harness-steward are not in `agents/` | a persona there has a Notion, Calendar or browser tool | `C:/Users/Michael/.claude/tests/test_agent_cards.py` |
@@ -132,7 +132,7 @@ Today is Sat 2026-11-07. Scheduled Cortex runs keep their current files until M4
 - **M3, by 2026-11-21:** the Foreman cards (build, spec, review). Foreman reads cards (AC-2, AC-3, AC-9 on Foreman). Playbooks become pointers.
 - **M4, by 2026-11-28:** the Cortex cards. cortexd reads cards (AC-2, AC-3, AC-9 on Cortex). The Cortex researcher and deal-scout move onto web-scout with their own grants (AC-6, AC-10). Stages 0 and 0b become code (AC-7).
 - **M5, by 2026-12-05 (review date):**
-  - Foreman's default becomes the full chain (AC-4). `cycle.js` and `Factory/factory` are retired (AC-8).
+  - Foreman's default becomes the five stages (AC-4). `cycle.js` and `Factory/factory` are retired (AC-8).
   - The first creative eval runs, and spec loops get spend caps.
   - Measure against the before column.
 

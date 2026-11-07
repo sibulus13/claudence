@@ -3,10 +3,10 @@
 ```mermaid
 flowchart TD
   C["change"] --> K{"bug?"}
-  K -- "yes" --> B["bugfix: red reproducer, fix, code review"]
+  K -- "yes" --> B["bugfix: red reproducer, fix, QA"]
   K -- "no" --> R{"any risk flag, or more than 5 ACs?"}
-  R -- "no" --> T1["T1: draft, build, code review"]
-  R -- "yes" --> T2["T2: probe, draft, design review, build, code review"]
+  R -- "no" --> T1["T1: design and spec, implement, refactor, QA"]
+  R -- "yes" --> T2["T2: probe, spec, design review, implement, refactor, QA"]
 ```
 
 Adopted 2026-11-02 (owner: "run a minimally designed set for v3"). Research and rationale:
@@ -31,16 +31,17 @@ The tier is computed, not chosen: a declared tier below the computed one is an e
 
 | Tier | Trigger | Stages | Agent-stage budget (expected / cap) |
 |---|---|---|---|
-| bugfix | one divergence from expected behaviour, 1-3 expected ACs | red reproducer, fix, code review | 2 / 4 |
-| bugfix, flagged | a bugfix with any risk flag | probe, design review, red reproducer, fix, code review | 3 / 5 |
-| T1 | 1-5 ACs, no risk flag | draft, red tests, build, code review | 2 / 4 |
-| T2 | 6-15 ACs, or any risk flag | probe, draft, design review, red tests, build, code review | 6 / 9 |
+| bugfix | one divergence from expected behaviour, 1-3 expected ACs | red reproducer, fix, QA | 2 / 4 |
+| bugfix, flagged | a bugfix with any risk flag | probe, design review, red reproducer, fix, QA | 3 / 5 |
+| T1 | 1-5 ACs, no risk flag | design and spec, implement (red tests first), refactor, QA | 2 / 4 |
+| T2 | 6-15 ACs, or any risk flag | probe, spec, design review, implement (red tests first), refactor, QA | 6 / 9 |
 
 - **Risk flags** (any one makes T2): `contract` (an API, schema, CLI or file format another part reads), `data`
   (migration, irreversible or user data), `security` (auth, secrets, payments, PII), `enforcement` (a gate, guard or
   hook that admits or refuses), `concurrency` (state changed by more than one actor), `removal` (a behaviour removed
   or narrowed), `live` (the repo's CLAUDE.md says `deploymentTier: live`; derived, and it also needs recorded human
   approval).
+- **Five stages** (owner 2026-11-07, D76): design, spec, implement, refactor, QA. Refactor is a behaviour-preserving second commit in the implement dispatch, so it adds no stage to the budget. QA is the `review-and-run` skill run by a fresh reviewer: it runs the core use cases live or end to end and replaces the read-only code review. Its record uses kind `code` until a `qa` kind is added (`docs/work/agent-consolidation`, M2). Flow diagram: `D:/repo/docs/reports/2026-11-07-lean-delivery-proposal.md` "Proposed stage flow".
 - **2 or more flags**: still T2, plus the security reviewer (the reviewer in security mode, `agents/reviewer.md`) in parallel.
 - **Budget**: a stage is one agent dispatch. Exhausting the cap stops the item as `repair-budget-exhausted`; it is
   never extended. Changes over 400 changed lines are code-reviewed in slices of at most 400 lines.

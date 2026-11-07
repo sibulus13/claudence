@@ -35,7 +35,8 @@ broken are enforced in code (`~/.claude/hooks/guard.py`), not here. Each rule's 
   notifications go through TeleFi, news through Augur. Fleet plans: `$FLEET_DOCS` (default `D:/repo/docs`, private repo).
 
 ## 3. Autonomy and blockers
-- Loop: next unblocked milestone -> implement with its tests -> run the gate -> commit (conventional
+- Loop: next unblocked milestone -> design -> spec -> implement with its tests -> refactor -> QA by a fresh reviewer that
+  runs the core use cases live (review-and-run) -> run the gate -> commit (conventional
   `feat:`/`fix:`/`chore:`/`docs:`/`refactor:`/`test:`) and push -> repeat. Auto-commit and push unless the repo
   says otherwise. Stage specific files. Never amend a pushed commit.
 - A large milestone (a project, service or feature finished) or code going public ends with the refactor
