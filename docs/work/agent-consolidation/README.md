@@ -41,7 +41,7 @@ One plan for roadmap item 0 (`D:/repo/docs/LEDGER.md:20`). This item merges two 
 The report's milestones are superseded by the ones below.
 
 Goals:
-- Define one versioned card schema, `agent-card.v1`, owned here.
+- Define one versioned card schema, `agent-card.v1`, owned here, as an extension of the Claude Code agent file: the base fields (prompt body, `tools`, `disallowedTools`, `permissionMode`, `mcpServers`, `hooks`, `model`, `effort`, `skills`) are Claude Code's own, the same as the Agent SDK `AgentDefinition`; `agent-card.v1` adds only `version`, output schema, checks and eval in the same frontmatter, which Claude Code ignores (re-check 2026-11-08, `D:/repo/docs/reports/2026-11-08-lifecycle-and-agent-defs-standard.md`, Q2).
 - Build every agent from it: in the main session, Foreman and cortexd.
 - Make a check of every rule that is prose today.
 
