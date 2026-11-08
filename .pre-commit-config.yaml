@@ -1,5 +1,5 @@
-# Fleet git hooks (work item: ~/.claude/docs/work/spec-gate/). Copied into each repo as .pre-commit-config.yaml by
-# ~/.claude/scripts/install_fleet_hooks.py; `pre-commit install` then wires both stages.
+# claudence's own git hooks (work items: ~/.claude/docs/work/spec-gate/, docs/work/pii-scan/). The fleet installer
+# (~/.claude/scripts/install_fleet_hooks.py) copies git-hooks/fleet-pre-commit-config.yaml, not this file.
 default_install_hook_types: [pre-commit, commit-msg]
 repos:
   - repo: local
@@ -21,7 +21,13 @@ repos:
         language: unsupported
         entry: python C:/Users/Michael/.claude/scripts/pii_scan.py
         types: [text]
+        exclude: ^docs/work/pii-scan/(reviews|evidence)/  # its own reviews quote the fake test fixtures
         stages: [pre-commit]
+      - id: pii-scan-msg
+        name: public repos add no personal data to the commit message or author
+        language: unsupported
+        entry: python C:/Users/Michael/.claude/scripts/pii_scan.py --commit-msg
+        stages: [commit-msg]
       - id: spec-gate
         name: source commits cite a building or shipped work item (docs/work)
         language: unsupported
