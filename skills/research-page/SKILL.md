@@ -30,7 +30,9 @@ session doing research. Answer the questions on one page and stop when they are 
 4. **Gap.** Compare the two, row by row. A difference is only a gap if it costs something real.
 5. **Do.** The top 3 changes, ranked by how much it hurts today, with evidence from our own records. Name what to ignore.
 6. **Propose adoption.** Every off-the-shelf component that fits becomes a row in `D:/repo/docs/TECH_RADAR.md` with
-   ring `proposed` (or a move between rings), its evidence and the next step. Adopting what is widespread and
+   ring `proposed` (or a move between rings), its evidence and the next step. **A proposal names the alternatives it
+   beat:** at least 3 other options for the same component, each with its adoption health, or a statement that fewer
+   exist (owner 2026-11-08: agent-orchestrator was proposed with no alternatives compared). Adopting what is widespread and
    reliable beats building; building needs a stated reason.
 7. **Persist.** Write the page to `D:/repo/docs/reports/<yyyy-mm-dd>-<slug>.md` (a project-only study goes in that
    repo's `docs/research/`), add one row under its category in `D:/repo/docs/context/research.md`, and add or re-date
