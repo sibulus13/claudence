@@ -19,6 +19,14 @@ session doing research. Answer the questions on one page and stop when they are 
 3. **Standard.** Current practice, primary sources first, dated. Label blogs and vendor pages as weak. Say what you
    could not confirm. Include the widely used, free, well-validated off-the-shelf options (platform, library or
    service), whatever they run on.
+   - **Community scan:** search GitHub (`gh search repos`, awesome-lists), Reddit and Hacker News for projects that
+     already do what we built or plan, and for practitioners' verdicts on each option (thread link and date).
+   - **Adoption health**, from `gh api repos/<owner>/<repo>` and its releases and contributors: stars, forks, watchers,
+     contributors, last push, last release, releases in 90 days, licence, archived. Put it in the radar row.
+   - **Default ring thresholds** (assumed 2026-11-08, revisit after 10 radar decisions): Adopt needs a push in the last
+     30 days, a release in the last 90, an OSI licence, and broad adoption (about 5k+ stars or 50+ contributors, or a
+     foundation or major vendor behind it). Trial needs active maintenance and about 1k+ stars. Anything less is
+     Assess or Borrow-idea. Below the bar on adoption is a finding the owner sees, even for something we already use.
 4. **Gap.** Compare the two, row by row. A difference is only a gap if it costs something real.
 5. **Do.** The top 3 changes, ranked by how much it hurts today, with evidence from our own records. Name what to ignore.
 6. **Propose adoption.** Every off-the-shelf component that fits becomes a row in `D:/repo/docs/TECH_RADAR.md` with
@@ -47,7 +55,7 @@ session doing research. Answer the questions on one page and stop when they are 
 Question: <one line>
 | Area | Have | Standard | Gap | Criticality |
 Do: 1, 2, 3
-Radar: | Component | Ring | Replaces or adds | Evidence | Next step |
+Radar: | Component | Ring | Replaces or adds | Health (stars / forks / watchers / contributors / last release) | Evidence | Next step |
 Ignore: ...
 Sources: ...
 ```
