@@ -52,3 +52,6 @@
 | 2026-11-08 | Foreman worktree move (qa) | A junction to shared `node_modules` lets pnpm install into the main checkout | NEW: shared-mutable-link | pending retro | Foreman worktree-root AC-5 |
 | 2026-11-08 | Catwalk live map (qa) | Catwalk matches run files by the old `.git/foreman-worktrees` path; no shared fixture between the two repos | NEW: cross-repo-path-contract | pending retro | none yet |
 | 2026-11-08 | spec-deltas (D74) | The new Build amendments header was written into the standard and skill but not into the v3 checker, which refused it | contradictory-agent-instructions | pending retro | tests/test_spec_v3.py d74 |
+| 2026-11-08 | Foreman conflict-resolver (qa) | Routing read only finished run rows; the merge-conflict state lived on unfinished consolidation re-check rows, so the motivating case never routed | split-state | pending retro | test/core/conflict-resolver.test.js AC-2 regression |
+| 2026-11-08 | Foreman conflict-resolver (qa) | The prompt asked for `git merge` and `gh pr comment`, which its permission profile denied under dontAsk | NEW: prompt-vs-permission-profile | pending retro | test/core/conflict-resolver.test.js AC-5 contract |
+| 2026-11-08 | Foreman conflict-resolver (qa) | A sweep keyed on finished rows misses issues whose finished rows retention pruned | NEW: retention-pruned state | pending retro | none yet (backlog) |
