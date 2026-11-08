@@ -35,7 +35,10 @@ Anything the pass finds that the spec did not say is a spec delta: record it wit
 7. **Consumers.** Run the test suite of every repo that imports the code.
 8. **Independent review.** A `reviewer` agent with fresh context diffs against the pre-refactor commit:
    behaviour changes, bugs, leftover complexity, weak tests. Fix blockers and majors; log the rest.
-9. **Docs.** SPEC, README, CLAUDE.md and DECISIONS match the code. Preserve each file's line endings
-   (`git ls-files --eol`; a diff of the whole file means they flipped).
+9. **Docs.** Every doc this change made stale is updated in this commit, because only this stage has both the context
+   and edit rights (D77): SPEC, DESIGN, README, CLAUDE.md, DECISIONS, the work item, the context-index row for anything
+   moved or added (`context-index` skill), and any other repo that reads a contract you changed (grep the fleet for the
+   old path, name or label). Shared roll-up docs (STATE header, PHASE-LOG) are left to the post-merge step where the repo
+   has one. Preserve each file's line endings (`git ls-files --eol`; a diff of the whole file means they flipped).
 10. **Publish gate** (only when going public): `git log -p` scanned for secrets, tokens, private paths and
    usage data; a LICENSE; a DECISIONS row for going public. Then commit `refactor:` and add a LEDGER row.

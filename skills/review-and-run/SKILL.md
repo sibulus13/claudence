@@ -29,6 +29,8 @@ If it cannot be run, say why and what that leaves unproven.
 
 A state, input or behaviour the run met that the spec does not cover is a spec delta: record it with the `spec-deltas` skill (`C:/Users/Michael/.claude/skills/spec-deltas/SKILL.md`), whether or not it blocks.
 
+Check docs too: name each doc the change left stale (a moved path, a renamed contract, a decision with no row, another repo still reading the old shape) on the `Backlog:` line. It blocks only when a stale doc would lead the next run into a breaking action, such as a contract doc that another repo builds against. You flag; the implementer or the parent updates (D77).
+
 ## Findings
 
 Each finding states its class, the path to reach it, and what you saw.
