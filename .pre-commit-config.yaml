@@ -16,6 +16,12 @@ repos:
         entry: python C:/Users/Michael/.claude/scripts/decision_ids.py
         files: '(^|/)docs/DECISIONS\.md$'
         stages: [pre-commit]
+      - id: pii-scan
+        name: public repos add no personal data (opt-in by a .pii-scan marker)
+        language: unsupported
+        entry: python C:/Users/Michael/.claude/scripts/pii_scan.py
+        types: [text]
+        stages: [pre-commit]
       - id: spec-gate
         name: source commits cite a building or shipped work item (docs/work)
         language: unsupported
