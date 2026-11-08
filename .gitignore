@@ -86,3 +86,6 @@ node_modules/
 
 # claude.ai synced skills: local copies, never published (agent-consolidation M0)
 skills/synced/
+
+# Private data the PII scan reads, never committed
+private/

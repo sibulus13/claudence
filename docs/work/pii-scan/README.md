@@ -3,7 +3,7 @@ id: pii-scan
 type: bugfix
 standard: 3
 risk: [security, enforcement]
-status: spec-locked
+status: building
 touches: [harness]
 layers: {architecture: none, component: none, functional: none, data: none}
 created: "2026-11-08"
@@ -56,3 +56,11 @@ The commit landed; the only check afterwards was a manual grep.
 ## Root cause
 
 claudence's hook config checked file names, decision ids and the spec trailer, but nothing checked content before a push to a public repo. Scope is claudence only: the fleet installer copies `git-hooks/fleet-pre-commit-config.yaml`, which does not carry this hook (rolling it out to the other public repos is backlog). Out of scope, backlog (security review 2026-11-08): a pre-push scan of each outgoing commit, the guard bypasses `git commit -n`, `-c core.hooksPath` and `SKIP=`, binary and UTF-16 files (`types: [text]`), encoded emails and split terms, and cherry-picked commits made without the hook. The author emails already published in this repo's history are an owner decision (rewriting public history). The private terms live in `~/.claude/private/pii_terms.txt`, gitignored, because the terms themselves are personal data.
+
+## Build amendments
+
+| Stage | Change or discovery | Why (what exposed it) | Test |
+|---|---|---|---|
+| implement | The commit-msg scan reads only the message git keeps: comment lines and the `commit -v` diff below the scissors line are dropped | Final verify review: removing an old address with `commit -v` could be refused | `tests/test_pii_scan.py::test_the_diff_that_commit_v_appends_is_not_scanned` |
+| implement | Tests pin the committer identity on its own and the Spotify mask | Final verify review: two mutants survived | `tests/test_pii_scan.py::test_a_commit_message_or_author_with_personal_data_is_refused` |
+| implement | The item's own `reviews/` and `evidence/` are excluded from the file scan | Its review records quote the fake test fixtures and were refused | `tests/test_pii_scan.py::test_a_repo_without_the_marker_is_not_scanned` |
