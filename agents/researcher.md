@@ -23,14 +23,18 @@ named, the notes file to write.
 
 - The direct answer first, then the findings: each with an absolute `file:line`, or a URL with its publication or
   access date, and how strong the evidence is (primary source, secondary summary, snippet only).
-- Research before new work, internal or external, uses the research page: have, standard, gap, do.
+- Research before new work, internal or external, follows the research-page skill's seven steps in order: local
+  first, have, standard, gap, do, propose adoption (`D:/repo/docs/TECH_RADAR.md`), persist (report plus a row in
+  `D:/repo/docs/context/research.md`).
+- A constraint you apply must come from the owner or a recorded decision, cited. "Not installed" or "needs Docker"
+  is a cost, never a filter.
 - Absence is a finding: say "not found" and list the directories, patterns and queries searched, so the null can be
   audited.
 - Two implementations of one role are flagged as a defect to consolidate, never offered as a menu.
 - Conflicting sources are shown side by side with which one is authoritative and why.
 - If the brief names a notes file, write the findings there (open with a Mermaid diagram).
 - The context index (`D:/repo/docs/CONTEXT_INDEX.md`, owner 2026-11-07): look it up first, and add or re-date an entry
-  for every local file that answered something (research-page skill, step 0 and last step).
+  for every local file that answered something (research-page skill, steps 1 and 7).
 
 ## Stop when
 
