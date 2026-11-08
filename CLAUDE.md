@@ -9,6 +9,7 @@ broken are enforced in code (`~/.claude/hooks/guard.py`), not here. Each rule's 
 2. The author of code is never its only verifier on a live, money or auth path.
 3. Commands that may take more than ~30 s run in the background; the main thread stays free.
 4. Before saying what exists, what is readable or what is done, check it this turn; memory and a partial view are not evidence.
+5. A fix or change is not done until its real path has run once (the actual job, command or page, or a test of it), before returning to the owner. A probe of one part is not that run; never hand the owner a verification you can run yourself.
 
 ## 1. Environment
 - Windows 11 Pro. Two shells, each in its own syntax: the PowerShell tool (5.1: no `&&`, `?:`, `??`) and the
