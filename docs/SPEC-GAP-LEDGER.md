@@ -46,3 +46,4 @@
 | 2026-11-07 | Foreman merge-review (qa) | The review criteria told a read-only reviewer to run the tests (docs/work/merge-review/README.md, A6) | NEW: contradictory-agent-instructions | pending retro | |
 | 2026-11-07 | Foreman merge-review (qa) | The criteria asked for a Backlog line that was then dropped on a pass (A6) | NEW: output-requested-but-not-persisted | pending retro | |
 | 2026-11-07 | Foreman merge-review (qa) | A test fixture was written from the design (plain text), not from the real reviewer output (a json envelope), so a parser passed its test and failed on every live run (A7) | NEW: fixture-from-design-not-real-output | pending retro | |
+| 2026-11-08 | Foreman resume-from-branch (qa) | A run resumed on an open PR's branch opened a second PR (#110 beside #109) instead of reusing it | NEW: resume-opens-duplicate-pr | pending retro | |
