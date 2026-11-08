@@ -1322,3 +1322,12 @@ def test_ac1_corpus_v2_items_judge_byte_identically_against_the_pinned_base(tmp_
     diffs = [k for k in outputs["old"] if outputs["old"][k] != outputs["new"].get(k)]
     assert not diffs, f"{len(diffs)} of {len(outputs['old'])} results differ, first: {diffs[:3]}"
     print(f"corpus: {len(readmes)} items x 18 cases = {len(outputs['old'])} results, 0 diffs")
+
+
+def test_d74_build_amendments_accept_the_stage_header(tmp_path: Path) -> None:
+    # D74 (spec-deltas): the four-column header with a Stage column is valid, and its Test cell is still required
+    header = "| Stage | Change or discovery | Why (what exposed it) | Test |\n|---|---|---|---|"
+    good = check(tmp_path, readme(extra=f"\n## Build amendments\n\n{header}\n| qa | a change | a reason | tests/test_demo.py |\n"))
+    assert not has(good, "CK-V3-DOC", "Build amendments"), show(good)
+    errors = check(tmp_path, readme(extra=f"\n## Build amendments\n\n{header}\n| qa | a change | a reason |  |\n"))
+    assert has(errors, "CK-V3-DOC", "Build amendments", "Test"), show(errors)

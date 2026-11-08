@@ -77,11 +77,11 @@ length, goal counts, Approach options, Contracts content) are review guidance, n
 | Reproduce | minimal numbered steps, or the reproducer test | bugfix |
 | Expected | the AC table, 1-3 rows (more is a spec change, not a bug) | bugfix |
 | Actual | verbatim output or error | bugfix |
-| Must not change | `\| ID \| Must not change \| Test \|`, ids `MNC-n`, at least 1 row | bugfix |
+| Must not change | `\| ID \| Must not change \|| Build amendments | `| Stage | Change or discovery | Why (what exposed it) | Test |` (D74), or the older `| Change | Why (what the test exposed) | Test |`; every Test cell filled (D37) | when present |\|`, ids `MNC-n`, at least 1 row | bugfix |
 | Root cause | facts apart from hypotheses, filled in at the fix | bugfix |
-| Build amendments | `\| Change \| Why (what the test exposed) \| Test \|`, every Test cell filled (D37) | when present |
+| Build amendments | `| Stage | Change or discovery | Why (what exposed it) | Test |` (D74), or the older `| Change | Why (what the test exposed) | Test |`; every Test cell filled (D37) | when present |\| Change \| Why (what the test exposed) \| Test \|`, every Test cell filled (D37) | when present |
 
-**AC table** (v2's, unchanged): `| AC | Traces | Given / when | Pass when | Fail when | Test |`, unique `AC-n`, at
+**AC table** (v2's, unchanged): `| AC | Traces | Given / when | Pass when | Fail when || Build amendments | `| Stage | Change or discovery | Why (what exposed it) | Test |` (D74), or the older `| Change | Why (what the test exposed) | Test |`; every Test cell filled (D37) | when present ||`, unique `AC-n`, at
 most 15. Tests cite `<id>/AC-n` and `<id>/MNC-n` verbatim (checked from `building`).
 
 ## Outcomes: how many dimensions, at what detail
@@ -179,7 +179,7 @@ owner: harness
 ## Purpose
 ## Goals and non-goals
 ## Behaviour
-| AC | Traces | Given / when | Pass when | Fail when | Test |
+| AC | Traces | Given / when | Pass when | Fail when || Build amendments | `| Stage | Change or discovery | Why (what exposed it) | Test |` (D74), or the older `| Change | Why (what the test exposed) | Test |`; every Test cell filled (D37) | when present ||
 ## Outcomes
 | Dimension | Level | Row or n/a reason | AC |
 ~~~

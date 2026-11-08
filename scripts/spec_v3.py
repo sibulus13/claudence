@@ -49,6 +49,9 @@ FEATURE_T2_SECTIONS = ["Approach", "Assumptions", "Probe"]
 BUGFIX_SECTIONS = ["Symptom", "Reproduce", "Expected", "Actual", "Must not change", "Root cause"]
 OUTCOMES_HEADER = ["Dimension", "Level", "Row or n/a reason", "AC"]
 AMENDMENTS_HEADER = ["Change", "Why (what the test exposed)", "Test"]
+# D74 (spec-deltas): the same table with the stage that found the change; either header is valid.
+AMENDMENTS_STAGE_HEADER = ["Stage", "Change or discovery", "Why (what exposed it)", "Test"]
+AMENDMENTS_HEADERS = [AMENDMENTS_HEADER, AMENDMENTS_STAGE_HEADER]
 OPEN_MARKER = re.compile(r"\[NEEDS CLARIFICATION|\bTBD\b", re.I)
 AC_ID = re.compile(r"^AC-\d+$")
 
@@ -386,12 +389,14 @@ def check_amendments(item, rep: spec_check.Report) -> None:
     if section is None:
         return
     table = section.first_table
-    if table is None or norm(table.header) != norm(AMENDMENTS_HEADER):
-        rep.err(DOC_RULE, "README.md", "`Build amendments` table header must be | " + " | ".join(AMENDMENTS_HEADER) + " |")
+    header = next((h for h in AMENDMENTS_HEADERS if table is not None and norm(table.header) == norm(h)), None)
+    if header is None:
+        rep.err(DOC_RULE, "README.md", "`Build amendments` table header must be "
+                + " or ".join("| " + " | ".join(h) + " |" for h in AMENDMENTS_HEADERS))
         return
     for n, cells in enumerate(table.rows, start=1):
-        empty = [AMENDMENTS_HEADER[i] for i in range(len(AMENDMENTS_HEADER)) if i >= len(cells) or not cells[i]]
-        if empty or len(cells) != len(AMENDMENTS_HEADER):
+        empty = [header[i] for i in range(len(header)) if i >= len(cells) or not cells[i]]
+        if empty or len(cells) != len(header):
             rep.err(DOC_RULE, "README.md", f"`Build amendments` row {n} needs every cell filled (empty: {', '.join(empty) or 'width'})")
 
 
