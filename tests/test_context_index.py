@@ -67,4 +67,3 @@ def test_context_index_AC_4_the_researcher_can_write_and_is_told_lookup_first_up
     assert "Edit" in tools and "Write" in tools
     skill = (HOME / "skills" / "research-page" / "SKILL.md").read_text(encoding="utf-8")
     assert "context_index.py lookup" in skill and "CONTEXT_INDEX.md" in skill
-    assert skill.index("context_index.py lookup") < skill.index("**Have.**")

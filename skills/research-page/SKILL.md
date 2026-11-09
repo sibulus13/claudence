@@ -35,11 +35,13 @@ session doing research. Answer the questions on one page and stop when they are 
 5. **Online.** Current practice, primary sources first, dated. Label blogs and vendor pages as weak. Say what you could not
    confirm. Include the widely used, free, well-validated off-the-shelf options (platform, library or service), whatever
    they run on.
-   - **Sources for software, automation and AI:** GitHub (`gh search repos`, awesome-lists), web search (Google or the
-     available equivalent), Reddit, Hacker News and Y Combinator (company directory, Launch YC). Pick equivalents for other
-     domains. Look for projects that already do what we built or plan, and for practitioners' verdicts (link and date).
+   - **Minimum sources for software, automation and AI, at least these:** GitHub (`gh search repos`, awesome-lists), web
+     search (Google or the available equivalent), Reddit, Hacker News and Y Combinator (company directory, Launch YC). Add
+     whatever else fits the question, such as vendor docs, papers, Product Hunt, X, Lobsters or community forums. Pick
+     equivalents for other domains. Look for projects that already do what we built or plan, and for practitioners'
+     verdicts (link and date).
    - **Coverage line:** one entry per source, `searched` or `unreachable: <why>`. An unreachable source is never reported
-     as finding nothing.
+     as finding nothing, and an unreachable minimum source goes to the owner as an open item with a route to reach it.
    - **Adoption health**, from `gh api repos/<owner>/<repo>` and its releases and contributors: stars, forks, watchers,
      contributors, last push, last release, releases in 90 days, licence, archived. Put it in the radar row.
    - **Default ring thresholds** (assumed 2026-11-08, revisit after 10 radar decisions): Adopt needs a push in the last

@@ -59,13 +59,3 @@ def test_the_shared_rules_name_the_denial_rule_and_verbatim_quotes() -> None:
     assert re.search(r"denies.{0,120}stop", shared, re.I | re.S)
     assert re.search(r"verbatim", shared, re.I)
     assert re.search(r"D63", shared)
-
-
-def test_the_research_page_runs_the_owners_study_flow_in_order() -> None:
-    # owner 2026-11-08: direction, local state, fan-out, online, gap, adopt-or-continue
-    text = (AGENTS.parent / "skills" / "research-page" / "SKILL.md").read_text(encoding="utf-8")
-    steps = ("**Direction.**", "**Local first.**", "**Have.**", "**Investigate.**", "**Online.**", "**Gap.**", "**Adopt or continue.**", "**Persist.**")
-    positions = [text.index(step) for step in steps]
-    assert positions == sorted(positions)
-    for source in ("GitHub", "Reddit", "Hacker News", "Y Combinator", "Coverage line", "`continue local`"):
-        assert source in text, source

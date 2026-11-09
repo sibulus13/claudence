@@ -24,8 +24,9 @@ Adopted 2026-10-25 (owner: "freeze only the most fundamental behaviours, so test
 rewriting every time; tests must be able to fail and test meaningfully, not always pass or test
 the wrong thing"). Sources: Google, *Software Engineering at Google* ch. 12 (test behaviours via
 public APIs, prefer state over interactions, unchanging tests); Fowler, *TestPyramid* and
-*Mocks Aren't Stubs*; Beck, red-green-refactor; mutation testing (a test that survives a deliberate
-bug is not testing that code).
+*Mocks Aren't Stubs*; Beck, red-green-refactor and Test Desiderata (behaviour-sensitive, structure-insensitive); Microsoft,
+*Best practices for writing unit tests* (minimal input, one act, no logic in tests); mutation testing (a test that survives a
+deliberate bug is not testing that code).
 
 ## 1. What to test (freeze the fundamentals only)
 - **A test freezes a contract, not a design.** Test what a caller or the owner relies on: the
@@ -48,6 +49,12 @@ bug is not testing that code).
   rename, reorder or rewording breaks a test, the test pinned implementation: loosen it.
 
 ## 2. How to assert (minimal, outcome-only)
+- **Default set per behaviour: 1 positive, 1 shape, 1 negative** (owner 2026-11-08). Positive: a normal input gives the
+  outcome. Shape: the output matches its contract, only where a consumer reads that shape. Negative: an invalid input is
+  refused with its named result. Never check every condition; an extra test must name the distinct behaviour or incident it adds.
+- **Exercise the real thing.** Searching a skill, persona or doc for words is not a behaviour test: it can't show the
+  behaviour happens and it breaks on rewording. Verify those with a real run.
+- **No logic in a test.** No loops or conditionals: use a parameterised test instead.
 - **One behaviour per test; 1-3 asserts on its outcome.** Act once, assert what it produced.
 - Assert the **field that carries the behaviour**, not the whole object (`note in comment`, not
   `deepEqual(fullEnvelope)`), unless the exact shape IS the contract (a schema, a wire format).
@@ -99,3 +106,4 @@ bug is not testing that code).
 2. What single outcome proves it?
 3. Did I see it fail when the behaviour broke?
 4. Would a behaviour-preserving refactor keep it green?
+5. Beyond 1 positive, 1 shape and 1 negative, what distinct behaviour does this test add?
