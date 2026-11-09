@@ -79,6 +79,7 @@ broken are enforced in code (`~/.claude/hooks/guard.py`), not here. Each rule's 
   state machine), never through each other's internals. Shared capabilities become standalone services with a
   standard external schema (the TeleFi pattern). Project specifics live in a per-project manifest, not in shared code.
 - Prefer an existing tool or service over building one, and tools an agent can inspect (CLI/API) over GUI-only.
+- A new product, service, platform or large feature starts with `~/.claude/playbooks/product-development.md`: POC on the core use cases before any full spec (owner 2026-11-08).
 - Schema first for any non-trivial data shape (zod or pydantic, types derived), validated at boundaries.
 - Test-driven: write the failing test before the code (red, then green, then refactor), and see each test fail once.
   Write one behaviour test per acceptance criterion, plus a regression test first when a bug happens.

@@ -23,5 +23,6 @@ flowchart TD
 | `notifications.md` | writing or changing any message sent through TeleFi | plain title, context, what to do; when not to ping; `python -m telefi check-wording` |
 | `refactor-pass.md` | a large milestone is done, or code goes public | simplify, constants, minimal tests, mutation check, fresh review |
 | `agent-dispatch.md` | Agent / Workflow | dispatch order, fan-out pre-flight, isolation |
+| `product-development.md` | a new product, service, platform or large feature, before any full spec | vision, core use cases, POC first, pre-revenue pushback |
 
 A rule is a default: a deviation carries a one-line comment saying why. Copying a legacy local pattern is not a reason. The language files that used to live here are pointer stubs now.
