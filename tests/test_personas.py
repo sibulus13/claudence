@@ -31,10 +31,10 @@ def test_the_folded_personas_live_on_as_modes() -> None:
     assert "decision mode" in designer and "Reversibility" in designer
 
 
-def test_every_persona_defaults_to_opus_at_medium_effort() -> None:
+def test_implementer_builds_on_sonnet_and_the_rest_judge_on_opus_at_medium_effort() -> None:
     for name in personas():
         fm = frontmatter(name)
-        assert fm.get("model") == "opus", name
+        assert fm.get("model") == ("sonnet" if name == "implementer" else "opus"), name
         assert fm.get("effort") == "medium", name
 
 

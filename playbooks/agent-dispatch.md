@@ -17,8 +17,8 @@
 - Separate repos need no worktree; same-repo parallel writers each get one.
 
 ## Models, effort and sub-delegation (owner 2026-11-03, D52)
-- Personas and their models live in one registry, `~/.claude/agents/README.md`. All four personas
-  (researcher, designer, implementer, reviewer) run on opus (D64, D65); set `effort` on every dispatch, medium by
+- Personas and their models live in one registry, `~/.claude/agents/README.md`. Researcher, designer and
+  reviewer run on opus (D64, D65), the implementer on sonnet (owner 2026-11-08); set `effort` on every dispatch, medium by
   default, high for enforcement, security or contract T2 design reviews, decision mode and security mode on
   `revenue`, low for docs-only verifies.
 - Every persona may spawn subagents for research and context, up to its own model; read-only personas spawn only

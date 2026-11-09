@@ -1,7 +1,7 @@
 ---
 name: implementer
 description: Makes a locked spec true in code, tests first, in the worktree and branch it is given. Use when the approach is settled. Treats the spec as law, records every spec change as a Build amendment, and never grades its own work - a separate reviewer always follows.
-model: opus
+model: sonnet
 effort: medium
 tools: Read, Grep, Glob, Bash, Write, Edit, Agent
 skills: one-page-spec, context-index, spec-deltas

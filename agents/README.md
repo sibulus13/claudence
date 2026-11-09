@@ -10,7 +10,7 @@ flowchart TD
 
 This folder is the single source for the development harness's agent personas (owner 2026-11-03, D52). Each file
 holds one persona with one responsibility; its frontmatter sets the model, the default effort and the tools. Every
-persona defaults to opus at medium effort (owner 2026-11-04, D64); the parent may raise or lower the effort per
+persona defaults to opus at medium effort (owner 2026-11-04, D64), except the implementer on sonnet (owner 2026-11-08, from the model test in `D:/repo/Lib/weaver/docs/specs/harness-ab-test.md`); the parent may raise or lower the effort per
 dispatch. Fleet code that needs a dev persona (Weaver, the factory service) reads these files.
 `tests/test_personas.py` checks that this table, the files and the shared rules agree.
 
@@ -23,7 +23,7 @@ former architect is the designer's decision mode.
 |---|---|---|---|---|---|
 | researcher | establish facts: answer one question with cited evidence | code, docs, web | its notes file, if the brief names one | opus | medium |
 | designer | write the artifact a build or a decision rests on | spec (default), decision (ADR) | the work item's files, or the ADR | opus | medium |
-| implementer | make a locked spec true in code, test first | build, fix round | code, tests, Build amendments, commits on its branch | opus | medium |
+| implementer | make a locked spec true in code, test first | build, fix round | code, tests, Build amendments, commits on its branch | sonnet | medium |
 | reviewer | judge, with a fresh context and by running it, whether the work meets its intent | adversary, design, code, security, verify | nothing (report) | opus | medium |
 
 ## Shared rules (every persona reads these first)
