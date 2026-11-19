@@ -1,7 +1,7 @@
 ---
 id: fix-sweep-long-command-line
 type: bugfix
-status: spec-locked
+status: building
 touches: [harness]
 layers:
   architecture: none
@@ -45,9 +45,14 @@ large run (the first archive of a ~300-file backup folder) could not start git a
 | AC | Traces | Given / when | Pass when | Fail when | Test |
 |---|---|---|---|---|---|
 | AC-1 | - | 400 tracked files with long names are archived (their paths together exceed 32767 characters) and `commit_moves` runs | it returns no failures and the repo is clean | it raises or leaves changes uncommitted | tests/test_context_lifecycle.py |
+| AC-2 | - | a tracked file named `café-日本.md` is archived and `commit_moves` runs (build amendment from the design review) | it returns no failures and the repo is clean | it raises an encoding error or git reports an unmatched pathspec | tests/test_context_lifecycle.py |
 
 ## Gate plan
 
 | Risk | Kind (deterministic / qualitative) | Check | Blocking / advisory |
 |---|---|---|---|
 | a large sweep cannot commit, or an ignored path gets staged | deterministic | python -m pytest tests/test_context_lifecycle.py tests/test_projects_sweep.py -q | blocking |
+
+## Build amendments
+
+- 2026-11-19, from the design review: `git_run` decodes git's output and encodes its stdin as UTF-8 (it used the cp1252 default, so a non-ASCII path failed or was silently left uncommitted). AC-2 added.

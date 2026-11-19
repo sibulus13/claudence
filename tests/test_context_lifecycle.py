@@ -200,3 +200,15 @@ def test_context_sweep_regression_2026_11_15_many_moves_fit_the_windows_command_
         p.unlink()
     assert ps.commit_moves(fleet, [{"path": str(p), "outcome": "done"} for p in gone]) == []
     assert git(fleet, "status", "--porcelain") == ""
+
+
+def test_context_sweep_build_amendment_a_non_ascii_path_is_committed(tmp_path):
+    """fix-sweep-long-command-line/AC-2 (design review 2026-11-19: git paths were read and written as cp1252)"""
+    fleet = tmp_path / "docs"
+    gone = aged(fleet / "research_notes" / "café-日本.md", 100)
+    git(fleet, "init", "-q")
+    git(fleet, "add", "-A")
+    git(fleet, "commit", "-q", "-m", "init")
+    gone.unlink()
+    assert ps.commit_moves(fleet, [{"path": str(gone), "outcome": "done"}]) == []
+    assert git(fleet, "status", "--porcelain") == ""

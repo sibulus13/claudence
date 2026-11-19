@@ -191,8 +191,15 @@ def apply(actions: list[dict], now: float | None = None) -> list[dict]:
     return actions
 
 
-def git_run(repo: Path, *args: str) -> subprocess.CompletedProcess:
-    return subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True, timeout=GIT_TIMEOUT_S)
+def git_run(repo: Path, *args: str, stdin: str | None = None) -> subprocess.CompletedProcess:
+    return subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True, encoding="utf-8",
+                          timeout=GIT_TIMEOUT_S, input=stdin)     # git's paths are UTF-8, not the cp1252 default
+
+
+def nul_list(paths: list[str]) -> str:
+    """Paths for git's stdin (`--stdin -z`, `--pathspec-from-file=- --pathspec-file-nul`): a command line holding every
+    moved path overflowed Windows' 32767-character limit (WinError 206, sweep of 2026-11-15)."""
+    return "".join(f"{p}\0" for p in paths)
 
 
 def commit_moves(fleet: Path, actions: list[dict]) -> list[str]:
@@ -203,15 +210,16 @@ def commit_moves(fleet: Path, actions: list[dict]) -> list[str]:
                       for p in (a["path"], a.get("dest")) if p and Path(p).resolve().is_relative_to(root)})
     if not touched:
         return []
-    tracked = set(git_run(fleet, "ls-files", "--", *touched).stdout.split("\n"))
-    ignored = set(git_run(fleet, "check-ignore", "--", *touched).stdout.split("\n"))
+    tracked = set(git_run(fleet, "ls-files", "-z").stdout.split("\0"))
+    ignored = set(git_run(fleet, "check-ignore", "--stdin", "-z", stdin=nul_list(touched)).stdout.split("\0"))
     paths = sorted(p for p in touched if p in tracked or (p not in ignored and (root / p).exists()))
     if not paths:
         return []
     failures = []
-    for step in (["add", "-A", "--", *paths],
-                 ["commit", "-q", "-m", f"chore: weekly context sweep moved {len(paths)} fleet doc paths", "--", *paths]):
-        r = git_run(fleet, *step)
+    from_stdin = ["--pathspec-from-file=-", "--pathspec-file-nul"]
+    for step in (["add", "-A", *from_stdin],
+                 ["commit", "-q", "-m", f"chore: weekly context sweep moved {len(paths)} fleet doc paths", *from_stdin]):
+        r = git_run(fleet, *step, stdin=nul_list(paths))
         if r.returncode != 0:
             return [f"git-{step[0]}-failed: {(r.stderr or r.stdout).strip()[:300]}"]
     if git_run(fleet, "rev-parse", "--abbrev-ref", "@{u}").returncode == 0:
