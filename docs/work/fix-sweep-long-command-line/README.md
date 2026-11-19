@@ -1,7 +1,7 @@
 ---
 id: fix-sweep-long-command-line
 type: bugfix
-status: draft
+status: spec-locked
 touches: [harness]
 layers:
   architecture: none

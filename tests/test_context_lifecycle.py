@@ -187,3 +187,16 @@ def test_context_lifecycle_AC_4_moves_are_committed_except_ignored_and_others_wo
     assert git(fleet, "status", "--porcelain").split() == ["M", "LEDGER.md"]
     assert not tracked.exists()
 
+
+
+def test_context_sweep_regression_2026_11_15_many_moves_fit_the_windows_command_line(tmp_path):
+    """fix-sweep-long-command-line/AC-1 (regression 2026-11-15: every moved path on one git command line, WinError 206)"""
+    fleet = tmp_path / "docs"
+    gone = [aged(fleet / "research_notes" / f"{i:04d}-{'a-long-research-note-name-' * 4}.md", 100) for i in range(400)]
+    git(fleet, "init", "-q")
+    git(fleet, "add", "-A")
+    git(fleet, "commit", "-q", "-m", "init")
+    for p in gone:
+        p.unlink()
+    assert ps.commit_moves(fleet, [{"path": str(p), "outcome": "done"} for p in gone]) == []
+    assert git(fleet, "status", "--porcelain") == ""
